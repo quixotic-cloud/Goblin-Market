@@ -490,6 +490,16 @@ simulated function PopUntilClass( class<UIScreen> ClassToKeep, optional bool Mus
 	PopUntil( GetScreen( ClassToKeep ), MustExist );
 }
 
+/*
+* This will preserve the Screen of the ScreenClass type (or derived from the target class type), and pop all screens above it.
+*
+* USE THIS ONLY WHEN YOU WANT TO NUKE ADDITIONAL LAYERS
+*/
+simulated function PopUntilFirstInstanceOfClass(class<UIScreen> ClassToKeep, optional bool MustExist = true)
+{
+	PopUntil(GetFirstInstanceOf(ClassToKeep), MustExist);
+}
+
 //----------------------------------------------------------------------------
 //----------------------------------------------------------------------------
 

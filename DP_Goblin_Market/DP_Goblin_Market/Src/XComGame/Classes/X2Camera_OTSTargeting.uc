@@ -35,6 +35,22 @@ function bool ShowTargetingOutlines()
 	return true;
 }
 
+function Removed()
+{
+	super.Removed();
+
+	if (TargetActor != none)
+	{
+		if (XGUnit(TargetActor) != none)
+		{
+			if (XGUnit(TargetActor).GetPawn() != none)
+			{
+				XGUnit(TargetActor).GetPawn().UpdateAuxParameters(true);
+			}
+		}
+	}
+}
+
 defaultproperties
 {
 	ShouldAlwaysShow=true

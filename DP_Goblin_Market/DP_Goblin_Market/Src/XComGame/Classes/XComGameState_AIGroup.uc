@@ -524,10 +524,15 @@ function ProcessReflexMoveActivate()
 					NewUnitState.ActionPoints.Length = 0;
 					NewUnitState.ActionPoints.AddItem(class'X2CharacterTemplateManager'.default.StandardActionPoint); //Give the AI one free action point to use.
 					NewGameState.AddStateObject(NewUnitState);
+
+					if (NewUnitState.GetMyTemplate().OnRevealEventFn != none)
+					{
+						NewUnitState.GetMyTemplate().OnRevealEventFn(NewUnitState);
+					}
 				}
 				else
 				{
-					NewGameState.PurgeGameStateForObjectID(NewUnitState.ObjectID);					
+					NewGameState.PurgeGameStateForObjectID(NewUnitState.ObjectID);
 				}
 			}
 
@@ -639,6 +644,14 @@ function OnScamperComplete()
 	local XComGameStateContext_RevealAI ScamperContext;
 	local XGAIPlayer AIPlayer;
 	local StateObjectReference Ref;
+	local XComGameStateContext_RevealAI AIRevealContext;
+	local XComGameStateContext Context;
+	local XComGameStateContext_Ability AbilityContext;
+	local Array<int> SourceObjects;
+	local bool PreventSimultaneousVisualization;
+	local XComGameStateHistory History;
+
+	History = `XCOMHISTORY;
 
 	//Find the AI player data object, and mark the reflex action state done.
 	AIPlayer = XGAIPlayer(`BATTLE.GetAIPlayer());
@@ -652,6 +665,43 @@ function OnScamperComplete()
 	ScamperContext.CausedRevealUnit_ObjectID = RevealInstigatorUnitObjectID;
 
 	`XCOMGAME.GameRuleset.SubmitGameStateContext(ScamperContext);
+
+	PreventSimultaneousVisualization = false;
+	foreach History.IterateContextsByClassType(class'XComGameStateContext', Context)
+	{
+		AIRevealContext = XComGameStateContext_RevealAI(Context);
+		if( AIRevealContext != None && AIRevealContext.RevealAIEvent == eRevealAIEvent_Begin )
+		{
+			break;
+		}
+
+		AbilityContext = XComGameStateContext_Ability(Context);
+		if( AbilityContext != None && AbilityContext.InputContext.AbilityTemplateName != 'StandardMove' )
+		{
+			if( SourceObjects.Find(AbilityContext.InputContext.SourceObject.ObjectID) != INDEX_NONE )
+			{
+				PreventSimultaneousVisualization = true;
+				break;
+			}
+
+			SourceObjects.AddItem(AbilityContext.InputContext.SourceObject.ObjectID);
+		}
+	}
+
+	if( PreventSimultaneousVisualization )
+	{
+		foreach History.IterateContextsByClassType(class'XComGameStateContext', Context)
+		{
+			AIRevealContext = XComGameStateContext_RevealAI(Context);
+			if( AIRevealContext != None && AIRevealContext.RevealAIEvent == eRevealAIEvent_Begin )
+			{
+				break;
+			}
+
+			Context.SetVisualizationStartIndex(-1);
+		}
+	}
+	
 
 	ClearScamperData();
 	AIPlayer.ClearWaitForScamper();

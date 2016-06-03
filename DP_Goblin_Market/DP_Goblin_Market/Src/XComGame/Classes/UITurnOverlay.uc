@@ -22,20 +22,24 @@ var bool m_bXComTurn;
 var bool m_bAlienTurn;
 var bool m_bOtherTurn;
 var bool m_bReflexAction;
+var bool m_bSpecialTurn;
 
 var localized string       m_sXComTurn;
 var localized string       m_sAlienTurn;
 var localized string       m_sOtherTurn;
 var localized string       m_sExaltTurn;
 var localized string       m_sReflexAction;
+var localized string       m_sSpecialTurn;
 
 var string XComTurnSoundResourcePath;
 var string AlienTurnSoundResourcePath;
+var string SpecialTurnSoundResourcePath;
 var string ReflexStartAndLoopSoundResourcePath;
 var string ReflexEndResourcePath;
 
 var AkEvent XComTurnSound;
 var AkEvent AlienTurnSound;
+var AkEvent SpecialTurnSound;
 //----------------------------------------------------------------------------
 // MEMBERS
 
@@ -48,9 +52,9 @@ simulated function OnInit()
 	Hide();
 	
 	if( WorldInfo.NetMode == NM_Standalone && `BATTLE.m_kDesc != None && `BATTLE.m_kDesc.m_iMissionType == eMission_ExaltRaid )		
-		SetDisplayText( m_sAlienTurn, m_sXComTurn, m_sExaltTurn, m_sReflexAction );
+		SetDisplayText( m_sAlienTurn, m_sXComTurn, m_sExaltTurn, m_sReflexAction, m_sSpecialTurn );
 	else
-		SetDisplayText( m_sAlienTurn, m_sXComTurn, m_sOtherTurn, m_sReflexAction );
+		SetDisplayText( m_sAlienTurn, m_sXComTurn, m_sOtherTurn, m_sReflexAction, m_sSpecialTurn );
 
 	if(`PRES.m_bUIShowMyTurnOnOverlayInit)
 	{
@@ -63,6 +67,10 @@ simulated function OnInit()
 	else if(`PRES.m_bUIShowReflexActionOnOverlayInit)
 	{
 		ShowReflexAction(); 
+	}
+	else if( `PRES.m_bUIShowSpecialTurnOnOverlayInit )
+	{
+		ShowSpecialTurn();
 	}
 
 	if(!WorldInfo.IsConsoleBuild())
@@ -83,6 +91,7 @@ simulated function OnInit()
 
 	XComTurnSound = AkEvent(DynamicLoadObject(XComTurnSoundResourcePath, class'AkEvent'));
 	AlienTurnSound = AkEvent(DynamicLoadObject(AlienTurnSoundResourcePath, class'AkEvent'));
+	SpecialTurnSound = AkEvent(DynamicLoadObject(SpecialTurnSoundResourcePath, class'AkEvent'));
 }
 
 
@@ -91,7 +100,7 @@ simulated function OnInit()
 // 		UNIQUE FUNCTIONS:
 //==============================================================================
 
-simulated function SetDisplayText(string alienText, string xcomText, string p2Text, string reflexText )
+simulated function SetDisplayText(string alienText, string xcomText, string p2Text, string reflexText, optional string specialOverlayText )
 {
 	local ASValue myValue;
 	local Array<ASValue> myArray;
@@ -108,7 +117,10 @@ simulated function SetDisplayText(string alienText, string xcomText, string p2Te
 	myArray.AddItem( myValue );
 
 	myValue.s = reflexText;
-	myArray.AddItem( myValue );
+	myArray.AddItem(myValue);
+
+	myValue.s = specialOverlayText;
+	myArray.AddItem(myValue);
 
 	Invoke("SetText", myArray);
 }
@@ -295,6 +307,27 @@ simulated function HideReflexAction()
 	m_bReflexAction = false;
 }
 //--------------------------------------
+simulated function ShowSpecialTurn()
+{
+	if( !class'XComGameState_Cheats'.static.GetVisualizedCheatsObject().DisableTurnOverlay )
+	{
+		Show();
+
+		Invoke("ShowSpecialTurn");
+		m_bSpecialTurn = true;
+
+		WorldInfo.PlayAkEvent(SpecialTurnSound);
+	}
+}
+simulated function HideSpecialTurn()
+{
+	if( !class'XComGameState_Cheats'.static.GetVisualizedCheatsObject().DisableTurnOverlay )
+	{
+		Invoke("HideSpecialTurn");
+		m_bSpecialTurn = false;
+	}
+}
+//--------------------------------------
 
 simulated function bool IsShowingAlienTurn()
 {
@@ -312,6 +345,10 @@ simulated function bool IsShowingReflexAction()
 {
 	return m_bReflexAction;
 }
+simulated function bool IsShowingSpecialTurn()
+{
+	return m_bSpecialTurn;
+}
 
 //==============================================================================
 //		DEFAULTS:
@@ -328,11 +365,13 @@ defaultproperties
 	m_bAlienTurn = false;
 	m_bOtherTurn = false;
 	m_bReflexAction = false; 
+	m_bSpecialTurn = false;
 
 	bHideOnLoseFocus = false;
 
 	XComTurnSoundResourcePath = "SoundTacticalUI.TacticalUI_XCOMTurn"
 	AlienTurnSoundResourcePath = "SoundTacticalUI.TacticalUI_AlienTurn"
+	SpecialTurnSoundResourcePath = "DLC_60_SoundTacticalUI.TacticalUI_AlienRulerTurn";
 	//ReflexStartAndLoopSoundResourcePath;
 	//ReflexEndResourcePath;
 }

@@ -161,15 +161,13 @@ simulated function CreateMPStartState()
 		//Add the start state to the history
 		History.AddGameStateToHistory(NewStartState);
 
-
-
-		//Feed from soldier selection screen eventually
-		CharacterGenerator = spawn( class 'XGCharacterGenerator' );
-	
 		CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 		`assert(CharTemplateMgr != none);
 
 		CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('Soldier');	
+		`assert(CharacterTemplate != none);
+		CharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+		`assert(CharacterGenerator != none);
 
 		for( PlayerIdx = 0; PlayerIdx < BattleData.PlayerTurnOrder.Length; ++PlayerIdx)
 		{

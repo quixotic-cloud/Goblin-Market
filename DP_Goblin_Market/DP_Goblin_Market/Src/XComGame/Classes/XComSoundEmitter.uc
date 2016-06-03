@@ -8,7 +8,7 @@
 //---------------------------------------------------------------------------------------
 
 
-class XComSoundEmitter extends Actor;
+class XComSoundEmitter extends Actor native;
 
 var float fTimeAlive;
 var int iAssociatedGameStateObjectId;

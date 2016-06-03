@@ -24,6 +24,7 @@ var config int FANFIRE_COOLDOWN;
 var config int KILLZONE_COOLDOWN;
 var config int SERIAL_COOLDOWN;
 var config int SHARPSHOOTERAIM_BONUS;
+var config int LIGHTNINGHANDS_COOLDOWN;
 var Name KillZoneReserveType;           //  Type of action point to reserve for KillZone ability.
 
 static function array<X2DataTemplate> CreateTemplates()
@@ -109,6 +110,8 @@ static function X2AbilityTemplate LongWatch()
 	ActionPointCost.iNumPoints = 2;
 	ActionPointCost.bConsumeAllPoints = true;
 	ActionPointCost.bFreeCost = true;           //  ReserveActionPoints effect will take all action points away
+	ActionPointCost.DoNotConsumeAllEffects.Length = 0;
+	ActionPointCost.DoNotConsumeAllSoldierAbilities.Length = 0;
 	Template.AbilityCosts.AddItem(ActionPointCost);
 	
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
@@ -213,6 +216,7 @@ static function X2AbilityTemplate LongWatchShot()
 	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
 	Template.AddShooterEffectExclusions(SkipExclusions);
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 	
 	SingleTarget = new class'X2AbilityTarget_Single';
 	SingleTarget.OnlyIncludeTargetsInsideWeaponRange = true;
@@ -306,6 +310,7 @@ static function X2AbilityTemplate DeadeyeAbility()
 	Template.AddTargetEffect(class'X2Ability_GrenadierAbilitySet'.static.ShredderDamageEffect());
 
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
 	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
@@ -495,6 +500,7 @@ static function X2AbilityTemplate FanFire()
 	AmmoCost.iAmmo = 1;
 	Template.AbilityCosts.AddItem(AmmoCost);
 	Template.bAllowAmmoEffects = true; // 	
+	Template.bAllowBonusWeaponEffects = true;
 
 	// Weapon Upgrade Compatibility
 	Template.bAllowFreeFireWeaponUpgrade = true;                                            // Flag that permits action to become 'free action' via 'Hair Trigger' or similar upgrade / effects
@@ -604,7 +610,7 @@ static function X2AbilityTemplate LightningHands()
 	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 4;
+	Cooldown.iNumTurns = default.LIGHTNINGHANDS_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 
 	// *** VALIDITY CHECKS *** //
@@ -627,6 +633,7 @@ static function X2AbilityTemplate LightningHands()
 	AmmoCost.iAmmo = 1;
 	Template.AbilityCosts.AddItem(AmmoCost);
 	Template.bAllowAmmoEffects = true; // 	
+	Template.bAllowBonusWeaponEffects = true;
 
 	Template.AbilityCosts.AddItem(default.FreeActionCost);
 
@@ -760,6 +767,8 @@ static function X2AbilityTemplate KillZone()
 	ActionPointCost.iNumPoints = 2;
 	ActionPointCost.bConsumeAllPoints = true;   //  this will guarantee the unit has at least 1 action point
 	ActionPointCost.bFreeCost = true;           //  ReserveActionPoints effect will take all action points away
+	ActionPointCost.DoNotConsumeAllEffects.Length = 0;
+	ActionPointCost.DoNotConsumeAllSoldierAbilities.Length = 0;
 	Template.AbilityCosts.AddItem(ActionPointCost);
 
 	Template.AbilityToHitCalc = default.DeadEye;
@@ -832,6 +841,7 @@ static function X2AbilityTemplate KillZoneShot()
 	local X2Effect_Persistent               KillZoneEffect;
 	local X2Condition_UnitEffectsWithAbilitySource  KillZoneCondition;
 	local X2Condition_Visibility            TargetVisibilityCondition;
+	local X2Condition_UnitProperty          ShooterCondition;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'KillZoneShot');
 
@@ -872,6 +882,9 @@ static function X2AbilityTemplate KillZoneShot()
 	Template.AddTargetEffect(KillZoneEffect);
 
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
+	ShooterCondition = new class'X2Condition_UnitProperty';
+	ShooterCondition.ExcludeConcealed = true;
+	Template.AbilityShooterConditions.AddItem(ShooterCondition);
 	Template.AddShooterEffectExclusions();
 
 	SingleTarget = new class'X2AbilityTarget_Single';
@@ -883,6 +896,7 @@ static function X2AbilityTemplate KillZoneShot()
 	Template.AddTargetEffect(class'X2Ability_GrenadierAbilitySet'.static.ShredderDamageEffect());
 
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	//Trigger on movement - interrupt the move
 	Trigger = new class'X2AbilityTrigger_Event';
@@ -950,6 +964,7 @@ static function X2AbilityTemplate Faceoff()
 	Template.AddMultiTargetEffect(new class'X2Effect_ApplyWeaponDamage');
 
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
 	Template.BuildVisualizationFn = Faceoff_BuildVisualization;

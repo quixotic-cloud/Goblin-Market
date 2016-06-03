@@ -11,6 +11,7 @@ var bool bUseWeaponDamageType;
 var bool bHitSourceTile;
 var bool bHitTargetTile;
 var bool bHitAdjacentDestructibles;
+var bool bAllowDestructionOfDamageCauseCover; // if the cause of the damage is a unit, allow this damage event to destroy that unit's cover (because this is normally protected against).
 
 simulated function ApplyDirectionalDamageToTarget(XComGameState_Unit SourceUnit, XComGameState_Unit TargetUnit, XComGameState NewGameState)
 {
@@ -60,7 +61,7 @@ simulated function ApplyDirectionalDamageToTarget(XComGameState_Unit SourceUnit,
 
 		if (bHitAdjacentDestructibles)
 		{
-			WorldData.GetAdjacentDestructibles(bHitSourceTile ? SourceUnit : TargetUnit, DestructData, DamageDirection);
+			WorldData.GetAdjacentDestructibles(bHitSourceTile ? SourceUnit : TargetUnit, DestructData, DamageDirection, bHitSourceTile ? TargetUnit : SourceUnit);
 			for (i = 0; i < DestructData.DestructibleActors.Length; ++i)
 			{
 				DestructActor = Actor(DestructData.DestructibleActors[i]);
@@ -85,7 +86,10 @@ simulated function ApplyDirectionalDamageToTarget(XComGameState_Unit SourceUnit,
 			}
 		}
 
-		DamageEvent.HitLocation = SourceLocation;
+		if (bHitSourceTile)
+			DamageEvent.HitLocation = SourceLocation;
+		else
+			DamageEvent.HitLocation = TargetLocation;
 		DamageEvent.Momentum = DamageDirection;
 		DamageEvent.DamageDirection = DamageDirection; //Limit environmental damage to the attack direction( ie. spare floors )
 		DamageEvent.PhysImpulse = 100;
@@ -93,6 +97,7 @@ simulated function ApplyDirectionalDamageToTarget(XComGameState_Unit SourceUnit,
 		DamageEvent.DamageCause = SourceUnit.GetReference();
 		DamageEvent.DamageSource = DamageEvent.DamageCause;
 		DamageEvent.bRadialDamage = false;
+		DamageEvent.bAllowDestructionOfDamageCauseCover = bAllowDestructionOfDamageCauseCover;
 
 		if (bHitSourceTile)
 		{

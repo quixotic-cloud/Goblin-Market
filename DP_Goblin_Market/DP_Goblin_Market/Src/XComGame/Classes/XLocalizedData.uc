@@ -182,6 +182,8 @@ var localized string DateTimeFormatString;
 // Redacted string
 var localized string Redacted;
 
+var localized string CannotBeDodged;
+
 defaultproperties
 {
 

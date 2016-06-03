@@ -36,6 +36,18 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	`XCOMGRI.DoRemoteEvent('CIN_HideArmoryStaff'); //Hide the staff in the armory so that they don't overlap with the soldiers
 }
 
+simulated function OnReceiveFocus()
+{
+	super.OnReceiveFocus();
+	Movie.Pres.Get3DMovie().HideAllDisplays();
+}
+
+simulated function OnLoseFocus()
+{
+	super.OnLoseFocus();
+	Movie.Pres.Get3DMovie().HideAllDisplays();
+}
+
 simulated function OpenCharacterPool()
 {
 	`HQPRES.UICharacterPool();

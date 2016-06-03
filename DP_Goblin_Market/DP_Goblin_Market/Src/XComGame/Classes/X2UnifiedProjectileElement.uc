@@ -38,10 +38,12 @@ var() ProjectileType                UseProjectileType<ToolTip="Indicates what ty
 var() name                          MuzzleSocketName<ToolTip="Indicates the name of the muzzle socket this projectile should come from. Defaults to 'gun_fire'">;
 var() bool							bPlayWeaponAnim<ToolTip="If TRUE, this projectile element will trigger the fire animation of its weapon to play">;
 var() float							MaxTravelDistanceParam<ToolTip="Value to cap the 'Traveled_Distance' particle param for best looking effect">;
+var() float                         MaxTravelTime<ToolTip="If non-zero, the Travel Speed will be effectively increased so that it never takes longer than this much time to reach the target.">;
 
 var(AttachedMesh) SkeletalMesh		AttachSkeletalMesh<ToolTip="Assigns a mesh to this projectile component">;
 var(AttachedMesh) AnimTree		    AttachAnimTree<ToolTip="Anim tree the skeletal mesh should use, if set">;
 var(AttachedMesh) AnimSet		    AttachAnimSet<ToolTip="Anim set for the attached skeletal mesh">;
+var(AttachedMesh) bool              CopyWeaponAppearance<ToolTip="All patterns and colors from the weapon firing the projectile will be copied onto the attached mesh.">;
 
 //ProjectileQuantitySettings   
 var(ProjectileSpreadSettings)		int ProjectileCount<ToolTip="Defaults to 1 if this value is set greater 1 then the system will fire multiple instances of this element. Eg. shotgun">;

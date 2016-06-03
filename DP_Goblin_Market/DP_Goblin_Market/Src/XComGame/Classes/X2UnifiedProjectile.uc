@@ -23,6 +23,7 @@ struct native ProjectileElementInstance
 	var float LastImpactTime;						  //The time at which we last played the impact events
 	var int VolleyIndex;                              //Indicates which volley this is part of
 	var int MultipleProjectileIndex;                  //For multiple projectile shots, indicates which projectile this element represents
+	var float AdjustedTravelSpeed;                    //Initialized to the element's TravelSpeed, but different if the element's MaxTravelTime requires it to be faster
 	
 	//These are set and updated when the projectile is fired
 	var bool bFired;                                  //Indicates whether this instance has been fired or not
@@ -101,6 +102,11 @@ var private bool bPlayedMetaHitEffect;                   //A latch for making su
 var private name OrdnanceType;
 var bool bFirstShotInVolley;							//Indicate this is the first shot in the volley
 var private bool bProjectileFired;						//Indicate that at least a shot has been fired;
+
+cpptext
+{
+	virtual void PostLoad();
+}
 
 function ConfigureNewProjectile(X2Action_Fire InFireAction, 
 								AnimNotify_FireWeaponVolley InVolleyNotify,
@@ -554,9 +560,12 @@ function FireProjectileInstance(int Index)
 	local AnimSequence FoundAnimSeq;
 	local AnimNodeSequence PlayingSequence;
 
-	local float TravelDistance;
+	local float TravelDistance, SpeedAdjustedDistance;
 	local float TimeToTravel, TrailAdjustmentTimeToTravel;
 	local bool bDebugImpactEvents;
+
+	//local ParticleSystem AxisSystem;
+	//local ParticleSystemComponent PSComponent;
 
 	ShooterState = XComGameState_Unit( `XCOMHISTORY.GetGameStateForObjectID( SourceAbility.InputContext.SourceObject.ObjectID ) );
 	AbilityState = XComGameState_Ability( `XCOMHISTORY.GetGameStateForObjectID( AbilityContextAbilityRefID ) );
@@ -685,6 +694,7 @@ function FireProjectileInstance(int Index)
 	}
 	
 	//Derive the end time from the travel distance and speed if we are not of the grenade type.
+	Projectiles[Index].AdjustedTravelSpeed = Projectiles[Index].ProjectileElement.TravelSpeed;      //  initialize to base travel speed
 	DistanceTravelled = VSize(HitLocation - SourceLocation);
 	if( Projectiles[Index].GrenadePath == none )
 	{
@@ -694,6 +704,19 @@ function FireProjectileInstance(int Index)
 		{
 			TimeToTravel = (DistanceTravelled / Projectiles[Index].ProjectileElement.TravelSpeed);
 			TrailAdjustmentTimeToTravel = (Projectiles[Index].ProjectileElement.MaximumTrailLength / Projectiles[Index].ProjectileElement.TravelSpeed);
+			
+			//  modify the adjusted travel speed as necessary based on max travel time
+			if (Projectiles[Index].ProjectileElement.MaxTravelTime > 0 && Projectiles[Index].ProjectileElement.MaxTravelTime < TimeToTravel)
+			{
+				//  account for the max distance now so that the travel speed isn't based on going off into the distance much further than it should
+				SpeedAdjustedDistance = DistanceTravelled;
+				if (Projectiles[Index].ProjectileElement.MaxTravelDistanceParam > 0)
+					SpeedAdjustedDistance = min(DistanceTravelled, Projectiles[Index].ProjectileElement.MaxTravelDistanceParam);
+				
+				TimeToTravel = Projectiles[Index].ProjectileElement.MaxTravelTime;
+				Projectiles[Index].AdjustedTravelSpeed = SpeedAdjustedDistance / TimeToTravel;
+				TrailAdjustmentTimeToTravel = (Projectiles[Index].ProjectileElement.MaximumTrailLength / Projectiles[Index].AdjustedTravelSpeed);
+			}
 		}
 		Projectiles[Index].EndTime = Projectiles[Index].StartTime + TimeToTravel;
 		if (Projectiles[Index].ProjectileElement.MaximumTrailLength > 0.0f)
@@ -748,6 +771,10 @@ function FireProjectileInstance(int Index)
 		CreateSkeletalMeshActor = Spawn(class'SkeletalMeshActorSpawnable', self, , Projectiles[Index].InitialSourceLocation, rotator(Projectiles[Index].InitialTravelDirection));
 		Projectiles[Index].TargetAttachActor = CreateSkeletalMeshActor;
 		CreateSkeletalMeshActor.SkeletalMeshComponent.SetSkeletalMesh(Projectiles[Index].ProjectileElement.AttachSkeletalMesh);
+		if (Projectiles[Index].ProjectileElement.CopyWeaponAppearance && SourceWeapon.m_kGameWeapon != none)
+		{
+			SourceWeapon.m_kGameWeapon.DecorateWeaponMesh(CreateSkeletalMeshActor.SkeletalMeshComponent);
+		}
 		CreateSkeletalMeshActor.SkeletalMeshComponent.SetAnimTreeTemplate(Projectiles[Index].ProjectileElement.AttachAnimTree);
 		CreateSkeletalMeshActor.SkeletalMeshComponent.AnimSets.AddItem(Projectiles[Index].ProjectileElement.AttachAnimSet);
 		CreateSkeletalMeshActor.SkeletalMeshComponent.UpdateAnimations();
@@ -766,6 +793,15 @@ function FireProjectileInstance(int Index)
 			tmpNode.PlayDynamicAnim(AnimParams);
 		}
 	}
+
+	// handy debugging helper, just uncomment this and the declarations at the top
+// 	AxisSystem = ParticleSystem( DynamicLoadObject( "FX_Dev_Steve_Utilities.P_Axis_Display", class'ParticleSystem' ) );
+// 	PSComponent = new(Projectiles[Index].TargetAttachActor) class'ParticleSystemComponent';
+// 	PSComponent.SetTemplate(AxisSystem);
+// 	PSComponent.SetAbsolute( false, false, false );
+// 	PSComponent.SetTickGroup( TG_EffectsUpdateWork );
+// 	PSComponent.SetActive( true );
+// 	Projectiles[Index].TargetAttachActor.AttachComponent( PSComponent );
 
 	if( Projectiles[Index].GrenadePath != none )
 	{
@@ -886,7 +922,7 @@ function FireProjectileInstance(int Index)
 		
 			if( Projectiles[Index].GrenadePath == none ) //If there is a grenade path, we move along that
 			{
-				Projectiles[Index].TargetAttachActor.Velocity = Projectiles[Index].InitialTravelDirection * Projectiles[Index].ProjectileElement.TravelSpeed;
+				Projectiles[Index].TargetAttachActor.Velocity = Projectiles[Index].InitialTravelDirection * Projectiles[Index].AdjustedTravelSpeed;
 			}			
 			break;
 		case eProjectileType_Ranged:
@@ -908,7 +944,7 @@ function FireProjectileInstance(int Index)
 					Projectiles[Index].SourceAttachActor);
 			}
 			Projectiles[Index].SourceAttachActor.Velocity = vect(0,0,0);
-			Projectiles[Index].TargetAttachActor.Velocity = Projectiles[Index].InitialTravelDirection * Projectiles[Index].ProjectileElement.TravelSpeed;
+			Projectiles[Index].TargetAttachActor.Velocity = Projectiles[Index].InitialTravelDirection * Projectiles[Index].AdjustedTravelSpeed;
 			break;
 		}
 
@@ -1019,14 +1055,14 @@ function MaybeUpdateContinuousRange(int Index)
 		{
 			Projectiles[ Index ].bWaitingToDie = false;
 			Projectiles[ Index ].StartTime = WorldInfo.TimeSeconds;
-			Projectiles[ Index ].EndTime = Projectiles[ Index ].StartTime + (DistanceDiff / Projectiles[ Index ].ProjectileElement.TravelSpeed);
+			Projectiles[ Index ].EndTime = Projectiles[ Index ].StartTime + (DistanceDiff / Projectiles[ Index ].AdjustedTravelSpeed);
 
 			Projectiles[ Index ].TargetAttachActor.SetPhysics( PHYS_Projectile );
-			Projectiles[ Index ].TargetAttachActor.Velocity = vector(Projectiles[ Index ].SourceAttachActor.Rotation) * Projectiles[ Index ].ProjectileElement.TravelSpeed;
+			Projectiles[ Index ].TargetAttachActor.Velocity = vector(Projectiles[ Index ].SourceAttachActor.Rotation) * Projectiles[ Index ].AdjustedTravelSpeed;
 		}
 		else
 		{
-			Projectiles[ Index ].EndTime = Projectiles[ Index ].StartTime + (TargetDistance / Projectiles[ Index ].ProjectileElement.TravelSpeed);
+			Projectiles[ Index ].EndTime = Projectiles[ Index ].StartTime + (TargetDistance / Projectiles[ Index ].AdjustedTravelSpeed);
 		}
 	}
 	else if (TargetDistance < TravelDistance)
@@ -1100,7 +1136,7 @@ function ProcessReturn(int Index)
 	}
 
 	Projectiles[ Index ].TargetAttachActor.SetPhysics( PHYS_Projectile );
-	Projectiles[ Index ].TargetAttachActor.Velocity = -1 * vector( Projectiles[ Index ].SourceAttachActor.Rotation ) * Projectiles[ Index ].ProjectileElement.TravelSpeed;
+	Projectiles[ Index ].TargetAttachActor.Velocity = -1 * vector( Projectiles[ Index ].SourceAttachActor.Rotation ) * Projectiles[ Index ].AdjustedTravelSpeed;
 }
 
 function MaybeUpdateTargetDistance(int Index)
@@ -1201,11 +1237,6 @@ function UpdateProjectileDistances(int Index, float fDeltaT)
 		}
 	}
 
-	if (!Projectiles[ Index ].bWaitingToDie)
-	{
-		Projectiles[ Index ].AliveTime += fDeltaT;
-	}
-
 	if (Projectiles[ Index ].ProjectileElement.UseProjectileType != eProjectileType_Traveling)
 	{
 		UpdateType = int( Projectiles[ Index ].ProjectileElement.bAttachToSource ) | (int( Projectiles[ Index ].ProjectileElement.bAttachToTarget ) << 1);
@@ -1215,7 +1246,7 @@ function UpdateProjectileDistances(int Index, float fDeltaT)
 	{
 		// no attachment
 		case 0:
-			TravelledDistance = Projectiles[ Index ].AliveTime * Projectiles[ Index ].ProjectileElement.TravelSpeed;
+			TravelledDistance = Projectiles[ Index ].AliveTime * Projectiles[ Index ].AdjustedTravelSpeed;
 
 			if (Projectiles[Index].GrenadePath != none)
 			{
@@ -1339,7 +1370,7 @@ function bool StruckTarget(int Index, float fDeltaT)
 		TargetVisualizer = XGUnit(`XCOMHISTORY.GetVisualizer(AbilityContextPrimaryTargetID));
 		if(TargetVisualizer != none || (bCosmetic && !bCosmeticShouldHitTarget))
  		{
-			DistanceTraveled = Projectiles[Index].ProjectileElement.TravelSpeed * Projectiles[Index].AliveTime;
+			DistanceTraveled = Projectiles[Index].AdjustedTravelSpeed * Projectiles[Index].AliveTime;
 			bTraveledToTarget = DistanceTraveled > Projectiles[Index].InitialTargetDistance;
 
 			ProjectileTrace(HitLocation, HitNormal, Projectiles[Index].InitialSourceLocation, Projectiles[Index].InitialTravelDirection, true, HitInfo); //This is the main place that we should check for a collision with the pawn
@@ -1360,7 +1391,7 @@ function bool StruckTarget(int Index, float fDeltaT)
  		{
 			// Acid Blob / Poison spit are projectile hits that aren't cosmetic, but only have target locations, not target actors
 			// this code blows up the projectile once it has travel to/past its destination.
- 			DistanceTraveled = Projectiles[Index].ProjectileElement.TravelSpeed * Projectiles[Index].AliveTime;
+ 			DistanceTraveled = Projectiles[Index].AdjustedTravelSpeed * Projectiles[Index].AliveTime;
 			bTraveledToTarget = DistanceTraveled > Projectiles[Index].InitialTargetDistance;
 
 			if (Projectiles[Index].ProjectileElement.bTriggerHitReact)
@@ -1486,7 +1517,7 @@ function DoTransitImpact(int Index, float fDeltaT)
 
 			if(Projectiles[Index].GrenadePath == none)
 			{
-				TraveledDistance = Projectiles[Index].AliveTime * Projectiles[Index].ProjectileElement.TravelSpeed;
+				TraveledDistance = Projectiles[Index].AliveTime * Projectiles[Index].AdjustedTravelSpeed;
 				if(TraveledDistance >= ProcessImpact.TravelDistance && ProcessImpact.TravelDistance > 96.0f)
 				{
 					bTriggerImpact = true;
@@ -1601,7 +1632,7 @@ function DoMainImpact(int Index, float fDeltaT, bool bShowImpactEffects)
 	local float BestImpactEventDist;
 	local vector BestImpactEffectPoint;
 
-	if (Projectiles[ Index ].ProjectileElement.TravelSpeed == 0)
+	if (Projectiles[ Index ].AdjustedTravelSpeed == 0)
 	{
 		// when projectile doesn't travel anywhere, we won't have impacted anything
 		// seems to be an audio "projectile" with no physical form.
@@ -1893,12 +1924,36 @@ state Executing
 		SetupVolley();
 	}
 
+	event EndState(Name PreviousStateName)
+	{
+		local XComGameState_EnvironmentDamage EnvironmentDamageEvent;
+		local StateObjectReference Target;
+		local X2Action_WaitForAbilityEffect DamageAction;
+		local XComGameStateVisualizationMgr VisualizationMgr;
+
+		VisualizationMgr = `XCOMVISUALIZATIONMGR;
+
+		if (Projectiles.Length > 0)
+		{
+			foreach FireAction.VisualizeGameState.IterateByClassType( class'XComGameState_EnvironmentDamage', EnvironmentDamageEvent )
+			{
+				Target = EnvironmentDamageEvent.GetReference( );
+				DamageAction = X2Action_WaitForAbilityEffect( VisualizationMgr.GetCurrentTrackActionForState( Target, FireAction.CurrentHistoryIndex ) );
+				if ((DamageAction != none) && !DamageAction.bAbilityEffectReceived)
+				{
+					`redscreen("A damage event track was not triggered even though the projectile processing has been completed. ~RussellA");
+					break;
+				}
+			}
+		}
+	}
+
 	simulated event Tick( float fDeltaT )
 	{
 		local int Index, i;
 		local bool bAllProjectilesDone;
 
-		local bool bShouldEnd, bShouldUpdate, bProjectileComplete, bStruckTarget;
+		local bool bShouldEnd, bShouldUpdate, bProjectileEffectsComplete, bStruckTarget;
 		local float timeDifferenceForRecoil;
 		local float originalfDeltaT;
 		originalfDeltaT = fDeltaT;
@@ -1915,7 +1970,12 @@ state Executing
 					//Travel Speed for Micromissile is the scalar value of how a gravity thrown bomb would be like
 					 fDeltaT = Projectiles[Index].ProjectileElement.TravelSpeed * originalfDeltaT;
 				}
+
 				Projectiles[ Index ].ActiveTime += fDeltaT;
+				if (!Projectiles[ Index ].bWaitingToDie)
+				{
+					Projectiles[ Index ].AliveTime += fDeltaT;
+				}
 
 				// Traveling projectiles should be forcibly deactivated once they've reaced their destination (and the trail has caught up).
 				if(Projectiles[Index].ParticleEffectComponent != None && (Projectiles[Index].ProjectileElement.UseProjectileType == eProjectileType_Traveling) && (WorldInfo.TimeSeconds >= (Projectiles[Index].EndTime + Projectiles[Index].TrailAdjustmentTime)))
@@ -1931,7 +1991,7 @@ state Executing
 				bShouldUpdate = Projectiles[Index].ProjectileElement.bAttachToSource || Projectiles[Index].ProjectileElement.bAttachToTarget ||
 					((Projectiles[Index].ProjectileElement.UseProjectileType == eProjectileType_RangedConstant) && (!Projectiles[Index].bConstantComplete));
 
-				bProjectileComplete = (Projectiles[ Index ].ParticleEffectComponent == none || Projectiles[ Index ].ParticleEffectComponent.HasCompleted( ));
+				bProjectileEffectsComplete = (Projectiles[ Index ].ParticleEffectComponent == none || Projectiles[ Index ].ParticleEffectComponent.HasCompleted( ));
 
 				if (bShouldEnd)
 				{
@@ -1962,10 +2022,10 @@ state Executing
 				// always update the trail
 				UpdateProjectileTrail( Index );
 
-				bAllProjectilesDone = bAllProjectilesDone && bProjectileComplete;
+				bAllProjectilesDone = bAllProjectilesDone && bProjectileEffectsComplete && Projectiles[Index].bWaitingToDie;
 
 				// A fallback to catch bad projectile effects that are lasting too long (except for the constants)
-				if (!bProjectileComplete && (WorldInfo.TimeSeconds > (Projectiles[Index].EndTime + Projectiles[Index].TrailAdjustmentTime + 10.0)) && (Projectiles[Index].ProjectileElement.UseProjectileType != eProjectileType_RangedConstant))
+				if (!bProjectileEffectsComplete && (WorldInfo.TimeSeconds > (Projectiles[Index].EndTime + Projectiles[Index].TrailAdjustmentTime + 10.0)) && (Projectiles[Index].ProjectileElement.UseProjectileType != eProjectileType_RangedConstant))
 				{
 					Projectiles[ Index ].ParticleEffectComponent.DeactivateSystem( );
 					Projectiles[ Index ].ParticleEffectComponent = none;

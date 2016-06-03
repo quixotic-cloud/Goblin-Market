@@ -55,7 +55,7 @@ const WORLD_StepSize_3D_Diagonal = 150.0933f; // = cubic diagonal distance betwe
 const WORLD_HalfStepSize = 48.0f;
 const WORLD_FloorHeight = 64.0f;
 const WORLD_HalfFloorHeight = 32.0f;
-const WORLD_FloorHeightsPerLevel = 3.0f;
+const WORLD_FloorHeightsPerLevel = 4.0f;
 const WORLD_TotalLevels = 3.0f;
 
 const WORLD_BaseHeight = 24.0f; //Offset by std. curb height
@@ -169,6 +169,7 @@ var transient XComDestructibleActor DefaultDestructibleActor;
 var transient int RebuildIndex;
 var transient bool bEnableRebuildTileData;
 var transient bool bSyncingVisualizer;  //Set to TRUE for the duration of of the SyncVisualizers call. Certain operations need to be aware of this state.
+var transient bool bBatchingTileUpdates;
 
 var delegate<CanSeeLocationCallback> CurrentCanSeeLocationCallback;
 var object CurrentCanSeeLocationCallbackOwner;
@@ -817,7 +818,7 @@ native function FindFloorInfoForEffect(ParticleSystemComponent ParticleEffect, T
 //------------------------------------------------------------------------------
 delegate CanSeeLocationCallback();
 native function bool IsInNoSpawnZone( const out Vector vLoc, bool bCivilian=FALSE, bool bLogFailures=false );
-
+native function CollectLadderLandingTiles(out array<TTile> LadderTiles);
 //------------------------------------------------------------------------------
 // Visibility
 //------------------------------------------------------------------------------
@@ -867,7 +868,8 @@ native function bool IsActionAvailable(const Vector TestLocation, optional float
 native function Vector FindClosestValidLocation(const Vector TestLocation, bool bAllowFlying, bool bPrioritizeZLevel, bool bAvoidNoSpawnZones=false); //bPrioritizeZLevel controls whether this function will exhaustively search similar Z levels
 
 native function bool GetSpawnTilePossibilities(const out TTile RootTile, int Length, int Width, int Height, out array<TTile> TilePossibilities);
-native function bool GetFloorTilePositions(const Vector InPoint, const float Radius, const float Height, out array<vector> vFloorTilePositions, optional bool bSortedByDist=false);
+native function bool GetUnoccupiedNonCoverTiles(const out TTile RootTile, int TileRadius, out array<TTile> TilePossibilities);
+native function bool GetFloorTilePositions(const Vector InPoint, const float Radius, const float Height, out array<vector> vFloorTilePositions, optional bool bSortedByDist = false);
 //------------------------------------------------------------------------------
 // Tile Data ( blocking, fire, etc. )
 //------------------------------------------------------------------------------
@@ -911,7 +913,7 @@ native function bool SetIsWaterTile( const out TTile kTile, bool bIsWaterTile );
 native function bool IsLocationHighCover(const out vector Location);
 native function bool IsLocationLowCover(const out vector Location);
 
-native function bool GetAdjacentDestructibles( XComGameState_Unit Unit, out DestructibleTileData DestructibleData, optional out Vector CoverForShooterLocation );
+native function bool GetAdjacentDestructibles( XComGameState_Unit Unit, out DestructibleTileData DestructibleData, optional out Vector CoverForShooterLocation, optional XComGameState_Unit SourceUnit);
 
 native function GenerateProjectileTouchList(XComGameState_Unit Shooter, const out vector StartLocation, const out vector StopLocation, out array<ProjectileTouchEvent> OutProjectileTouchEvents, bool bDebug);
 
@@ -1198,6 +1200,7 @@ defaultproperties
 	bCinematicMode = false
 	iDebugFloorTileUnitSize=1
 	DebugFOWViewer=-2
+	bBatchingTileUpdates=false
 
 	DefaultFractureActorPath = "FX_DestructionDefaults.ARC_FracActor"
 	DefaultDestructibleActorPath = "FX_DestructionDefaults.ARC_DestructibleActor"

@@ -264,16 +264,20 @@ simulated function RefreshData()
 		UITacticalHUD(screen).m_kShotHUD.MC.FunctionVoid( "ShowHit" );
 		UITacticalHUD(screen).m_kShotHUD.MC.FunctionVoid( "ShowCrit" );
 
-		if(bLeftWingWasOpen)
-			OnWingButtonClicked(LeftWingButton);
-
-		if(bRightWingWasOpen)
-			OnWingButtonClicked(RightWingButton);
-
 		LeftWingButton.Show();
 		RightWingButton.Show();
-		bLeftWingWasOpen = false;
-		bRightWingWasOpen = false;
+
+		if( !bLeftWingOpen && bLeftWingWasOpen )
+		{
+			bLeftWingWasOpen = false;
+			OnWingButtonClicked(LeftWingButton);
+		}
+
+		if( !bRightWingOpen && bRightWingWasOpen )
+		{
+			bRightWingWasOpen = false;
+			OnWingButtonClicked(RightWingButton);
+		}
 	}
 
 	if (Target.ObjectID == 0)

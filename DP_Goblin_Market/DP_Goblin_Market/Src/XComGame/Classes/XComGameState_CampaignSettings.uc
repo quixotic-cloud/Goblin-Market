@@ -21,6 +21,7 @@ var privatewrite bool bTutorialEnabled;			// TRUE indicates that this campaign w
 var privatewrite bool bSuppressFirstTimeNarrative; // TRUE, the tutorial narrative moments will be skipped
 var privatewrite array<name> SecondWaveOptions;	// A list of identifiers indicating second wave options that are enabled
 var privatewrite array<name> RequiredDLC;		// A list of DLC ( either mods or paid ) that this campaign is using
+var privatewrite array<name> EnabledOptionalNarrativeDLC; // A list of DLC where optional narrative content for this campaign is enabled
 
 //Dev options
 var bool bCheatStart;		// Calls 'DebugStuff' in XGStrategy when starting a new game. Skips the first battle entirely and grants facilities / items
@@ -91,6 +92,29 @@ function RemoveRequiredDLC(name DLCDisabled)
 	RequiredDLC.RemoveItem(DLCDisabled);
 }
 
+function AddOptionalNarrativeDLC(name DLCEnabled)
+{
+	if(RequiredDLC.Find(DLCEnabled) != INDEX_NONE)
+	{
+		EnabledOptionalNarrativeDLC.AddItem(DLCEnabled);
+	}
+}
+
+function bool HasOptionalNarrativeDLCEnabled(name DLCName)
+{
+	return (EnabledOptionalNarrativeDLC.Find(DLCName) != INDEX_NONE);
+}
+
+function RemoveAllOptionalNarrativeDLC()
+{
+	EnabledOptionalNarrativeDLC.Remove(0, EnabledOptionalNarrativeDLC.Length);
+}
+
+function RemoveOptionalNarrativeDLC(name DLCDisabled)
+{
+	EnabledOptionalNarrativeDLC.RemoveItem(DLCDisabled);
+}
+
 static function CopySettings(XComGameState_CampaignSettings Src, XComGameState_CampaignSettings Dest)
 {
 	Dest.StartTime = Src.StartTime;
@@ -101,6 +125,7 @@ static function CopySettings(XComGameState_CampaignSettings Src, XComGameState_C
 	Dest.bSuppressFirstTimeNarrative = Src.bSuppressFirstTimeNarrative;
 	Dest.SecondWaveOptions = Src.SecondWaveOptions;
 	Dest.RequiredDLC = Src.RequiredDLC;
+	Dest.EnabledOptionalNarrativeDLC = Src.EnabledOptionalNarrativeDLC;
 	Dest.bCheatStart = Src.bCheatStart;
 	Dest.bSkipFirstTactical = Src.bSkipFirstTactical;
 }
@@ -119,9 +144,10 @@ static function CopySettingsFromOnlineEventMgr(XComGameState_CampaignSettings De
 	Dest.bSuppressFirstTimeNarrative = EventMgr.CampaignbSuppressFirstTimeNarrative;
 	Dest.SecondWaveOptions = EventMgr.CampaignSecondWaveOptions;
 	Dest.RequiredDLC = EventMgr.CampaignRequiredDLC;
+	Dest.EnabledOptionalNarrativeDLC = EventMgr.CampaignOptionalNarrativeDLC;
 }
 
-static function CreateCampaignSettings(XComGameState StartState, bool InTutorialEnabled, int SelectedDifficulty, bool InSuppressFirstTimeVO)
+static function CreateCampaignSettings(XComGameState StartState, bool InTutorialEnabled, int SelectedDifficulty, bool InSuppressFirstTimeVO, optional array<name> OptionalNarrativeDLC)
 {
 	local XComGameState_CampaignSettings Settings;
 	local XComOnlineEventMgr EventManager;
@@ -135,10 +161,24 @@ static function CreateCampaignSettings(XComGameState StartState, bool InTutorial
 	Settings.SetGameIndexFromProfile();
 
 	Settings.RemoveAllRequiredDLC();
+	Settings.RemoveAllOptionalNarrativeDLC();
 	EventManager = `ONLINEEVENTMGR;
 	for(i = EventManager.GetNumDLC() - 1; i >= 0; i--)
 	{
 		Settings.AddRequiredDLC(EventManager.GetDLCNames(i));
+	}
+
+	// If we are coming from the tutorial, copy the optional narrative DLC here so it can be used when setting up the strategy objectives
+	if (InTutorialEnabled && OptionalNarrativeDLC.Length == 0)
+	{
+		Settings.EnabledOptionalNarrativeDLC = EventManager.CampaignOptionalNarrativeDLC;
+	}
+	else
+	{
+		for (i = 0; i < OptionalNarrativeDLC.Length; i++)
+		{
+			Settings.AddOptionalNarrativeDLC(OptionalNarrativeDLC[i]);
+		}
 	}
 }
 

@@ -5,6 +5,7 @@
 class X2TargetingMethod_Teleport extends X2TargetingMethod_Grenade;
 
 var private X2Actor_InvalidTarget InvalidTileActor;
+var private XComActionIconManager IconManager;
 
 function Init(AvailableAction InAction)
 {
@@ -16,6 +17,9 @@ function Init(AvailableAction InAction)
 
 	InvalidTileActor = Battle.Spawn(class'X2Actor_InvalidTarget');
 	ExplosionEmitter.SetHidden(true);
+
+	IconManager = `PRES.GetActionIconMgr();
+	IconManager.UpdateCursorLocation(true);
 }
 
 function Canceled()
@@ -24,6 +28,8 @@ function Canceled()
 
 	// clean up the ui
 	InvalidTileActor.Destroy();
+
+	IconManager.ShowIcons(false);
 }
 
 function Update(float DeltaTime)
@@ -51,6 +57,7 @@ function Update(float DeltaTime)
 			TeleportTile = World.GetTileCoordinatesFromPosition(TargetLocations[0]);
 			Tiles.AddItem(TeleportTile);
 			DrawAOETiles(Tiles);
+			IconManager.UpdateCursorLocation(, true);
 		}
 		else
 		{

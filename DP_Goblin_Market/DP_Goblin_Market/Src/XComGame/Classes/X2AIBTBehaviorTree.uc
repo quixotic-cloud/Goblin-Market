@@ -38,6 +38,7 @@ struct native BTQueueEntry		// Struct for keeping track of units whose behavior 
 	var bool bSurprisedScamper; // True if this unit should run behavior tree with the SurprisedScamper condition.
 	var bool bFirstScamper;		// True if this unit is the first in its group to scamper. Used to set the AI begin reveal.
 	var bool bScamperEntry;		// True if this entry is for a scamper action.
+	var bool bInitFromPlayerEachRun; // True to reset more behavior tree vars on each run as if it is the start of the player turn. BTVars & ErrorChecking.
 };
 var array<BTQueueEntry> ActiveBTQueue;  // List of behavior trees to kick off.
 var BTQueueEntry ActiveBTQueueEntry; //Currently active behavior tree queue entry
@@ -45,6 +46,18 @@ var BTQueueEntry ActiveBTQueueEntry; //Currently active behavior tree queue entr
 // Debug data
 var X2AIBTBehavior ActiveNode;
 var String ActiveCharacterName;
+
+struct native BTCustomNodeEntry
+{
+	var Name NodeTypeString;
+	var Name ExtendsFromType;
+	var String ClassName;
+};
+var config array<BTCustomNodeEntry> CustomNodes;
+
+// Cached conditions here so that we don't allocate a zillion of these check conditions.
+var transient array<X2Condition> CachedActiveWithAPConditions;  
+var transient array<X2Condition> CachedActiveDamagedConditions;
 
 native function Name GetNodeName(int Index);
 native function int GetNodeIndex(Name BehaviorName);
@@ -61,6 +74,16 @@ native function int FindBehaviorIndex(Name NodeName);
 native function bool IsScoringBehavior(Name BehaviorName, optional out Name strScore, optional out Name strNodeName);
 
 native function bool IsValidBehavior( Name RootName );
+
+native function Name GetNodeTypeOverride(BehaviorTreeNode NodeData, out X2AIBTDecorator Dec, out X2AIBTDefaultConditions Cond, out X2AIBTDefaultActions Act);
+native function Class ConstructBTNodeObject(BehaviorTreeNode NodeData, out Name NodeTypeName);
+
+function ClearQueue()
+{
+	ActiveBTQueue.Length = 0;
+	bBTQueueTimerActive = false;
+	ActiveQueueID = INDEX_NONE;
+}
 
 function LogNodeDetailText(string strLog)
 {
@@ -96,6 +119,7 @@ function EndBehaviorTree(int ObjectID)
 	{
 		`RedScreen("Attempting to end behavior tree - object ID mismatch! @acheng");
 	}
+	ActiveNode = None;
 
 	if( ActiveBTQueueEntry.RunCount > 0 )
 	{
@@ -229,7 +253,7 @@ function TryStartBehaviorTreeRun()
 		{
 			Behavior.UseSurprisedScamperMovement();
 		}
-		Behavior.StartRunBehaviorTree(ActiveBTQueueEntry.Node);
+		Behavior.StartRunBehaviorTree(ActiveBTQueueEntry.Node,,ActiveBTQueueEntry.bInitFromPlayerEachRun);
 	}
 	else
 	{
@@ -247,7 +271,7 @@ function bool IsFirstScamperUnitActive(optional out int ActiveID_out)
 	return false;
 }
 
-simulated function bool QueueBehaviorTreeRun(XComGameState_Unit UnitState, string BTRootNode, int RunCount = 1, int StartHistoryIndex = -1, bool bScamperEntry = false, bool bFirstScamper = false, bool bSurprisedScamper = false)
+simulated function bool QueueBehaviorTreeRun(XComGameState_Unit UnitState, string BTRootNode, int RunCount = 1, int StartHistoryIndex = -1, bool bScamperEntry = false, bool bFirstScamper = false, bool bSurprisedScamper = false, bool bInitFromPlayerEachRun=false)
 {
 	local XGUnit UnitVisualizer;
 	local XComGameStateHistory History;
@@ -286,6 +310,7 @@ simulated function bool QueueBehaviorTreeRun(XComGameState_Unit UnitState, strin
 	QEntry.bScamperEntry = bScamperEntry;
 	QEntry.bFirstScamper = bFirstScamper;
 	QEntry.bSurprisedScamper = bSurprisedScamper;
+	QEntry.bInitFromPlayerEachRun = bInitFromPlayerEachRun;
 	AddToActiveBTQueue(QEntry);
 
 	return true;

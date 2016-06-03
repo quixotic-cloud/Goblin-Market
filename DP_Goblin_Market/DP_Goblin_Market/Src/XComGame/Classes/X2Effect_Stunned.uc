@@ -9,6 +9,7 @@ simulated protected function OnEffectAdded(const out EffectAppliedData ApplyEffe
 {
 	local XComGameState_Unit UnitState;
 	local X2EventManager EventManager;
+	local bool IsOurTurn;
 
 	UnitState = XComGameState_Unit(kNewTargetState);
 	if (UnitState != none)
@@ -29,6 +30,12 @@ simulated protected function OnEffectAdded(const out EffectAppliedData ApplyEffe
 		{
 			UnitState.ReserveActionPoints.Length = 0;
 			UnitState.StunnedActionPoints += StunLevel;
+
+			if(IsTickEveryAction(UnitState) && UnitState.StunnedActionPoints > 1)
+			{
+				// when ticking per action, randomly subtract an action point, effectively giving rulers a 1-2 stun
+				UnitState.StunnedActionPoints -= `SYNC_RAND(1);
+			}
 		}
 
 		if( UnitState.IsTurret() ) // Stunned Turret.   Update turret state.
@@ -37,18 +44,35 @@ simulated protected function OnEffectAdded(const out EffectAppliedData ApplyEffe
 		}
 
 		//  If it's the unit's turn, consume action points immediately
-		if (UnitState.ControllingPlayer == `TACTICALRULES.GetCachedUnitActionPlayerRef())
+		IsOurTurn = UnitState.ControllingPlayer == `TACTICALRULES.GetCachedUnitActionPlayerRef();
+		if (IsOurTurn)
 		{
-			while (UnitState.StunnedActionPoints > 0 && UnitState.ActionPoints.Length >= UnitState.StunnedActionPoints)
+			// keep track of how many action points we lost, so we can regain them if the
+			// stun is cleared this turn, and also reduce the stun next turn by the
+			// number of points lost
+			while (UnitState.StunnedActionPoints > 0 && UnitState.ActionPoints.Length > 0)
 			{
 				UnitState.ActionPoints.Remove(0, 1);
 				UnitState.StunnedActionPoints--;
 				UnitState.StunnedThisTurn++;
 			}
+			
+			// if we still have action points left, just immediately remove the stun
+			if(UnitState.ActionPoints.Length > 0)
+			{
+				// remove the action points and add them to the "stunned this turn" value so that
+				// the remove stun effect will restore the action points correctly
+				UnitState.StunnedActionPoints = 0;
+				UnitState.StunnedThisTurn = 0;
+				NewEffectState.RemoveEffect(NewGameState, NewGameState, true, true);
+			}
 		}
 
 		// Immobilize to prevent scamper or panic from enabling this unit to move again.
-		UnitState.SetUnitFloatValue(class'X2Ability_DefaultAbilitySet'.default.ImmobilizedValueName, 1);
+		if(!IsOurTurn || UnitState.ActionPoints.Length == 0) // only if they are not immediately getting back up
+		{
+			UnitState.SetUnitFloatValue(class'X2Ability_DefaultAbilitySet'.default.ImmobilizedValueName, 1);
+		}
 	}
 }
 
@@ -57,10 +81,15 @@ simulated function OnEffectRemoved(const out EffectAppliedData ApplyEffectParame
 	local XComGameState_Unit UnitState;
 
 	UnitState = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(ApplyEffectParameters.TargetStateObjectRef.ObjectID));
-	if( (UnitState != none) && UnitState.IsTurret() )
+	if( UnitState != none)
 	{
 		UnitState = XComGameState_Unit(NewGameState.CreateStateObject(UnitState.Class, UnitState.ObjectID));
-		UnitState.UpdateTurretState(false);
+
+		if(UnitState.IsTurret())
+		{
+			UnitState.UpdateTurretState(false);
+		}
+
 		UnitState.SetUnitFloatValue(class'X2Ability_DefaultAbilitySet'.default.ImmobilizedValueName, 0);
 		NewGameState.AddStateObject(UnitState);
 	}
@@ -82,30 +111,52 @@ function bool StunTicked(X2Effect_Persistent PersistentEffect, const out EffectA
 		//(This prevents one-turn stuns from looking like they "did nothing", when in fact they consumed exactly one turn of actions.)
 		//-btopp 2015-09-21
 
+		// per-tick units need to decrement the stun
+		if(IsTickEveryAction(UnitState))
+		{
+			UnitState = XComGameState_Unit(NewGameState.CreateStateObject(UnitState.Class, UnitState.ObjectID));
+			UnitState.StunnedActionPoints--;
+
+			if(UnitState.StunnedActionPoints == 0)
+			{
+				// give them an action point back so they can move immediately
+				UnitState.StunnedThisTurn = 0;
+				UnitState.ActionPoints.AddItem(class'X2CharacterTemplateManager'.default.StandardActionPoint);
+			}
+			NewGameState.AddStateObject(UnitState);
+		}
+
 		if (UnitState.StunnedActionPoints > 0) 
+		{
 			return false;
-		else if (UnitState.StunnedActionPoints == 0 && UnitState.NumAllActionPoints() == 0)
-			return false; 
+		}
+		else if (UnitState.StunnedActionPoints == 0 
+			&& UnitState.NumAllActionPoints() == 0 
+			&& !UnitState.GetMyTemplate().bCanTickEffectsEveryAction) // allow the stun to complete anytime if it is ticking per-action
+		{
+			return false;
+		}
 	}
 	return true;
 }
 
 simulated function AddX2ActionsForVisualization(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, name EffectApplyResult)
 {
-	local X2Action_PlaySoundAndFlyOver SoundAndFlyOver;
 	local X2Action_PlayAnimation PlayAnimation;
-	local bool bRobotic;
+	local XComGameState_Unit TargetUnit;
 	local XGUnit Unit;
 	local XComUnitPawn UnitPawn;
 
-	if (EffectApplyResult == 'AA_Success' && BuildTrack.StateObject_NewState.IsA('XComGameState_Unit'))
+	TargetUnit = XComGameState_Unit(VisualizeGameState.GetGameStateForObjectID(BuildTrack.StateObject_NewState.ObjectID));
+	if(TargetUnit == none)
 	{
-		bRobotic = XComGameState_Unit(BuildTrack.StateObject_NewState).IsRobotic();
+		`assert(false);
+		TargetUnit = XComGameState_Unit(BuildTrack.StateObject_NewState);
+	}
 
-		SoundAndFlyOver = X2Action_PlaySoundAndFlyOver(class'X2Action_PlaySoundAndFlyOver'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext()));
-		SoundAndFlyOver.SetSoundAndFlyOverParameters(None, (bRobotic ? RoboticStunnedText : StunnedText) @ StunLevel, '', eColor_Bad, class'UIUtilities_Image'.const.UnitStatus_Stunned);
-
-		if( XComGameState_Unit(BuildTrack.StateObject_NewState).IsTurret() )
+	if (EffectApplyResult == 'AA_Success' && TargetUnit != none)
+	{
+		if( TargetUnit.IsTurret() )
 		{
 			class'X2Action_UpdateTurretAnim'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext());
 		}
@@ -129,7 +180,20 @@ simulated function AddX2ActionsForVisualization(XComGameState VisualizeGameState
 			}
 		}
 
-		super.AddX2ActionsForVisualization(VisualizeGameState, BuildTrack, EffectApplyResult);
+		if(TargetUnit.ActionPoints.Length > 0)
+		{
+			// unit had enough action points to consume the stun, so show the flyovers and just stand back up
+			if (VisualizationFn != none)
+				VisualizationFn(VisualizeGameState, BuildTrack, EffectApplyResult);		
+
+			// we are just standing right back up
+			AddX2ActionsForVisualization_Removed_Internal(VisualizeGameState, BuildTrack, EffectApplyResult);
+		}
+		else
+		{
+			// only apply common persistent visualization if we aren't immediately removing the effect
+			super.AddX2ActionsForVisualization(VisualizeGameState, BuildTrack, EffectApplyResult);
+		}
 	}
 }
 
@@ -139,12 +203,13 @@ simulated function AddX2ActionsForVisualization_Sync(XComGameState VisualizeGame
 	AddX2ActionsForVisualization(VisualizeGameState, BuildTrack, 'AA_Success');
 }
 
-simulated function AddX2ActionsForVisualization_Removed(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, const name EffectApplyResult, XComGameState_Effect RemovedEffect)
+// if the stun is immediately removed due to not all action points being consumed, we will still need
+// to visualize the unit getting up. Handle that here so that we can use the same code for normal and
+// immediately recovery
+simulated private function AddX2ActionsForVisualization_Removed_Internal(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, const name EffectApplyResult)
 {
 	local X2Action_PlayAnimation PlayAnimation;
 	local XComGameState_Unit StunnedUnit;
-
-	super.AddX2ActionsForVisualization_Removed(VisualizeGameState, BuildTrack, EffectApplyResult, RemovedEffect);
 
 	StunnedUnit = XComGameState_Unit(BuildTrack.StateObject_NewState);
 
@@ -158,6 +223,13 @@ simulated function AddX2ActionsForVisualization_Removed(XComGameState VisualizeG
 		PlayAnimation = X2Action_PlayAnimation(class'X2Action_PlayAnimation'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext()));
 		PlayAnimation.Params.AnimName = 'HL_StunnedStop';
 	}
+}
+
+simulated function AddX2ActionsForVisualization_Removed(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, const name EffectApplyResult, XComGameState_Effect RemovedEffect)
+{
+	super.AddX2ActionsForVisualization_Removed(VisualizeGameState, BuildTrack, EffectApplyResult, RemovedEffect);
+
+	AddX2ActionsForVisualization_Removed_Internal(VisualizeGameState, BuildTrack, EffectApplyResult);
 }
 
 // This function checks if the Cyberus should be killed by a stun. There is a special case that
@@ -213,7 +285,7 @@ defaultproperties
 {
 	bIsImpairing=true
 	DamageTypes(0) = "stun"
-	DamageTypes(1) = "Mental"
+//	DamageTypes(1) = "Mental"
 	EffectTickedFn=StunTicked
 	CustomIdleOverrideAnim="HL_StunnedIdle"
 }

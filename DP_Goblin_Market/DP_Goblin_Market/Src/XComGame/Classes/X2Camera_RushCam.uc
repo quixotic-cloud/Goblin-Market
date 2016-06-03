@@ -100,7 +100,9 @@ function UpdateCamera(float DeltaTime)
 	// first check if we want to cut to a ladder cam
 	CurrentPathNodeIndex = UnitToFollow.VisualizerUsePath.GetPathIndexFromPathDistance(UnitToFollow.GetPawn().m_fDistanceMovedAlongPath);
 	CurrentTraversal = UnitToFollow.VisualizerUsePath.GetTraversalType(CurrentPathNodeIndex);
-	if(CurrentTraversal == eTraversal_ClimbLadder || CurrentTraversal == eTraversal_DropDown)
+	if(CurrentTraversal == eTraversal_ClimbLadder 
+		|| CurrentTraversal == eTraversal_DropDown
+		|| CurrentTraversal == eTraversal_JumpUp)
 	{
 		LadderCam = new class'X2Camera_ClimbLadderCam';
 		LadderCam.UnitToFollow = UnitToFollow;

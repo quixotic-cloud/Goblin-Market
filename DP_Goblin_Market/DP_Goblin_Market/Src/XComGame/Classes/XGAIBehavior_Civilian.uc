@@ -365,3 +365,12 @@ simulated function OnUnitEndTurn()
 {
 	m_kPlayer.OnUnitEndTurn(m_kUnit);
 }
+
+simulated function bool IsInBadArea(Vector vLoc, bool bDebugLog = false, optional out string strFail)
+{
+	if( XGAIPlayer_Civilian(m_kPlayer).IsInLadderArea(vLoc) )
+	{
+		return true;
+	}
+	return super.IsInBadArea(vLoc, bDebugLog, strFail);
+}

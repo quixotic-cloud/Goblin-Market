@@ -98,6 +98,9 @@ struct CinescriptCut
 	// If true, will not do stepout fixup/prediction logic and instead center the matinee on the unit. Only for matinee cuts
 	var bool IgnoreStepoutFixups;
 
+	// If true, will force matinee camera cuts to be based on the ground, instead of the unit's current z-height
+	var bool SnapMatineeToGround;
+
 	structdefaultproperties
 	{
 		CutChance=1
@@ -122,8 +125,26 @@ struct AbilityCameraDefinition
 	var bool GameplayRequired;                      // If true, will play this sequence even if action cams are turned off. 
 };
 
+struct MatineePrefixReplacement
+{
+	var string AbilityCameraType;       // If not empty, this replacement will only apply to the specified ability camera
+	var array<name> CharacterTemplates; // If specified, the replacement will only apply to these character types        
+	var string OriginalPrefix;          // The original matinee we want to replace
+	var string ReplacementPrefix;       // The matinee we are replacing the original with
+	var float NewCutChance;             // If >= 0, specifies a new cut chance for this matinee
+
+	structdefaultproperties
+	{
+		NewCutChance = -1
+	}
+};
+
 // List of all cinescript camera definitions
 var private const config array<AbilityCameraDefinition> AbilityCameras;
+
+// List of all matinee replacements. Adds a bit more flexibility for mods and complex camera setups to
+// add custom behavior for specific types of aliens
+var private const config array<MatineePrefixReplacement> MatineeReplacements;
 
 // ini entry being used by this camera
 var privatewrite AbilityCameraDefinition CameraDefinition;
@@ -438,6 +459,8 @@ private function DoCameraCut(CinescriptCut CameraCut)
 {
 	local int Index;
 
+	CheckForMatineeReplacements(CameraCut);
+
 	if(`SYNC_FRAND() <= CameraCut.CutChance || class'XComGameState_Cheats'.static.GetVisualizedCheatsObject().AlwaysDoCinescriptCut)
 	{
 		switch(CameraCut.NewCameraType)
@@ -476,6 +499,50 @@ function bool YieldIfActive()
 	return ChildCamera == none;
 }
 
+private function CheckForMatineeReplacements(out CinescriptCut Cut)
+{
+	local MatineePrefixReplacement Replacement;
+	local Actor MatineeFocusActor;
+	local XGUnit FocusUnit;
+	local name FocusUnitTemplate;
+
+	if(Cut.MatineeCommentPrefix == "")
+	{
+		// no matinee to replace
+		return;
+	}
+
+	// see if there is a replacement matinee we want to use for this cut
+	foreach MatineeReplacements(Replacement)
+	{
+		if(Replacement.OriginalPrefix == Cut.MatineeCommentPrefix
+			&& (Replacement.AbilityCameraType == "" || Replacement.AbilityCameraType == CameraDefinition.AbilityCameraType))
+		{
+			// check if this matches the correct character template
+			if(FocusUnitTemplate == '') // only check this once if other conditions have passed, as an optimization
+			{
+				// 3-way if collapsed into two selectors for code brevity
+				MatineeFocusActor = Cut.FocusPrimaryTarget ? GetPrimaryTargetActor() : GetShooterPawn().GetGameUnit();
+				MatineeFocusActor = Cut.FocusShooterItemUnit ? XComUnitPawn(GetShooterItemUnitPawn()).GetGameUnit() : MatineeFocusActor;
+
+				FocusUnit = XGUnit(MatineeFocusActor);
+				if(FocusUnit != none)
+				{
+					FocusUnitTemplate = FocusUnit.GetVisualizedGameState().GetMyTemplateName();
+				}
+			}
+
+			if(Replacement.CharacterTemplates.Length == 0 || (Replacement.CharacterTemplates.Find(FocusUnitTemplate) != INDEX_NONE))
+			{
+				// we found a replacement matinee, set it
+				Cut.MatineeCommentPrefix = Replacement.ReplacementPrefix;
+				Cut.CutChance = Replacement.NewCutChance >= 0 ? Replacement.NewCutChance : Cut.CutChance;
+				return;
+			}
+		}
+	}
+}
+
 private function DoOverTheShoulderCut(CinescriptCut CameraCut)
 {
 	local X2Camera_OverTheShoulder OTSCamera;
@@ -510,7 +577,7 @@ private function DoOverTheShoulderCut(CinescriptCut CameraCut)
 	OTSCamera.CandidateMatineeCommentPrefix = CameraCut.MatineeCommentPrefix;
 	OTSCamera.FiringUnit = FiringUnit;
 	OTSCamera.SetTarget(TargetActor);
-	OTSCamera.DOFFocusShooter = CameraCut.FocusPrimaryTarget;
+	OTSCamera.DOFFocusShooter = false;
 	OTSCamera.ShouldBlend = !CameraCut.DisableBlend;
 	OTSCamera.ShouldAlwaysShow = CameraCut.ShouldAlwaysShow;
 
@@ -574,6 +641,7 @@ private function DoMidpointCut(CinescriptCut CameraCut)
 
 private function DoMatineeCut(CinescriptCut CameraCut)
 {
+	local XComWorldData WorldData;
 	local X2Camera_Matinee MatineeCamera;
 	local XComUnitPawn ShooterPawn;
 	local XGUnit ShooterUnit;
@@ -657,11 +725,24 @@ private function DoMatineeCut(CinescriptCut CameraCut)
 	MatineeCamera.PopWhenFinished = CameraCut.PopWhenFinished;
 	MatineeCamera.ShouldAlwaysShow = CameraCut.ShouldAlwaysShow;
 
+	WorldData = `XWORLD;
 	if(UseStepoutLocation)
 	{
 		ShooterStepoutFacing.Roll = 0;
 		ShooterStepoutFacing.Pitch = 0;
+
+		if(CameraCut.SnapMatineeToGround)
+		{
+			ShooterStepoutLocation.Z = WorldData.GetFloorZForPosition(ShooterStepoutLocation, true);
+		}
+
 		MatineeCamera.SetExplicitMatineeLocation(ShooterStepoutLocation, ShooterStepoutFacing);
+	}
+	else if(CameraCut.SnapMatineeToGround)
+	{
+		ShooterStepoutLocation = MatineeFocusActor.Location;
+		ShooterStepoutLocation.Z = WorldData.GetFloorZForPosition(ShooterStepoutLocation, true);
+		MatineeCamera.SetExplicitMatineeLocation(ShooterStepoutLocation, MatineeFocusActor.Rotation);
 	}
 
 	MatineeCamera.SetMatineeByComment(CameraCut.MatineeCommentPrefix, MatineeFocusActor);

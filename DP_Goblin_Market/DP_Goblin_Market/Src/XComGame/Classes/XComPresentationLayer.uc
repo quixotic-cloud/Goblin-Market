@@ -28,6 +28,7 @@ var bool                        m_bPathMessageActive; //accessible by the tutori
 var UIEnemyArrowContainer       m_kEnemyArrows; 
 var UIInventoryTactical			m_kInventoryTactical; //LOOTING
 var UIMissionSummary            m_kMissionSummary;
+var UIChallengePostScreen		m_kChallengeModeSummary;
 var UIMultiplayerHUD            m_kMultiplayerHUD;
 var UIMultiplayerChatManager    m_kMultiplayerChatManager;
 var UITacticalHUD               m_kTacticalHUD;
@@ -79,12 +80,12 @@ var string m_strSuppressedIcon;
 var protectedwrite bool         m_bUIShowMyTurnOnOverlayInit;
 var protectedwrite bool         m_bUIShowOtherTurnOnOverlayInit;
 var protectedwrite bool         m_bUIShowReflexActionOnOverlayInit;
+var protectedwrite bool         m_bUIShowSpecialTurnOnOverlayInit;
 
 /// allows the concealment shader to be forced to the "off" position
 var protectedwrite bool         m_bConcealmentShaderEnabled;
 
-// true when the user is prompted to start a challenge mission
-var private bool				m_bWaitForChallengeAccept;
+var private bool                m_bWaitForChallengeAccept; // DEPRECATED bsteiner 3/24/2016
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //                             INITILIZATION
@@ -144,6 +145,11 @@ simulated function InitUIScreensComplete()
 
 	m_k3DUI = Spawn( class'XG3DInterface', self );
 
+	if (`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) != none)
+	{
+		InitializeChallengeModeUI();
+	}
+
 	InitializeSpecialMissionUI();
 	
 	m_bPresLayerReady = true;
@@ -185,15 +191,24 @@ simulated function UIFlagMgr()
 simulated function ResetUnitFlag(StateObjectReference kUnitRef)
 {
 	local UIUnitFlag kFlag;
+	local XComGameState_BaseObject StartingState;
+	local int VisualizedHistoryIndex;
+
 	if(m_kUnitFlagManager != None)
 	{
 		kFlag = m_kUnitFlagManager.GetFlagForObjectID(kUnitRef.ObjectID);
 		if( kFlag != none )
 		{
-			kFlag.Hide();
-			m_kUnitFlagManager.RemoveFlag(kFlag);
+			VisualizedHistoryIndex = `XCOMVISUALIZATIONMGR.LastStateHistoryVisualized;
+			StartingState = `XCOMHISTORY.GetGameStateForObjectID(kUnitRef.ObjectID, , VisualizedHistoryIndex);
+			kFlag.UpdateFromState(StartingState, true);
+			//kFlag.Hide();
+			//m_kUnitFlagManager.RemoveFlag(kFlag);
 		}
-		m_kUnitFlagManager.AddFlag(kUnitRef);
+		else
+		{
+			m_kUnitFlagManager.AddFlag(kUnitRef);
+		}
 	}
 }
 
@@ -413,6 +428,11 @@ simulated function UISpecialMissionHUD GetSpecialMissionHUD()
 	return UISpecialMissionHUD(ScreenStack.GetScreen(class'UISpecialMissionHUD'));
 }
 
+simulated function UIChallengeModeHUD GetChallengeModeHUD()
+{
+	return UIChallengeModeHUD( ScreenStack.GetScreen( class'UIChallengeModeHUD' ) );
+}
+
 simulated function XComActionIconManager GetActionIconMgr()
 {
 	return m_kActionIconManager;
@@ -522,7 +542,7 @@ simulated function HUDHide()
 simulated function HUDShow(optional bool ShowTacticalHUD = true, optional bool IgnroreUntilInternalUpdate = false)
 {
 	// Don't show the TacticalHUD if the mission is over - sbatista 7/12/13
-	if(m_kMissionSummary != none)
+	if((m_kMissionSummary != none) || (m_kChallengeModeSummary != none))
 		return;
 
 	// When the turn begins, delay showing the HUD so that the animation state of UI elements is set before TacticalHUD is shown.
@@ -865,28 +885,16 @@ simulated function UITimerMessage( string sTitle, string sSubtitle, string sCoun
 		kTurnCounter.Hide(); 
 }
 
+simulated function ConfirmStartTimerCallback(eUIAction Action); // DEPRECATED bsteiner 3/24/2016
+
 simulated function UIChallengeStartTimerMessage()
 {
-	local TDialogueBoxData DialogData;
-
-	DialogData.eType = eDialog_Normal;
-	DialogData.strText = m_strStartChallenge;
-	DialogData.strAccept = class'UIDialogueBox'.default.m_strDefaultAcceptLabel;
-	DialogData.fnCallback = ConfirmStartTimerCallback;
-
-	m_bWaitForChallengeAccept = true;
-
-	UIRaiseDialog(DialogData);
-}
-
-simulated function ConfirmStartTimerCallback(eUIAction Action)
-{
-	m_bWaitForChallengeAccept = false;
+	ScreenStack.Push( Spawn( class'UIChallengeModeScoringDialog', self ) );
 }
 
 simulated function bool WaitForChallengeAccept()
 {
-	return m_bWaitForChallengeAccept;
+	return ScreenStack.GetScreen( class'UIChallengeModeScoringDialog' ) != none;
 }
 
 simulated function UIAbilityHUD()
@@ -984,6 +992,42 @@ simulated function UIMissionSummaryScreen_Deactivate()
 	`BATTLE.QuitAndTransition();
 }
 
+simulated function UIChallengeModeSummaryScreen( )
+{
+	local XComWorldData WorldData;
+
+	if (m_kTacticalHUD != none)
+		m_kTacticalHUD.Hide( );
+
+	m_kChallengeModeSummary = UIChallengePostScreen( ScreenStack.Push( Spawn( class'UIChallengePostScreen', self ) ) );
+
+	m_kActionIconManager.ShowIcons( false );
+
+	WorldData = class'XComWorldData'.static.GetWorldData( );
+	if (WorldData != none && WorldData.Volume != none)
+	{
+		WorldData.Volume.BorderComponent.SetCustomHidden( TRUE );
+		WorldData.Volume.BorderComponentDashing.SetCustomHidden( TRUE );
+	}
+}
+
+simulated function UIChallengeModeSummaryScreen_Deactivate( )
+{
+	local XComWorldData WorldData;
+
+	m_kActionIconManager.ShowIcons( true );
+
+	WorldData = class'XComWorldData'.static.GetWorldData( );
+	if (WorldData != none && WorldData.Volume != none)
+	{
+		WorldData.Volume.BorderComponent.SetCustomHidden( TRUE );
+		WorldData.Volume.BorderComponentDashing.SetCustomHidden( TRUE );
+	}
+
+	`BATTLE.QuitAndTransition( );
+}
+
+
 simulated public function OnTurnTimerExpired()
 {
 	if( false ) //TODO: bsteiner: if( friendly fire popup is active
@@ -1041,9 +1085,13 @@ simulated function UIEndTurn( ETurnOverlay eOverlayType )
 
 			if( m_kTurnOverlay.IsShowingAlienTurn() )
 				m_kTurnOverlay.HideAlienTurn();
-			
+
 			if( m_kTurnOverlay.IsShowingOtherTurn() )
 				m_kTurnOverlay.HideOtherTurn();
+
+			if( m_kTurnOverlay.IsShowingSpecialTurn() )
+				m_kTurnOverlay.HideSpecialTurn();
+
 
 			m_kTurnOverlay.ShowXComTurn();
 			
@@ -1083,6 +1131,9 @@ simulated function UIHideAllHUD()
 	if( m_kTurnOverlay.IsShowingXComTurn() )
 		m_kTurnOverlay.HideXComTurn();
 
+	if( m_kTurnOverlay.IsShowingSpecialTurn() )
+		m_kTurnOverlay.HideSpecialTurn();
+
 	HUDHide();
 }
 
@@ -1113,6 +1164,7 @@ simulated function UIShowMyTurnOverlay()
 		m_bUIShowMyTurnOnOverlayInit = true;
 		m_bUIShowOtherTurnOnOverlayInit = false;
 		m_bUIShowReflexActionOnOverlayInit = false;
+		m_bUIShowSpecialTurnOnOverlayInit = false;
 	}
 }
 
@@ -1131,6 +1183,7 @@ simulated function UIShowOtherTurnOverlay()
 		m_bUIShowMyTurnOnOverlayInit = false;
 		m_bUIShowOtherTurnOnOverlayInit = true;
 		m_bUIShowReflexActionOnOverlayInit = false;
+		m_bUIShowSpecialTurnOnOverlayInit = false;
 	}
 }
 simulated function UIShowReflexOverlay()
@@ -1147,6 +1200,7 @@ simulated function UIShowReflexOverlay()
 		m_bUIShowMyTurnOnOverlayInit = false;
 		m_bUIShowOtherTurnOnOverlayInit = false;
 		m_bUIShowReflexActionOnOverlayInit = true;
+		m_bUIShowSpecialTurnOnOverlayInit = false;
 	}
 }
 
@@ -1162,6 +1216,40 @@ simulated function UIHideReflexOverlay()
 	else
 	{
 		m_bUIShowReflexActionOnOverlayInit = false;
+	}
+}
+
+simulated function UIShowSpecialTurnOverlay()
+{
+	if( m_kTurnOverlay != none && m_kTurnOverlay.bIsInited )
+	{
+		if( !m_kTurnOverlay.IsShowingSpecialTurn() )
+		{
+			HUDHide();
+			m_kTurnOverlay.ShowSpecialTurn();
+		}
+	}
+	else
+	{
+		m_bUIShowMyTurnOnOverlayInit = false;
+		m_bUIShowOtherTurnOnOverlayInit = false;
+		m_bUIShowReflexActionOnOverlayInit = false;
+		m_bUIShowSpecialTurnOnOverlayInit = true;
+	}
+}
+simulated function UIHideSpecialTurnOverlay()
+{
+	if( m_kTurnOverlay != None && m_kTurnOverlay.bIsInited )
+	{
+		if( m_kTurnOverlay.IsShowingSpecialTurn() )
+		{
+			m_kTurnOverlay.HideSpecialTurn();
+			HUDShow();
+		}
+	}
+	else
+	{
+		m_bUIShowSpecialTurnOnOverlayInit = false;
 	}
 }
 
@@ -1226,6 +1314,15 @@ simulated function InitializeSpecialMissionUI()
 	ScreenStack.GetScreen(class'UISpecialMissionHUD').AllowShowDuringCinematic(`XENGINE.IsMultiplayerGame());
 }
 
+simulated function InitializeChallengeModeUI()
+{
+	if (ScreenStack.GetScreen( class'UIChallengeModeHUD' ) == none && Get2DMovie( ).bIsInited)
+	{
+		ScreenStack.Push( Spawn( class'UIChallengeModeHUD', self ) );
+	}
+	ScreenStack.GetScreen( class'UIChallengeModeHUD' ).AllowShowDuringCinematic( `XENGINE.IsMultiplayerGame( ) );
+}
+
 simulated function OnPauseMenu(bool bOpened)
 {
 	if (m_kTacticalHUD != none && m_kTacticalHUD.m_kTutorialHelpBox != none)
@@ -1281,6 +1378,9 @@ function EventListenerReturn OnPlayerTurnEnded(Object EventData, Object EventSou
 	{
 		m_kTurnOverlay.HideAlienTurn();
 	}
+
+	if( m_kTurnOverlay.IsShowingSpecialTurn() )
+		m_kTurnOverlay.HideSpecialTurn();
 
 	return ELR_NoInterrupt;
 }

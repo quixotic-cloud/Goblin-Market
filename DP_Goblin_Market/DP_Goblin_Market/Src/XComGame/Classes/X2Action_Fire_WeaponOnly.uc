@@ -18,7 +18,7 @@ Begin:
 		HideFOW();
 
 		// Sleep long enough for the fog to be revealed
-		Sleep(1.0f);
+		Sleep(1.0f * GetDelayModifier());
 	}
 
 	UnitPawn.EnableRMA(true, true);

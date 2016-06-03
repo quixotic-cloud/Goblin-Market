@@ -40,6 +40,12 @@ protected native function bool AddDataTemplate(X2DataTemplate Data, bool Replace
  */
 protected native function X2DataTemplate FindDataTemplate(name DataName) const;
 
+/** 
+ *  @param Templates is an array of templates in the all GameDataCaches that match the provided name. 
+ *  Child classes should implement a public wrapper that returns the class appropriate to the manager.
+ */
+native function FindDataTemplateAllDifficulties(name DataName, out array<X2DataTemplate> Templates) const;
+
 /** Called from native code XComEngine::Init(). */
 native function InitTemplates();
 

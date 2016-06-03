@@ -74,6 +74,9 @@ function Init(const out VisualizationTrack InTrack)
 {
 	local XComGameStateHistory History;	
 	local XComGameState_BaseObject TargetState;
+	local Vector ObjectFacing;
+	local Vector ObjectToSource;
+	local float DotResult;
 
 	super.Init(InTrack);
 	
@@ -104,6 +107,11 @@ function Init(const out VisualizationTrack InTrack)
 		SyncLocation = VLerp(UnitPawn.Location, TargetUnitPawn.Location, 0.5f);
 		SyncLocation.Z = Unit.GetDesiredZForLocation(SyncLocation); // Keep their Z on the floor
 		OriginalTargetLocation = TargetUnitPawn.Location;
+
+		//The fixup only applies to the Z coordinate.
+		FixupOffset.X = 0;
+		FixupOffset.Y = 0;
+		FixupOffset.Z = TargetUnitPawn.fBaseZMeshTranslation - SourceUnitPawn.fBaseZMeshTranslation;
 	}
 	else
 	{
@@ -114,12 +122,27 @@ function Init(const out VisualizationTrack InTrack)
 		SyncLocation = VLerp(UnitPawn.Location, HackedActor.Location, 0.5f);
 		SyncLocation.Z = Unit.GetDesiredZForLocation(SyncLocation); // Keep their Z on the floor
 		OriginalTargetLocation = HackedActor.Location;
-	}
-	FixupOffset = SyncLocation - OriginalTargetLocation;
-	//The fixup only applies to the Z coordinate.
-	FixupOffset.X = 0;
-	FixupOffset.Y = 0;
 
+		// Jwats: Advent vans are the only doors that you can regularly hack from around the corner. It causes the XPAD to 
+		//			go through the wall making it unclickable.  In that scenario just face away from the door.
+		if( InteractiveActor.AttachedMesh1 != None && InteractiveActor.AttachedMesh1.StaticMesh.Name == 'AdventVan_Door_x2' )
+		{
+			ObjectFacing = vector(InteractiveActor.Rotation);
+			ObjectToSource = SyncLocation - InteractiveActor.Location;
+			ObjectFacing.Z = 0;
+			ObjectToSource.Z = 0;
+			ObjectFacing = Normal(ObjectFacing);
+			ObjectToSource = Normal(ObjectToSource);
+
+			DotResult = ObjectFacing Dot ObjectToSource;
+
+			if( DotResult < 0.0f )
+			{
+				SourceToTarget = -SourceToTarget;
+			}
+		}
+	}
+	
 	OriginalSourceHeading = vector(SourceUnitPawn.Rotation);
 	OriginalSourceLocation = SourceUnitPawn.Location;
 
@@ -377,7 +400,7 @@ Begin:
 	}
 
 	// sleep a few more moments so they can see the results on screen before he puts the pad away.
-	Sleep(DelayAfterHackCompletes);
+	Sleep(DelayAfterHackCompletes * GetDelayModifier());
 
 	// if this was a successful hack and we are a key, update the pathing around the doors we unlocked
 	if(AbilityContext.IsResultContextHit()

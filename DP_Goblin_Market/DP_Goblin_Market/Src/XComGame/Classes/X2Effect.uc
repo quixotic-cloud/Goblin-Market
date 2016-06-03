@@ -10,6 +10,18 @@ class X2Effect extends Object
 	native(Core)
 	dependson(XComGameStateContext_Ability);
 
+struct native OverrideEffectInfo
+{
+	var int MaxNumberAllowed;
+	var int EffectIdxToApplyOnMaxExceeded;
+
+	structdefaultproperties
+	{
+		MaxNumberAllowed=0
+		EffectIdxToApplyOnMaxExceeded=INDEX_NONE
+	}
+};
+
 var array<X2Condition>  TargetConditions;
 var bool                bApplyOnHit;
 var bool                bApplyOnMiss;
@@ -20,6 +32,7 @@ var int                 ApplyChance;
 var delegate<ApplyChanceCheck> ApplyChanceFn;
 var int                 MinStatContestResult;              // The AbilityResultContext (in the EffectAppliedData) StatContestResult must be >= this number for the effect to apply.
 var int                 MaxStatContestResult;              // The AbilityResultContext (in the EffectAppliedData) StatContestResult must be <= this number for the effect to apply. Ignored if value < Min.
+var OverrideEffectInfo  MultiTargetStatContestInfo;
 var array<name>         DamageTypes;     // Units immune to any damage type listed here will resist the effect. For persistent effects, cleansing effects might look for a damage type to know to remove it.
 var bool                bIsImpairing;                      // If this effect impairs the unit, then an event must be sent out
 var bool                bIsImpairingMomentarily;           // Sends event but does not continue to report unit as impaired
@@ -57,6 +70,9 @@ simulated final function name ApplyEffect(const out EffectAppliedData ApplyEffec
 	local name DamageType;
 	local X2EventManager EventManager;
 	local XComGameState_Effect NewEffectState;
+	local bool bDoStatContestResultCheck;
+	local OverriddenEffectsInfo CurrentOverride;
+	local int OverrideIndex;
 
 	History = `XCOMHISTORY;
 
@@ -81,10 +97,35 @@ simulated final function name ApplyEffect(const out EffectAppliedData ApplyEffec
 		AbilityStateObject = XComGameState_Ability(History.GetGameStateForObjectID(ApplyEffectParameters.AbilityStateObjectRef.ObjectID));
 	}
 
-	if (MinStatContestResult != 0 && ApplyEffectParameters.AbilityResultContext.StatContestResult < MinStatContestResult)
-		return 'AA_EffectChanceFailed';
-	if (MaxStatContestResult != 0 && ApplyEffectParameters.AbilityResultContext.StatContestResult > MaxStatContestResult)
-		return 'AA_EffectChanceFailed';
+	// Check to see if this Effect should be treated as normal or is involved with a StatContestResult Override
+	bDoStatContestResultCheck = true;
+	OverrideIndex = ApplyEffectParameters.AbilityResultContext.TargetEffectsOverrides.OverrideInfo.Find('OverrideType', 'EffectOverride_StatContest');
+	if (OverrideIndex != INDEX_NONE)
+	{
+		CurrentOverride = ApplyEffectParameters.AbilityResultContext.TargetEffectsOverrides.OverrideInfo[OverrideIndex];
+		if (CurrentOverride.OverriddenEffects.Length > 0)
+		{
+			// An Effect can be replaced by nothing, so there needn't be any Effects in OverriddingEffects
+			if (CurrentOverride.OverriddenEffects.Find(self) != INDEX_NONE)
+			{
+				// This Effect has been replaced by another Effect due to StatContestResult modifications. Do not apply.
+				return 'AA_EffectChanceFailed';
+			}
+			else if (CurrentOverride.OverriddingEffects.Find(self) != INDEX_NONE)
+			{
+				// This Effect is replacing another Effect due to StatContestResult modifications. Skip the StatContestResult Check.
+				bDoStatContestResultCheck = false;
+			}
+		}
+	}
+
+	if (bDoStatContestResultCheck)
+	{
+		if (MinStatContestResult != 0 && ApplyEffectParameters.AbilityResultContext.StatContestResult < MinStatContestResult)
+			return 'AA_EffectChanceFailed';
+		if (MaxStatContestResult != 0 && ApplyEffectParameters.AbilityResultContext.StatContestResult > MaxStatContestResult)
+			return 'AA_EffectChanceFailed';
+	}
 
 	foreach TargetConditions(kCondition)
 	{		

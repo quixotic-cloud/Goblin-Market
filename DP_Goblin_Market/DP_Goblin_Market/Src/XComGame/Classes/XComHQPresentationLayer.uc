@@ -190,6 +190,9 @@ simulated function ExitPostMissionSequence()
 	local XComGameState NewGameState;
 	local XComGameState_HeadquartersXCom XComHQ;
 	local X2EventManager EventManager;
+	local XComOnlineEventMgr OnlineEventManager;
+	local array<X2DownloadableContentInfo> DLCInfos;
+	local int i;
 
 	XComHQ = XComGameState_HeadquartersXCom(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
 
@@ -242,6 +245,13 @@ simulated function ExitPostMissionSequence()
 	`GAME.GetGeoscape().m_kBase.m_kCrewMgr.RefreshFacilityPatients();
 	`GAME.GetGeoscape().m_kBase.m_kCrewMgr.RefreshMemorialPolaroids();
 	`GAME.GetGeoscape().m_kBase.m_kCrewMgr.RefreshWantedCaptures();
+
+	OnlineEventManager = `ONLINEEVENTMGR;
+	DLCInfos = OnlineEventManager.GetDLCInfos(false);
+	for (i = 0; i < DLCInfos.Length; ++i)
+	{
+		DLCInfos[i].OnExitPostMissionSequence();
+	}
 }
 
 private function ExitPostMission_ResetMap()
@@ -446,6 +456,8 @@ private function StrategyMap_FinishTransitionEnter()
 	GetCamera().ForceEarthViewImmediately(true);
 	`XSTRATEGYSOUNDMGR.PlayGeoscapeMusic();
 
+	`GAME.GetGeoscape().m_kBase.UpdateFacilityProps();
+
 	//Trigger the base crew to update their positions now that we know we aren't looking at them
 	`GAME.GetGeoscape().m_kBase.m_kCrewMgr.PopulateBaseRoomsWithCrew();
 
@@ -546,12 +558,22 @@ function DisableFlightModeAndTriggerGeoscapeEvent()
 
 function GeoscapeEntryEvent()
 {
+	local XComGameState_CampaignSettings CampaignState;
 	local XComGameState NewGameState;
 
 	// Use this event if something should be triggered after the Geoscape finishes loading (Ex: Camera pans to reveal missions)
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Trigger Entered Geoscape Event");
-	`XEVENTMGR.TriggerEvent('OnGeoscapeEntry', , , NewGameState);	
+	`XEVENTMGR.TriggerEvent('OnGeoscapeEntry', , , NewGameState);
 	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
+	
+	CampaignState = XComGameState_CampaignSettings(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_CampaignSettings'));
+	if (CampaignState.bSuppressFirstTimeNarrative)
+	{
+		// Trigger the event to spawn a POI the first time the player enters the Geoscape
+		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Trigger First Time POI Event");
+		`XEVENTMGR.TriggerEvent('SpawnFirstPOI', , , NewGameState);
+		`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
+	}
 
 	m_bBlockNarrative = false; // Turn off the narrative block in case it never got reset
 	m_bRecentStaffAvailable = false; // Turn off the recent staff available block
@@ -698,6 +720,11 @@ private function XComGameState_HeadquartersRoom GetCICRoom()
 // DOOM EFFECT
 //----------------------------------------------------
 
+function float GetDoomTimerVisModifiers()
+{
+	return `XPROFILESETTINGS.Data.bEnableZipMode ? class'X2TacticalGameRuleset'.default.ZipModeDoomVisModifier : 1.0;
+}
+
 //---------------------------------------------------------------------------------------
 function NonPanClearDoom(bool bPositive)
 {
@@ -714,7 +741,7 @@ function NonPanClearDoom(bool bPositive)
 		`XSTRATEGYSOUNDMGR.PlaySoundEvent("Doom_IncreasedScreenTear_ON");
 	}
 
-	SetTimer(3.0f, false, nameof(NoPanClearDoomPt2));
+	SetTimer(3.0f * GetDoomTimerVisModifiers(), false, nameof(NoPanClearDoomPt2));
 }
 
 //---------------------------------------------------------------------------------------
@@ -732,11 +759,11 @@ function NoPanClearDoomPt2()
 
 	if(AlienHQ.PendingDoomData.Length > 0)
 	{
-		SetTimer(4.0f, false, nameof(NoPanClearDoomPt2));
+		SetTimer(4.0f * GetDoomTimerVisModifiers(), false, nameof(NoPanClearDoomPt2));
 	}
 	else
 	{
-		SetTimer(4.0f, false, nameof(UnPanDoomFinished));
+		SetTimer(4.0f * GetDoomTimerVisModifiers(), false, nameof(UnPanDoomFinished));
 	}
 }
 
@@ -767,11 +794,11 @@ function DoomCameraPan(XComGameState_GeoscapeEntity EntityState, bool bPositive,
 
 	if(bFirstFacility)
 	{
-		SetTimer(3.0f, false, nameof(StartFirstFacilityCameraPan));
+		SetTimer(3.0f * GetDoomTimerVisModifiers(), false, nameof(StartFirstFacilityCameraPan));
 	}
 	else
 	{
-		SetTimer(3.0f, false, nameof(StartDoomCameraPan));
+		SetTimer(3.0f * GetDoomTimerVisModifiers(), false, nameof(StartDoomCameraPan));
 	}
 }
 
@@ -781,7 +808,7 @@ function StartDoomCameraPan()
 	// Pan to the location
 	CAMLookAtEarth(DoomEntityLoc, 0.5f, `HQINTERPTIME);
 	`XSTRATEGYSOUNDMGR.PlaySoundEvent("Doom_Camera_Whoosh");
-	SetTimer((`HQINTERPTIME + 3.0f), false, nameof(DoomCameraPanComplete));
+	SetTimer((`HQINTERPTIME + 3.0f * GetDoomTimerVisModifiers()), false, nameof(DoomCameraPanComplete));
 }
 
 //---------------------------------------------------------------------------------------
@@ -807,11 +834,11 @@ function DoomCameraPanComplete()
 
 	if(AlienHQ.PendingDoomData.Length > 0)
 	{
-		SetTimer(4.0f, false, nameof(DoomCameraPanComplete));
+		SetTimer(4.0f * GetDoomTimerVisModifiers(), false, nameof(DoomCameraPanComplete));
 	}
 	else
 	{
-		SetTimer(4.0f, false, nameof(UnpanDoomCamera));
+		SetTimer(4.0f * GetDoomTimerVisModifiers(), false, nameof(UnpanDoomCamera));
 	}
 }
 
@@ -860,7 +887,7 @@ function UnpanDoomCamera()
 {
 	CAMRestoreSavedLocation();
 	`XSTRATEGYSOUNDMGR.PlaySoundEvent("Doom_Camera_Whoosh");
-	SetTimer((`HQINTERPTIME + 3.0f), false, nameof(UnPanDoomFinished));
+	SetTimer((`HQINTERPTIME + 3.0f * GetDoomTimerVisModifiers()), false, nameof(UnPanDoomFinished));
 }
 
 //---------------------------------------------------------------------------------------
@@ -1032,10 +1059,16 @@ function UIArmory_MainMenu(StateObjectReference UnitRef, optional name DispEvent
 		UIArmory_MainMenu(ScreenStack.Push(Spawn(class'UIArmory_MainMenu', self), Get3DMovie())).InitArmory(UnitRef, DispEvent, SoldSpawnEvent, NavBackEvent, HideEvent, RemoveEvent, bInstant);
 }
 
-function UIArmory_Loadout(StateObjectReference UnitRef)
+function UIArmory_Loadout(StateObjectReference UnitRef, optional array<EInventorySlot> CannotEditSlots)
 {
-	if(ScreenStack.IsNotInStack(class'UIArmory_Loadout'))
-		UIArmory_Loadout(ScreenStack.Push(Spawn(class'UIArmory_Loadout', self), Get3DMovie())).InitArmory(UnitRef);
+	local UIArmory_Loadout ArmoryScreen;
+
+	if (ScreenStack.IsNotInStack(class'UIArmory_Loadout'))
+	{
+		ArmoryScreen = UIArmory_Loadout(ScreenStack.Push(Spawn(class'UIArmory_Loadout', self), Get3DMovie()));
+		ArmoryScreen.CannotEditSlotsList = CannotEditSlots;
+		ArmoryScreen.InitArmory(UnitRef);
+	}
 }
 
 function UIArmory_Promotion(StateObjectReference UnitRef, optional bool bInstantTransition)
@@ -2527,9 +2560,14 @@ simulated function UITrainingComplete(StateObjectReference UnitRef)
 
 simulated function TrainingCompleteCB(EUIAction eAction, UIAlert AlertData, optional bool bInstant = false)
 {
-	local XComGameState NewGameState; 
+	local XComGameState NewGameState;
+	local XComGameState_Unit UnitState;
 	
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Unit Promotion");
+	// Flag the new class popup as having been seen
+	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Unit Promotion Callback");
+	UnitState = XComGameState_Unit(NewGameState.CreateStateObject(class'XComGameState_Unit', AlertData.UnitInfo.UnitRef.ObjectID));
+	NewGameState.AddStateObject(UnitState);
+	UnitState.bNeedsNewClassPopup = false;
 	`XEVENTMGR.TriggerEvent('UnitPromoted', , , NewGameState);
 	`GAMERULES.SubmitGameState(NewGameState);
 

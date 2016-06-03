@@ -49,6 +49,7 @@ var bool bNarrativeDisabled;
 
 // Animation Debugging Variables START
 var bool bDebugAnims;
+var bool bDebugAnimsPawn;
 var bool bDisplayAnims;
 var Name m_DebugAnims_TargetName;
 
@@ -74,6 +75,8 @@ var XComOnlineStatsRead m_kStatsRead;
 var int X2DebugHistoryHighlight;
 var string ErrorReportTitle;
 var string ErrorReportText;
+
+var bool bShouldAutosaveBeforeEveryAction;
 
 struct native CommandSet
 {
@@ -243,6 +246,15 @@ exec function UIDrawGridPercent(float horizontalSpacing, float verticalSpacing, 
 exec function UISetDistortion( float Value )
 {
 	XComPlayerController(Outer).Pres.SetUIDistortionStrength(Value);
+}
+
+exec function UIClearCustomizeAlerts()
+{
+	`XPROFILESETTINGS.Data.m_arrCharacterCustomizationCategoriesClearedAttention.Length = 0;
+	`XPROFILESETTINGS.Data.m_arrCharacterCustomizationCategoriesInfo.Length = 0;
+	`ONLINEEVENTMGR.SaveProfileSettings(true);
+
+	`log("Customize alert categories cleared.");
 }
 
 exec function UIEnableTooltips()
@@ -649,7 +661,8 @@ exec function  Help(optional string tok)
 		HelpDESC("UIDrawGrid",			"Draw a grid at 25% increments in UI pixel space in the 2D movie.");
 		HelpDESC("UIDrawGridPixel",		"Specify a grid in UI pixel space to draw, in 2D or 3D.");
 		HelpDESC("UIDrawGridPercent",	"Specify a grid using percent in UI pixel space to draw, in 2D or 3D.");
-		HelpDESC("UISetDistortion",	    "Set the value for the UI distortion on the 3D material instance.");
+		HelpDESC("UISetDistortion", "Set the value for the UI distortion on the 3D material instance.");
+		HelpDESC("UIClearCustomizeAlerts", "Clear the array of alert categories you've seen in the UICustomizesystem from your profile.");
 	}
 	else
 	{
@@ -2920,6 +2933,49 @@ exec function LootList()
 	`log("end of loot list");
 }
 
+exec function DumpMPShellLoadoutDetails(optional int LoadoutId=-1)
+{
+	local XComGameState_Unit SoldierState;
+	local XComGameState kLoadoutState;
+	local array<XComGameState> arrSquadLoadouts;
+	local X2MPCharacterTemplateManager MPCharacterTemplateManager;
+
+	MPCharacterTemplateManager = class'X2MPCharacterTemplateManager'.static.GetMPCharacterTemplateManager();
+	m_kPres = `PRES;
+
+	if( LoadoutId < 0 )
+	{
+		arrSquadLoadouts = XComShellPresentationLayer(XComPlayerController(Outer).Pres).m_kMPShellManager.m_arrSquadLoadouts;
+
+	}
+	else
+	{
+		kLoadoutState = XComShellPresentationLayer(XComPlayerController(Outer).Pres).m_kMPShellManager.GetLoadoutFromId(LoadoutId);
+		arrSquadLoadouts.AddItem(kLoadoutState);
+	}
+
+	foreach arrSquadLoadouts(kLoadoutState)
+	{
+		OutputMsg(" ");
+		OutputMsg("Context:" @ kLoadoutState.GetContext().SummaryString());
+		OutputMsg("-------------------------------------------------------------------------");
+		foreach kLoadoutState.IterateByClassType(class'XComGameState_Unit', SoldierState, eReturnType_Reference)
+		{
+			//DisplaySoldierClassDetails(SoldierState);
+			OutputMsg("Fullname:" @ SoldierState.GetFullName());
+			OutputMsg("Template:" @ SoldierState.GetMyTemplateName() @ "  Mapping:" @ MPCharacterTemplateManager.FindCharacterTemplateMapOldToNew(SoldierState.GetMyTemplateName()));
+			OutputMsg("Soldier:" @ SoldierState.GetSoldierClassTemplateName() @ "  Mapping:" @ MPCharacterTemplateManager.FindCharacterTemplateMapOldToNew(SoldierState.GetSoldierClassTemplateName()));
+			OutputMsg("MP Char:" @ SoldierState.GetMPCharacterTemplateName() @ "  Mapping:" @ MPCharacterTemplateManager.FindCharacterTemplateMapOldToNew(SoldierState.GetMPCharacterTemplateName()));
+			OutputMsg("Personality:" @ SoldierState.GetPersonalityTemplate().DataName);
+			OutputMsg("Stats:" @ `ShowVar(SoldierState.GetCurrentStat(eStat_HP),HP) @ "  " @ `ShowVar(SoldierState.GetCurrentStat(eStat_Offense),Offense)
+				@ "  " @ `ShowVar(SoldierState.GetCurrentStat(eStat_Defense),Defense) @ "  " @ `ShowVar(SoldierState.GetCurrentStat(eStat_Will),Will)
+				@ "  " @ `ShowVar(SoldierState.GetCurrentStat(eStat_UtilityItems),UtilityItems));
+			OutputMsg("-------------------------------------------------------------------------");
+		}
+		OutputMsg("=========================================================================");
+	}
+}
+
 exec function DumpCharacterTemplateNames()
 {
 	local X2CharacterTemplateManager CharacterMgr;
@@ -2937,26 +2993,41 @@ function DisplaySoldierClassDetails(XComGameState_Unit SoldierState)
 {
 	local int iRankIndex;
 	local array<SoldierClassAbilityType> AbilityNames;
+	local X2AbilityTemplateManager AbilityTemplateMan;
+	local X2AbilityTemplate AbilityTemplate;
+	local X2CharacterTemplate CharacterTemplate;
+	local name AbilityName;
 
+	OutputMsg("=========================================================================");
+	OutputMsg(`ShowVar(SoldierState.ObjectID, 'ObjectID') @ `ShowVar(SoldierState.GetName(eNameType_Full), 'Soldier Name') @ `ShowVar(SoldierState.GetMyTemplate().DataName, 'Data Name') @ `ShowVar(SoldierState.GetMyTemplate().Name, 'Template Name'));
 	if (SoldierState.IsSoldier())
 	{
-		OutputMsg("=========================================================================");
-		OutputMsg(`ShowVar(SoldierState.ObjectID, 'ObjectID') @ `ShowVar(SoldierState.GetName(eNameType_RankFull), 'Soldier Name') @ `ShowVar(SoldierState.GetSoldierClassTemplate().DataName, 'Template Name'));
+		OutputMsg(`ShowVar(SoldierState.GetSoldierClassTemplate().DataName, 'Soldier Template Data Name') @ `ShowVar(SoldierState.GetSoldierClassTemplate().Name, 'Soldier Template Name') @ `ShowVar(SoldierState.GetName(eNameType_RankFull), 'Soldier Name'));
 		AbilityNames = SoldierState.GetEarnedSoldierAbilities();
 		OutputMsg(" ");
-		OutputMsg("==== Abilities ===");
+		OutputMsg("==== Earned Soldier Abilities ===");
 		for (iRankIndex = 0; iRankIndex < AbilityNames.Length; ++iRankIndex)
 		{
 			OutputMsg("     Ability(" $ iRankIndex $ "):" @ `ShowVar(AbilityNames[iRankIndex].AbilityName, 'AbilityName'));
 		}
-		OutputMsg(" ");
-		OutputMsg("==== Character Stats ===");
-		OutputMsg(SoldierState.CharacterStats_ToString());
-		OutputMsg("=========================================================================");
-		OutputMsg(" ");
-		OutputMsg(" ");
-		
 	}
+
+	OutputMsg(" ");
+	OutputMsg("==== Abilities ===");
+	AbilityTemplateMan = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager();
+	CharacterTemplate = SoldierState.GetMyTemplate();
+	foreach CharacterTemplate.Abilities(AbilityName)
+	{
+		AbilityTemplate = AbilityTemplateMan.FindAbilityTemplate(AbilityName);
+		OutputMsg("     Ability(" $ AbilityName $ "):" @ `ShowVar(AbilityTemplate, 'AbilityTemplate'));
+	}
+
+	OutputMsg(" ");
+	OutputMsg("==== Character Stats ===");
+	OutputMsg(SoldierState.CharacterStats_ToString());
+	OutputMsg("=========================================================================");
+	OutputMsg(" ");
+	OutputMsg(" ");
 }
 
 exec function DisplaySoldierRelationships(optional int ObjectID=-1)
@@ -3145,52 +3216,54 @@ exec function CreateChallengeStart(string LeaderBoardSuffix)
 	local XComGameStateHistory History;
 	local XComGameState_BattleData BattleDataState;
 	local XComGameState_ChallengeData ChallengeData;
-	local XComGameState_TimerData Timer;
+	local XComGameState StartState;
+	local XComGameState_ObjectivesList StartObjectives, TrueObjectives;
+	local XComGameState_MissionSite MissionSite;
 
-	History = class'XComGameStateHistory'.static.GetGameStateHistory();
-	History.ObliterateGameStatesFromHistory(History.GetNumGameStates() - History.FindStartStateIndex() - 1);
+	History = class'XComGameStateHistory'.static.GetGameStateHistory( );
 
+	StartState = History.GetGameStateFromHistory( History.FindStartStateIndex( ) );
+	MissionSite = XComGameState_MissionSite( History.GetSingleGameStateObjectForClass( class'XComGameState_MissionSite' ) );
 
-	BattleDataState = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
-	BattleDataState.iFirstStartTurnSeed = 0;
-	BattleDataState.bUseFirstStartTurnSeed = true;
-	BattleDataState.m_strDesc = "Challenge Mode"; //If you change this, be aware that this is how the ruleset knows the battle is a challenge mode battle
-	BattleDataState.m_strOpName = class'XGMission'.static.GenerateOpName(false);
-	BattleDataState.m_strMapCommand = "open" @ BattleDataState.MapData.PlotMapName $ "?game=XComGame.XComTacticalGame";
+	// copy over the objective strings from the latest non-start state to power the challenge squad select UI
+	foreach History.IterateByClassType( class'XComGameState_ObjectivesList', TrueObjectives )
+	{
+		break;
+	}
+	StartObjectives = XComGameState_ObjectivesList( StartState.GetGameStateForObjectID( TrueObjectives.ObjectID ) );
+	StartObjectives.ObjectiveDisplayInfos = TrueObjectives.ObjectiveDisplayInfos;
 
-	//BattleDataState = XComGameState_BattleData(History.GetStartState().CreateStateObject(class'XComGameState_BattleData', BattleDataState.ObjectID));
+	History.ObliterateGameStatesFromHistory( History.GetNumGameStates( ) - History.FindStartStateIndex( ) - 1 );
 
-	ChallengeData = XComGameState_ChallengeData(History.GetStartState().CreateStateObject(class'XComGameState_ChallengeData'));
+	BattleDataState = XComGameState_BattleData( History.GetSingleGameStateObjectForClass( class'XComGameState_BattleData' ) );
+	BattleDataState.m_strLocation = MissionSite.GetLocationDescription( );
+
+	ChallengeData = XComGameState_ChallengeData( History.GetSingleGameStateObjectForClass( class'XComGameState_ChallengeData' ) );
 	ChallengeData.LeaderBoardName = BattleDataState.m_strOpName @ LeaderBoardSuffix;
-	History.GetStartState().AddStateObject(ChallengeData);
 
-	Timer = XComGameState_TimerData(History.GetStartState().CreateStateObject(class'XComGameState_TimerData'));
-	Timer.SetTimerData(EGSTT_RealTime, EGSTDT_Down, EGSTRT_None);
-	History.GetStartState().AddStateObject(Timer);
-
-	History.WriteHistoryToFile("SaveData_Dev/", "ChallengeStartState");
+	History.WriteHistoryToFile( "SaveData_Dev/", "ChallengeStartState_" $ LeaderBoardSuffix );
 }
 
-exec function LoadChallengeStart()
+exec function LoadChallengeStart(string LeaderBoardSuffix)
 {
 	local XComGameStateHistory History;
 	local XComGameState_BattleData BattleDataState;
 
 	History = class'XComGameStateHistory'.static.GetGameStateHistory();
-	History.ReadHistoryFromFile("SaveData_Dev/", "ChallengeStartState");
+	History.ReadHistoryFromFile("SaveData_Dev/", "ChallengeStartState_" $ LeaderBoardSuffix);
 
 	BattleDataState = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
 	`ONLINEEVENTMGR.bIsChallengeModeGame = true;
 	ConsoleCommand(BattleDataState.m_strMapCommand);
 }
 
-exec function LoadChallengeReplay()
+exec function LoadChallengeReplay(string LeaderBoardSuffix)
 {
 	local XComGameStateHistory History;
 	local XComGameState_BattleData BattleDataState;
 
 	History = class'XComGameStateHistory'.static.GetGameStateHistory();
-	History.ReadHistoryFromFile("SaveData_Dev/", "MPTacticalGameStartState");
+	History.ReadHistoryFromFile("SaveData_Dev/", "ChallengeStartState_" $ LeaderBoardSuffix);
 
 	BattleDataState = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
 	`ONLINEEVENTMGR.bInitiateReplayAfterLoad = true;
@@ -4070,6 +4143,12 @@ exec function FiraxisLiveToggleAutoLogin()
 	LiveClient = `FXSLIVE;
 	LiveClient.bCHEATDisableAutoLogin = !LiveClient.bCHEATDisableAutoLogin;
 	`log(`location @ `ShowVar(LiveClient.bCHEATDisableAutoLogin, bCHEATDisableAutoLogin));
+}
+
+exec function ToggleAutosavePerAction()
+{
+	bShouldAutosaveBeforeEveryAction = !bShouldAutosaveBeforeEveryAction;
+	`log("bShouldAutosaveBeforeEveryAction = "$bShouldAutosaveBeforeEveryAction);
 }
 
 defaultproperties

@@ -49,10 +49,16 @@ TODO:</Description>
     <Content Include="Src\GoblinMarket\Classes\XComGameState_Intel.uc">
       <SubType>Content</SubType>
     </Content>
+    <Content Include="Src\XComGame\Classes\AnalyticsManager.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\AnimNotify_ApplyPsiEffectsToTarget.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_BlendIK.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_BreakWindow.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_CinescriptEvent.uc" />
+    <Content Include="Src\XComGame\Classes\AnimNotify_CosmeticUnit.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\AnimNotify_EndVolleyConstants.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_FireGrapple.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_FireWeapon.uc" />
@@ -66,6 +72,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\AnimNotify_PlayEffectCue.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_PlayWeaponAnim.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_UnitSpeak.uc" />
+    <Content Include="Src\XComGame\Classes\AsynchronousLoadRequest.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\CharacterLightRigComponent.uc" />
     <Content Include="Src\XComGame\Classes\CharacterPoolManager.uc" />
     <Content Include="Src\XComGame\Classes\Checkpoint.uc" />
@@ -147,6 +156,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\SeqAct_EnableGlobalAbility.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_EnableGlobalAbilityForUnit.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_EnableInteractiveActor.uc" />
+    <Content Include="Src\XComGame\Classes\SeqAct_EnableTileEffectVolume.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqAct_EndBattle.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_EndDialogue.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_EndSubSequence.uc" />
@@ -160,6 +172,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\SeqAct_GetEnemyToTarget.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_GetExtractionVolume.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_GetHeadquartersCrewPawns.uc" />
+    <Content Include="Src\XComGame\Classes\SeqAct_GetInteractiveObject.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqAct_GetLocation.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_GetMatineePawns.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_GetNonObjectiveVIP.uc" />
@@ -198,6 +213,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\SeqAct_PlayUnitVoiceOver.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_PreloadNarrative.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_PutItemInGameObject.uc" />
+    <Content Include="Src\XComGame\Classes\SeqAct_RedAlert.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqAct_RefreshConcealment.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_ReleaseAllPodHolds.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_RemoveActorFromBuildingVis.uc" />
@@ -217,7 +235,13 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\SeqAct_SetMaterialOnHumanPawn.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SetObjectiveShaderEnabled.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SetPriorityTarget.uc" />
+    <Content Include="Src\XComGame\Classes\SeqAct_SetTacticalMusicSet.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqAct_SetTutorial.uc" />
+    <Content Include="Src\XComGame\Classes\SeqAct_SetUnitActionPoints.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqAct_SetUnitEnabled.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SetUnitFacing.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SetUnitFlagScale.uc" />
@@ -228,6 +252,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\SeqAct_ShowTutorialTarget.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SkipAI.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SoldierChatter.uc" />
+    <Content Include="Src\XComGame\Classes\SeqAct_SpawnCinematicUnit.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqAct_SpawnEvacZone.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SpawnUnitFromAvenger.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_SwapTeams.uc" />
@@ -240,6 +267,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\SeqAct_ToggleHUDElements.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_ToggleUIVisibility.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_ToggleUnitFlags.uc" />
+    <Content Include="Src\XComGame\Classes\SeqAct_TransferToNewMission.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqAct_UnitHasItem.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_UnitLightingChannels.uc" />
     <Content Include="Src\XComGame\Classes\SeqAct_UnrestrictMovementCursor.uc" />
@@ -260,6 +290,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\SeqCond_CompareInteractiveObject.uc" />
     <Content Include="Src\XComGame\Classes\SeqCond_CompareUnit.uc" />
     <Content Include="Src\XComGame\Classes\SeqCond_IsInCinematicMode.uc" />
+    <Content Include="Src\XComGame\Classes\SeqCond_IsZipModeEnabled.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\SeqCond_SwitchString.uc" />
     <Content Include="Src\XComGame\Classes\SeqEvent_AbilityTriggered.uc" />
     <Content Include="Src\XComGame\Classes\SeqEvent_AlienSquadTerminated.uc" />
@@ -363,8 +396,17 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\UICallbackData_StateObjectReference.uc" />
     <Content Include="Src\XComGame\Classes\UICallbackData_SystemMessage.uc" />
     <Content Include="Src\XComGame\Classes\UIChallengeModeEventNotify.uc" />
+    <Content Include="Src\XComGame\Classes\UIChallengeModeHUD.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\UIChallengeModeScoringDialog.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\UIChallengeMode_SquadSelect.uc" />
     <Content Include="Src\XComGame\Classes\UIChallengeMode_UnitSlot.uc" />
+    <Content Include="Src\XComGame\Classes\UIChallengePostScreen.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\UICharacterPool.uc" />
     <Content Include="Src\XComGame\Classes\UICharacterPool_ListPools.uc" />
     <Content Include="Src\XComGame\Classes\UICheckbox.uc" />
@@ -461,6 +503,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\UIImage.uc" />
     <Content Include="Src\XComGame\Classes\UIInputDialogue.uc" />
     <Content Include="Src\XComGame\Classes\UIInputGate.uc" />
+    <Content Include="Src\XComGame\Classes\UIInputSteam.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\UIInventory.uc" />
     <Content Include="Src\XComGame\Classes\UIInventoryTactical.uc" />
     <Content Include="Src\XComGame\Classes\UIInventoryTactical_LootingItem.uc" />
@@ -614,6 +659,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\UIShell.uc" />
     <Content Include="Src\XComGame\Classes\UIShell3D.uc" />
     <Content Include="Src\XComGame\Classes\UIShellDifficulty.uc" />
+    <Content Include="Src\XComGame\Classes\UIShellNarrativeContent.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\UIShellStrategy.uc" />
     <Content Include="Src\XComGame\Classes\UIShell_NavHelpScreen.uc" />
     <Content Include="Src\XComGame\Classes\UISimpleCommodityScreen.uc" />
@@ -803,6 +851,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2AbilityToHitCalc_DeadEye.uc" />
     <Content Include="Src\XComGame\Classes\X2AbilityToHitCalc_Hacking.uc" />
     <Content Include="Src\XComGame\Classes\X2AbilityToHitCalc_PanicCheck.uc" />
+    <Content Include="Src\XComGame\Classes\X2AbilityToHitCalc_PercentChance.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2AbilityToHitCalc_RollStat.uc" />
     <Content Include="Src\XComGame\Classes\X2AbilityToHitCalc_SeeMovement.uc" />
     <Content Include="Src\XComGame\Classes\X2AbilityToHitCalc_StandardAim.uc" />
@@ -837,6 +888,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Ability_Cyberus.uc" />
     <Content Include="Src\XComGame\Classes\X2Ability_DebugAbilities.uc" />
     <Content Include="Src\XComGame\Classes\X2Ability_DefaultAbilitySet.uc" />
+    <Content Include="Src\XComGame\Classes\X2Ability_DLC_Day90DefaultAbilitySet.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Ability_Faceless.uc" />
     <Content Include="Src\XComGame\Classes\X2Ability_Gatekeeper.uc" />
     <Content Include="Src\XComGame\Classes\X2Ability_Grenades.uc" />
@@ -887,6 +941,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Action_CameraRemove.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_CarryUnitPickUp.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_CarryUnitPutDown.uc" />
+    <Content Include="Src\XComGame\Classes\X2Action_ChallengeScoreUpdate.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Action_ChryssalidCocoonDeathAction.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_ClearCameraFade.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_CommLink.uc" />
@@ -921,6 +978,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Action_Hack.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_HiddenMovement.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_HideLoadingScreen.uc" />
+    <Content Include="Src\XComGame\Classes\X2Action_IcarusJumpGremlin.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Action_InitCamera.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_InitFOW.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_InitUI.uc" />
@@ -984,6 +1044,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Action_ShowTutorialTarget.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_SKULLJACK.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_SpawnChryssalid.uc" />
+    <Content Include="Src\XComGame\Classes\X2Action_SpecialTurnOverlay.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Action_SpottedUnit.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_StartCinescriptCamera.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_StartMissionSoundtrack.uc" />
@@ -998,11 +1061,17 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Action_SyncVisualizer.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_TimedInterTrackMessageAllMultiTargets.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_TimedWait.uc" />
+    <Content Include="Src\XComGame\Classes\X2Action_TransferToNewMission.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Action_UnBurrow.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_UnitFalling.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_UnitFallingNoRagdoll.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_UnitToFacelessChangeForm.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_UnstreamDropshipIntro.uc" />
+    <Content Include="Src\XComGame\Classes\X2Action_UpdateAnimations.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Action_UpdateFlashlight.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_UpdateFOW.uc" />
     <Content Include="Src\XComGame\Classes\X2Action_UpdateScanningProtocolOutline.uc" />
@@ -1083,12 +1152,87 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Camera_RushCam.uc" />
     <Content Include="Src\XComGame\Classes\X2CardManager.uc" />
     <Content Include="Src\XComGame\Classes\X2CardManager_SerializeDataMP.uc" />
+    <Content Include="Src\XComGame\Classes\X2ChallengeAlertForce.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeAlertForceSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeArmor.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeArmorSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeElement.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeEnemyForces.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeEnemyForcesSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2ChallengeModeDataStructures.uc" />
     <Content Include="Src\XComGame\Classes\X2ChallengeModeInterface.uc" />
+    <Content Include="Src\XComGame\Classes\X2ChallengePrimaryWeapon.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengePrimaryWeaponSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSecondaryWeapon.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSecondaryWeaponSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSoldierClass.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSoldierClassSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSoldierRank.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSoldierRankSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSquadAlien.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSquadAlienSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSquadSize.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeSquadSizeSelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeTemplate.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeTemplateManager.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeUtility.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2ChallengeUtilitySelectors.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Character.uc" />
     <Content Include="Src\XComGame\Classes\X2CharacterTemplate.uc" />
     <Content Include="Src\XComGame\Classes\X2CharacterTemplateManager.uc" />
     <Content Include="Src\XComGame\Classes\X2Character_DefaultCharacters.uc" />
+    <Content Include="Src\XComGame\Classes\X2Character_DefaultMPCharacters.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\XComGame\Classes\X2CinematicSpawnPoint.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2CityTemplate.uc" />
     <Content Include="Src\XComGame\Classes\X2CommanderLookupTableManager.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition.uc" />
@@ -1106,6 +1250,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Condition_MapProperty.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_OnGroundTile.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_Panic.uc" />
+    <Content Include="Src\XComGame\Classes\X2Condition_PanicOnPod.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Condition_PlayerTurns.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_RevivalProtocol.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_StasisLanceTarget.uc" />
@@ -1123,6 +1270,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Condition_UnitInventory.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_UnitProperty.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_UnitStatCheck.uc" />
+    <Content Include="Src\XComGame\Classes\X2Condition_UnitType.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Condition_UnitValue.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_ValidUnburrowTile.uc" />
     <Content Include="Src\XComGame\Classes\X2Condition_Visibility.uc" />
@@ -1138,6 +1288,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Effect.uc" />
     <Content Include="Src\XComGame\Classes\X2EffectTrigger.uc" />
     <Content Include="Src\XComGame\Classes\X2EffectTrigger_Event.uc" />
+    <Content Include="Src\XComGame\Classes\X2Effect_AdditionalAnimSets.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Effect_AidProtocol.uc" />
     <Content Include="Src\XComGame\Classes\X2Effect_ApplyAcidToWorld.uc" />
     <Content Include="Src\XComGame\Classes\X2Effect_ApplyBlazingPinionsTargetToWorld.uc" />
@@ -1215,6 +1368,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2Effect_RangerStealth.uc" />
     <Content Include="Src\XComGame\Classes\X2Effect_Reaper.uc" />
     <Content Include="Src\XComGame\Classes\X2Effect_RedAlert.uc" />
+    <Content Include="Src\XComGame\Classes\X2Effect_ReduceCooldowns.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2Effect_Regeneration.uc" />
     <Content Include="Src\XComGame\Classes\X2Effect_RemoveEffects.uc" />
     <Content Include="Src\XComGame\Classes\X2Effect_RemoveEffectsByDamageType.uc" />
@@ -1346,7 +1502,13 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2NarrativeMoment.uc" />
     <Content Include="Src\XComGame\Classes\X2ObjectiveTemplate.uc" />
     <Content Include="Src\XComGame\Classes\X2ObjectTag.uc" />
+    <Content Include="Src\XComGame\Classes\X2PairedWeaponTemplate.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2PathSolver.uc" />
+    <Content Include="Src\XComGame\Classes\X2PathTargetPathingPawn.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2PointOfInterestTemplate.uc" />
     <Content Include="Src\XComGame\Classes\X2QuestItemTemplate.uc" />
     <Content Include="Src\XComGame\Classes\X2ReachableTilesCache.uc" />
@@ -1431,6 +1593,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\X2TargetingMethod_MeleePath.uc" />
     <Content Include="Src\XComGame\Classes\X2TargetingMethod_MimicBeacon.uc" />
     <Content Include="Src\XComGame\Classes\X2TargetingMethod_OverTheShoulder.uc" />
+    <Content Include="Src\XComGame\Classes\X2TargetingMethod_PathTarget.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\X2TargetingMethod_RocketLauncher.uc" />
     <Content Include="Src\XComGame\Classes\X2TargetingMethod_Teleport.uc" />
     <Content Include="Src\XComGame\Classes\X2TargetingMethod_TopDown.uc" />
@@ -1497,6 +1662,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\XComAnimNotify_PlaySocketAnim.uc" />
     <Content Include="Src\XComGame\Classes\XComAnimNotify_Ragdoll.uc" />
     <Content Include="Src\XComGame\Classes\XComAnimNotify_RaiseWeapon.uc" />
+    <Content Include="Src\XComGame\Classes\XComAnimNotify_TriggerDecal.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComAnimTreeController.uc" />
     <Content Include="Src\XComGame\Classes\XComArmsContent.uc" />
     <Content Include="Src\XComGame\Classes\XComAutosaveMgr.uc" />
@@ -1595,7 +1763,13 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\XComGameStateContext_ApplyWorldEffects.uc" />
     <Content Include="Src\XComGame\Classes\XComGameStateContext_ArchiveHistory.uc" />
     <Content Include="Src\XComGame\Classes\XComGameStateContext_AreaDamage.uc" />
+    <Content Include="Src\XComGame\Classes\XComGameStateContext_ChallengeScore.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComGameStateContext_ChangeContainer.uc" />
+    <Content Include="Src\XComGame\Classes\XComGameStateContext_CinematicSpawn.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComGameStateContext_EffectRemoved.uc" />
     <Content Include="Src\XComGame\Classes\XComGameStateContext_Falling.uc" />
     <Content Include="Src\XComGame\Classes\XComGameStateContext_HeadquartersOrder.uc" />
@@ -1688,6 +1862,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\XComGameState_UFO.uc" />
     <Content Include="Src\XComGame\Classes\XComGameState_UITimer.uc" />
     <Content Include="Src\XComGame\Classes\XComGameState_Unit.uc" />
+    <Content Include="Src\XComGame\Classes\XComGameState_Unit_AsyncLoadRequest.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComGameState_WorldEffectTileData.uc" />
     <Content Include="Src\XComGame\Classes\XComGameState_WorldNarrativeActor.uc" />
     <Content Include="Src\XComGame\Classes\XComGameState_WorldNarrativeTracker.uc" />
@@ -1745,9 +1922,15 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\XComMCP.uc" />
     <Content Include="Src\XComGame\Classes\XComMCPEventListener.uc" />
     <Content Include="Src\XComGame\Classes\XComMCPTypes.uc" />
+    <Content Include="Src\XComGame\Classes\XComMegaBuildingVolume.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComMergedLevelActor.uc" />
     <Content Include="Src\XComGame\Classes\XComMeshSwapVolume.uc" />
     <Content Include="Src\XComGame\Classes\XComMod.uc" />
+    <Content Include="Src\XComGame\Classes\XComModularBuildingVolume.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComMovementGridComponent.uc" />
     <Content Include="Src\XComGame\Classes\XComMPData.uc" />
     <Content Include="Src\XComGame\Classes\XComMPLobbyGRI.uc" />
@@ -1807,6 +1990,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\XComPawnHitEffect.uc" />
     <Content Include="Src\XComGame\Classes\XComPawnIndoorOutdoorInfo.uc" />
     <Content Include="Src\XComGame\Classes\XComPawnPhysicsProp.uc" />
+    <Content Include="Src\XComGame\Classes\XComPeripheryHidingVolume.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComPerkContent.uc" />
     <Content Include="Src\XComGame\Classes\XComPhotographer_Strategy.uc" />
     <Content Include="Src\XComGame\Classes\XComPhysicalMaterialProperty.uc" />
@@ -1840,6 +2026,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\XComSkelControlCopyParentBones.uc" />
     <Content Include="Src\XComGame\Classes\XComSkelControlLimb_LeftHandIK.uc" />
     <Content Include="Src\XComGame\Classes\XComSkeletalMeshActor.uc" />
+    <Content Include="Src\XComGame\Classes\XComSkeletalMeshActorMAT.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComSoundEmitter.uc" />
     <Content Include="Src\XComGame\Classes\XComSoundManager.uc" />
     <Content Include="Src\XComGame\Classes\XComSpawnPoint.uc" />
@@ -1867,6 +2056,9 @@ TODO:</Description>
     <Content Include="Src\XComGame\Classes\XComTacticalSoundManager.uc" />
     <Content Include="Src\XComGame\Classes\XComTileDestructionActor.uc" />
     <Content Include="Src\XComGame\Classes\XComTileEffectActor.uc" />
+    <Content Include="Src\XComGame\Classes\XComTileEffectVolume.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\XComTileFracLevelActor.uc" />
     <Content Include="Src\XComGame\Classes\XComTileFracMeshComponent.uc" />
     <Content Include="Src\XComGame\Classes\XComTorsoContent.uc" />

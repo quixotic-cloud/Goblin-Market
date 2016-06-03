@@ -254,13 +254,6 @@ simulated function bool OnUnrealCommand(int cmd, int arg)
 	if ( !CheckInputIsReleaseOrDirectionRepeat(cmd, arg) )
 		return false;
 
-	switch(cmd)
-	{
-	case class'UIUtilities_Input'.const.FXS_KEY_ENTER:
-		OnClickedConfirmButton(ConfirmButton);
-		return true;
-	}
-
 	return super.OnUnrealCommand(cmd, arg);
 }
 

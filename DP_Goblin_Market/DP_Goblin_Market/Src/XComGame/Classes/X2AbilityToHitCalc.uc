@@ -77,16 +77,25 @@ protected function FinalizeHitChance()
 	//  if crit goes negative, hit would get a boost, so restrict it to 0
 	if (m_ShotBreakdown.ResultTable[eHit_Crit] < 0)
 		m_ShotBreakdown.ResultTable[eHit_Crit] = 0;
+	//  cap success at 100 so it can be fully overridden by crit
+	m_ShotBreakdown.ResultTable[eHit_Success] = min(m_ShotBreakdown.ResultTable[eHit_Success], 100);
 	//  Crit is folded into the chance to hit, so lower accordingly
 	m_ShotBreakdown.ResultTable[eHit_Success] -= m_ShotBreakdown.ResultTable[eHit_Crit];
-	//  Graze is scaled against Success
-	if (m_ShotBreakdown.ResultTable[eHit_Graze] > 0)
+	//  Graze is scaled against Success - but ignored if success is 100%
+	if (m_ShotBreakdown.ResultTable[eHit_Graze] > 0) 
 	{
-		GrazeScale = float(m_ShotBreakdown.ResultTable[eHit_Graze]) / 100.0f;
-		GrazeScale *= float(m_ShotBreakdown.FinalHitChance);
-		FinalGraze = Round(GrazeScale);
-		m_ShotBreakdown.ResultTable[eHit_Success] -= FinalGraze;
-		m_ShotBreakdown.ResultTable[eHit_Graze] = FinalGraze;
+		if (m_ShotBreakdown.FinalHitChance < 100)
+		{
+			GrazeScale = float(m_ShotBreakdown.ResultTable[eHit_Graze]) / 100.0f;
+			GrazeScale *= float(m_ShotBreakdown.FinalHitChance);
+			FinalGraze = Round(GrazeScale);
+			m_ShotBreakdown.ResultTable[eHit_Success] -= FinalGraze;
+			m_ShotBreakdown.ResultTable[eHit_Graze] = FinalGraze;
+		}
+		else
+		{
+			m_ShotBreakdown.ResultTable[eHit_Graze] = 0;
+		}
 	}
 
 	if (m_ShotBreakdown.FinalHitChance >= 100)

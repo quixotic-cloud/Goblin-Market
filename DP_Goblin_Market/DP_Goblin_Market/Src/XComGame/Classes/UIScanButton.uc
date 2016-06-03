@@ -22,7 +22,8 @@ enum EUIScanButtonType
 	eUIScanButtonType_BlackMarket,
 	eUIScanButtonType_Supplies,
 	eUIScanButtonType_Contact,
-	eUIScanButtonType_Tower
+	eUIScanButtonType_Tower,
+	eUIScanButtonType_Alien
 };
 
 var EUIScanButtonType Type;

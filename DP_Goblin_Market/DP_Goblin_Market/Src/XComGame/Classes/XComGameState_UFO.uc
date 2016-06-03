@@ -456,7 +456,7 @@ function bool Update(XComGameState NewGameState)
 
 		// Do not trigger interception while the Avenger or Skyranger are flying, or if another popup is already being presented
 		StrategyMap = `HQPRES.StrategyMap2D;
-		if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+		if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.IsCurrentClass(class'UIAlert'))
 		{
 			// If we have hit our interception time, become visible, transport to be close to XComHQ, and start the attack
 			if (class'X2StrategyGameRulesetDataStructures'.static.LessThan(InterceptionTime, GetCurrentTime()))

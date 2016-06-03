@@ -230,6 +230,26 @@ simulated event PostInitAnimTree(SkeletalMeshComponent SkelComp)
 	}
 }
 
+function DebugAnims(Canvas kCanvas, bool DisplayHistory, XComIdleAnimationStateMachine IdleStateMachine, out Vector vScreenPos)
+{
+	local Array<AnimNodeSequence> DisplayedSequences;
+	local Array<AnimNodeBlendBase> DisplayedParents;
+	local XComAnimTreeController AnimControllerHack;
+	local SkeletalMeshComponent SkelComp;
+	local XComGameState_Item ItemState;
+
+	SkelComp = SkeletalMeshComponent(Mesh);
+	if( SkelComp != None )
+	{
+		AnimControllerHack = new class'XComAnimTreecontroller';
+		kCanvas.SetPos(vScreenPos.X, (vScreenPos.Y += 15.0f));
+		ItemState = XComGameState_Item(`XCOMHISTORY.GetGameStateForObjectID(m_kGameWeapon.ObjectID));
+		kCanvas.DrawText("Weapon:" @ ItemState.GetMyTemplateName());
+		kCanvas.SetPos(vScreenPos.X, (vScreenPos.Y += 15.0f));
+		AnimControllerHack.DisplayRelevantAnimNodes(SkelComp.Animations, 1.0f, kCanvas, DisplayedSequences, DisplayedParents, vScreenPos);
+	}
+}
+
 simulated function GivenTo(Pawn ThisPawn, optional bool bDoNotActivate)
 {
 //	Super.GivenTo(ThisPawn, bDoNotActivate);

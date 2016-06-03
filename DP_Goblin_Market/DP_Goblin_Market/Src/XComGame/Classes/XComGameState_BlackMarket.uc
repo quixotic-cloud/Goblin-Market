@@ -605,7 +605,7 @@ function bool Update(XComGameState NewGameState)
 	bModified = false;
 
 	// Do not trigger anything while the Avenger or Skyranger are flying, or if another popup is already being presented
-	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.IsCurrentClass(class'UIAlert'))
 	{		
 		// If the Avenger is not at the location and time runs out, close the market
 		/*if ((bNeedsScan || bIsOpen) && XComHQ.GetCurrentScanningSite().GetReference().ObjectID != ObjectID && class'X2StrategyGameRulesetDataStructures'.static.LessThan(ClosingTime, GetCurrentTime()))

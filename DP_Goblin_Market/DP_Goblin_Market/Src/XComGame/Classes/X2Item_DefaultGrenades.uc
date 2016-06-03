@@ -217,9 +217,7 @@ static function X2DataTemplate CreateFirebomb()
 	Template.iPhysicsImpulse = 10;
 
 	Template.CanBeBuilt = false;
-
-	Template.UpgradeItem = 'FirebombMK2';
-
+	
 	Template.RewardDecks.AddItem('ExperimentalGrenadeRewards');
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RangeLabel, , default.FIREGRENADE_RANGE);
@@ -269,6 +267,9 @@ static function X2DataTemplate FirebombMK2()
 
 	Template.CanBeBuilt = false;
 
+	Template.CreatorTemplateName = 'AdvancedGrenades'; // The schematic which creates this item
+	Template.BaseItem = 'Firebomb'; // Which item this will be upgraded from
+
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RangeLabel, , default.FIREBOMB_RANGE);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RadiusLabel, , default.FIREBOMB_RADIUS);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.ShredLabel, , default.FIREGRENADEM2_BASEDAMAGE.Shred);
@@ -306,13 +307,13 @@ static function X2DataTemplate CreateFragGrenade()
 
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	WeaponDamageEffect = new class'X2Effect_ApplyWeaponDamage';
 	WeaponDamageEffect.bExplosiveDamage = true;
 	Template.ThrownGrenadeEffects.AddItem(WeaponDamageEffect);
 	Template.LaunchedGrenadeEffects.AddItem(WeaponDamageEffect);
 
-	Template.UpgradeItem = 'AlienGrenade';
 	Template.HideIfResearched = 'PlasmaGrenade';
 
 	Template.OnThrowBarkSoundCue = 'ThrowGrenade';
@@ -364,6 +365,9 @@ static function X2DataTemplate CreateAlienGrenade()
 
 	Template.iPhysicsImpulse = 10;
 
+	Template.CreatorTemplateName = 'PlasmaGrenade'; // The schematic which creates this item
+	Template.BaseItem = 'FragGrenade'; // Which item this will be upgraded from
+
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
 
@@ -399,7 +403,7 @@ static function X2DataTemplate CreateFlashbangGrenade()
 	Template.bFriendlyFireWarning = false;
 	Template.Abilities.AddItem('ThrowGrenade');
 
-	Template.ThrownGrenadeEffects.AddItem(class'X2StatusEffects'.static.CreateDisorientedStatusEffect());
+	Template.ThrownGrenadeEffects.AddItem(class'X2StatusEffects'.static.CreateDisorientedStatusEffect(, , false));
 
 	//We need to have an ApplyWeaponDamage for visualization, even if the grenade does 0 damage (makes the unit flinch, shows overwatch removal)
 	WeaponDamageEffect = new class'X2Effect_ApplyWeaponDamage';
@@ -487,7 +491,6 @@ static function X2DataTemplate CreateSmokeGrenade()
 	Resources.Quantity = 25;
 	Template.Cost.ResourceCosts.AddItem(Resources);
 
-	Template.UpgradeItem = 'SmokeGrenadeMk2';
 	Template.HideIfResearched = 'AdvancedGrenades';
 
 	// Soldier Bark
@@ -534,6 +537,9 @@ static function X2DataTemplate SmokeGrenadeMk2()
 	Template.GameArchetype = "WP_Grenade_Smoke.WP_Grenade_Smoke_Lv2";
 
 	Template.CanBeBuilt = true;
+
+	Template.CreatorTemplateName = 'AdvancedGrenades'; // The schematic which creates this item
+	Template.BaseItem = 'SmokeGrenade'; // Which item this will be upgraded from
 	
 	// Cost
 	Resources.ItemTemplateName = 'Supplies';
@@ -591,8 +597,6 @@ static function X2DataTemplate CreateGasGrenade()
 
 	Template.CanBeBuilt = false;
 	
-	Template.UpgradeItem = 'GasGrenadeMk2';
-
 	Template.RewardDecks.AddItem('ExperimentalGrenadeRewards');
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RangeLabel, , default.GASGRENADE_RANGE);
@@ -641,6 +645,9 @@ static function X2DataTemplate CreateGasGrenadeMk2()
 	Template.GameArchetype = "WP_Grenade_Gas.WP_Grenade_Gas_Lv2";
 
 	Template.CanBeBuilt = false;
+	
+	Template.CreatorTemplateName = 'AdvancedGrenades'; // The schematic which creates this item
+	Template.BaseItem = 'GasGrenade'; // Which item this will be upgraded from
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RangeLabel, , default.GASBOMB_RANGE);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RadiusLabel, , default.GASBOMB_RADIUS);
@@ -689,9 +696,7 @@ static function X2DataTemplate CreateAcidGrenade()
 	Template.GameArchetype = "WP_Grenade_Acid.WP_Grenade_Acid";
 
 	Template.CanBeBuilt = false;
-
-	Template.UpgradeItem = 'AcidGrenadeMk2';
-
+	
 	Template.RewardDecks.AddItem('ExperimentalGrenadeRewards');
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RangeLabel, , default.ACIDGRENADE_RANGE);
@@ -742,6 +747,9 @@ static function X2DataTemplate CreateAcidGrenadeMk2()
 
 	Template.CanBeBuilt = false;
 
+	Template.CreatorTemplateName = 'AdvancedGrenades'; // The schematic which creates this item
+	Template.BaseItem = 'AcidGrenade'; // Which item this will be upgraded from
+
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RangeLabel, , default.ACIDBOMB_RANGE);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RadiusLabel, , default.ACIDBOMB_RADIUS);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.ShredLabel, , default.ACIDGRENADEM2_BASEDAMAGE.Shred);
@@ -768,11 +776,10 @@ static function X2GrenadeLauncherTemplate GrenadeLauncher()
 	Template.IncreaseGrenadeRange = default.GRENADELAUNCHER_RANGEBONUS;
 
 	Template.GameArchetype = "WP_GrenadeLauncher_CV.WP_GrenadeLauncher_CV";
-
-	Template.UpgradeItem = 'GrenadeLauncher_MG';
-
+	
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.GrenadeRangeBonusLabel, , default.GRENADELAUNCHER_RANGEBONUS);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.GrenadeRadiusBonusLabel, , default.GRENADELAUNCHER_RADIUSBONUS);
@@ -799,6 +806,9 @@ static function X2GrenadeLauncherTemplate AdvGrenadeLauncher()
 	Template.IncreaseGrenadeRange = default.ADVGRENADELAUNCHER_RANGEBONUS;
 
 	Template.GameArchetype = "WP_GrenadeLauncher_MG.WP_GrenadeLauncher_MG";
+
+	Template.CreatorTemplateName = 'GrenadeLauncher_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'GrenadeLauncher_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1146,7 +1156,7 @@ static function X2DataTemplate EMPGrenade()
 	RemoveEffects.EffectNamesToRemove.AddItem(class'X2Effect_EnergyShield'.default.EffectName);
 	Template.ThrownGrenadeEffects.AddItem(RemoveEffects);
 
-	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, 33);
+	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, 33, false);
 	StunnedEffect.SetDisplayInfo(ePerkBuff_Penalty, class'X2StatusEffects'.default.RoboticStunnedFriendlyName, class'X2StatusEffects'.default.RoboticStunnedFriendlyDesc, "img:///UILibrary_PerkIcons.UIPerk_stun");
 	StunnedEffect.TargetConditions.AddItem(UnitCondition);
 	Template.ThrownGrenadeEffects.AddItem(StunnedEffect);
@@ -1163,7 +1173,6 @@ static function X2DataTemplate EMPGrenade()
 
 	Template.Requirements.RequiredTechs.AddItem('Bluescreen');
 
-	Template.UpgradeItem = 'EMPGrenadeMk2';
 	Template.HideIfResearched = 'AdvancedGrenades';
 	
 	Template.bHideDamageStat = true;
@@ -1222,7 +1231,7 @@ static function X2DataTemplate EMPGrenadeMk2()
 	RemoveEffects.EffectNamesToRemove.AddItem(class'X2Effect_EnergyShield'.default.EffectName);
 	Template.ThrownGrenadeEffects.AddItem(RemoveEffects);
 
-	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, 50);
+	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, 50, false);
 	StunnedEffect.SetDisplayInfo(ePerkBuff_Penalty, class'X2StatusEffects'.default.RoboticStunnedFriendlyName, class'X2StatusEffects'.default.RoboticStunnedFriendlyDesc, "img:///UILibrary_PerkIcons.UIPerk_stun");
 	StunnedEffect.TargetConditions.AddItem(UnitCondition);
 	Template.ThrownGrenadeEffects.AddItem(StunnedEffect);
@@ -1232,6 +1241,9 @@ static function X2DataTemplate EMPGrenadeMk2()
 	Template.ThrownGrenadeEffects.AddItem(class'X2StatusEffects'.static.CreateHackDefenseChangeStatusEffect(default.EMPBOMB_HACK_DEFENSE_CHANGE, UnitCondition));
 
 	Template.LaunchedGrenadeEffects = Template.ThrownGrenadeEffects;
+
+	Template.CreatorTemplateName = 'AdvancedGrenades'; // The schematic which creates this item
+	Template.BaseItem = 'EMPGrenade'; // Which item this will be upgraded from
 
 	Resources.ItemTemplateName = 'Supplies';
 	Resources.Quantity = 50;

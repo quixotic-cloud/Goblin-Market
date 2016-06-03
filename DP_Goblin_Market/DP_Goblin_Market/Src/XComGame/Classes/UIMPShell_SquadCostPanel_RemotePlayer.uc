@@ -25,6 +25,15 @@ function InitRemotePlayerSquadCostPanel(X2MPShellManager kShellManager)
 	History = `XCOMHISTORY;
 
 	InitSquadCostPanel( m_kMPShellManager.OnlineGame_GetMaxSquadCost(), m_kLoadoutGameState, "");
+
+	SubscribeToOnCleanupWorld();
+
+	NetworkMgr = `XCOMNETMANAGER;
+	NetworkMgr.AddReceiveGameStateDelegate(OnReceiveGameState);
+	NetworkMgr.AddReceiveMergeGameStateDelegate(OnReceiveMergeGameState);
+	NetworkMgr.AddNotifyConnectionClosedDelegate(OnConnectionClosed);
+
+	Hide();
 }
 
 function setPointMeters(string strPlayerGamertag, string strPlayerTotal, string strPlayerMax, string strPlayerpointTotal, int numPlayerMeter)
@@ -35,19 +44,12 @@ function setPointMeters(string strPlayerGamertag, string strPlayerTotal, string 
 
 simulated function OnInit()
 {
+	`log(`location,,'XCom_Online');
 	super.OnInit();
 	
 	m_kGRI = XComMPLobbyGRI(WorldInfo.GRI);
 
-	SubscribeToOnCleanupWorld();
-
-	NetworkMgr = `XCOMNETMANAGER;
-	NetworkMgr.AddReceiveGameStateDelegate(OnReceiveGameState);
-	NetworkMgr.AddReceiveMergeGameStateDelegate(OnReceiveMergeGameState);
-	NetworkMgr.AddNotifyConnectionClosedDelegate(OnConnectionClosed);
-
 	RefreshData();
-	Hide();
 }
 
 function InitPlayer(ETeam TeamRegister)

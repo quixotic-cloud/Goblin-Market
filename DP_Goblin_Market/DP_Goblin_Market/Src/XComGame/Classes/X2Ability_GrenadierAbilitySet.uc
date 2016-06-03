@@ -28,6 +28,11 @@ var config float BLAST_PADDING_DMG_ADJUST;
 var config int CHAINSHOT_HIT_MOD;
 var config int ORDNANCE_BONUS;
 var config name FreeGrenadeForPocket;
+var config int HAILOFBULLETS_COOLDOWN;
+var config int BULLETSHRED_COOLDOWN;
+var config int SATURATION_FIRE_COOLDOWN;
+var config int CHAINSHOT_COOLDOWN;
+var config int DEMOLITION_COOLDOWN;
 
 static function array<X2DataTemplate> CreateTemplates()
 {
@@ -72,7 +77,7 @@ static function X2AbilityTemplate HailOfBullets()
 	Template.AbilityCosts.AddItem(AmmoCost);
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 6;
+	Cooldown.iNumTurns = default.HAILOFBULLETS_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 
 	ToHitCalc = new class'X2AbilityToHitCalc_StandardAim';
@@ -93,6 +98,7 @@ static function X2AbilityTemplate HailOfBullets()
 	Template.AssociatedPassives.AddItem( 'HoloTargeting' );
 	Template.AddTargetEffect(ShredderDamageEffect());
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
 
@@ -128,9 +134,12 @@ function GrenadePocketPurchased(XComGameState NewGameState, XComGameState_Unit U
 	local X2ItemTemplate FreeItem;
 	local XComGameState_Item ItemState;
 
+	if (UnitState.IsMPCharacter())
+		return;
+	
 	if (!UnitState.HasGrenadePocket())
 	{
-		`RedScreen("GrenadePocketPurchased called but the unit doesn't have one? -jbouscher / @gameplay" @ UnitState.ToString());
+		`RedScreen("GrenadePocketPurchased called but the unit doesn't have one? -jbouscher / @gameplay" @ UnitState.ToString());		
 		return;
 	}
 	FreeItem = class'X2ItemTemplateManager'.static.GetItemTemplateManager().FindItemTemplate(default.FreeGrenadeForPocket);
@@ -531,7 +540,7 @@ static function X2AbilityTemplate BulletShred()
 	Template.bAllowAmmoEffects = true;
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 4;
+	Cooldown.iNumTurns = default.BULLETSHRED_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 
 	// Weapon Upgrade Compatibility
@@ -540,6 +549,7 @@ static function X2AbilityTemplate BulletShred()
 	WeaponDamageEffect = ShredderDamageEffect();
 	WeaponDamageEffect.EffectDamageValue.Rupture = default.BULLET_SHRED;
 	Template.AddTargetEffect(WeaponDamageEffect);
+	Template.bAllowBonusWeaponEffects = true;
 	
 	Template.AddTargetEffect(HoloTargetEffect());
 	Template.AssociatedPassives.AddItem('HoloTargeting');
@@ -637,7 +647,7 @@ static function X2AbilityTemplate SaturationFire()
 	Template.AbilityCosts.AddItem(ActionPointCost);
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 6;
+	Cooldown.iNumTurns = default.SATURATION_FIRE_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 	
 	StandardAim = new class'X2AbilityToHitCalc_StandardAim';
@@ -717,7 +727,7 @@ static function X2AbilityTemplate ChainShot()
 	Template.AbilityCosts.AddItem(ActionPointCost);
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 4;
+	Cooldown.iNumTurns = default.CHAINSHOT_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 
 	//  require 2 ammo to be present so that both shots can be taken
@@ -748,6 +758,7 @@ static function X2AbilityTemplate ChainShot()
 	Template.AddTargetEffect(ShredderDamageEffect());
 	Template.AddTargetEffect(class'X2Ability'.default.WeaponUpgradeMissDamage);
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
 
@@ -758,19 +769,74 @@ static function X2AbilityTemplate ChainShot()
 	Template.AbilityConfirmSound = "TacticalUI_ActivateAbility";
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
-	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildVisualizationFn = ChainShot1_BuildVisualization;
 	Template.BuildInterruptGameStateFn = TypicalAbility_BuildInterruptGameState;
 
 	Template.AdditionalAbilities.AddItem('ChainShot2');
 	Template.PostActivationEvents.AddItem('ChainShot2');
-	Template.CinescriptCameraType = "StandardGunFiring";
 
 	Template.DamagePreviewFn = ChainShotDamagePreview;
 	Template.bCrossClassEligible = true;
 
-	Template.bPreventsTargetTeleport = true;
-
 	return Template;
+}
+
+simulated function ChainShot1_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+{
+	local XComGameStateContext_Ability AbilityContext;
+	local XComGameStateContext Context;
+	local XComGameStateContext_Ability TestAbilityContext;
+	local int EventChainIndex, TrackIndex, ActionIndex;
+	local XComGameStateHistory History;
+	local X2Action_EnterCover EnterCoverAction;
+	local X2Action_EndCinescriptCamera EndCinescriptCameraAction;
+
+	// Build the first shot of Rapid Fire's visualization
+	TypicalAbility_BuildVisualization(VisualizeGameState, OutVisualizationTracks);
+
+	Context = VisualizeGameState.GetContext();
+	AbilityContext = XComGameStateContext_Ability(Context);
+
+	if( AbilityContext.EventChainStartIndex != 0 )
+	{
+		History = `XCOMHISTORY;
+
+		// This GameState is part of a chain, which means there may be a second shot for rapid fire
+		for( EventChainIndex = AbilityContext.EventChainStartIndex; !Context.bLastEventInChain; ++EventChainIndex )
+		{
+			Context = History.GetGameStateFromHistory(EventChainIndex).GetContext();
+
+			TestAbilityContext = XComGameStateContext_Ability(Context);
+
+			if( TestAbilityContext.InputContext.AbilityTemplateName == 'ChainShot2' &&
+				TestAbilityContext.InputContext.SourceObject.ObjectID == AbilityContext.InputContext.SourceObject.ObjectID &&
+				TestAbilityContext.InputContext.PrimaryTarget.ObjectID == AbilityContext.InputContext.PrimaryTarget.ObjectID )
+			{
+				// Found a RapidFire2 visualization
+				for( TrackIndex = 0; TrackIndex < OutVisualizationTracks.Length; ++TrackIndex )
+				{
+					if( OutVisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == AbilityContext.InputContext.SourceObject.ObjectID)
+					{
+						// Found the Source track
+						break;
+					}
+				}
+
+				for( ActionIndex = OutVisualizationTracks[TrackIndex].TrackActions.Length - 1; ActionIndex >= 0; --ActionIndex )
+				{
+					EnterCoverAction = X2Action_EnterCover(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+					EndCinescriptCameraAction = X2Action_EndCinescriptCamera(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+					if ( (EnterCoverAction != none) ||
+						 (EndCinescriptCameraAction != none) )
+					{
+						OutVisualizationTracks[TrackIndex].TrackActions.Remove(ActionIndex, 1);
+					}
+				}
+
+				break;
+			}
+		}
+	}
 }
 
 function bool ChainShotDamagePreview(XComGameState_Ability AbilityState, StateObjectReference TargetRef, out WeaponDamageValue MinDamagePreview, out WeaponDamageValue MaxDamagePreview, out int AllowsShield)
@@ -827,6 +893,7 @@ static function X2AbilityTemplate ChainShot2()
 	Template.AddTargetEffect(ShredderDamageEffect());
 	Template.AddTargetEffect(class'X2Ability'.default.WeaponUpgradeMissDamage);
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	Trigger = new class'X2AbilityTrigger_EventListener';
 	Trigger.ListenerData.Deferral = ELD_OnStateSubmitted;
@@ -841,11 +908,45 @@ static function X2AbilityTemplate ChainShot2()
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_chainshot";
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
-	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildVisualizationFn = ChainShot2_BuildVisualization;
 	Template.bShowActivation = true;
-	Template.CinescriptCameraType = "StandardGunFiring";
 
 	return Template;
+}
+
+simulated function ChainShot2_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+{
+	local XComGameStateContext Context;
+	local XComGameStateContext_Ability AbilityContext;
+	local int TrackIndex, ActionIndex;
+	local X2Action_ExitCover ExitCoverAction;
+	local X2Action_StartCinescriptCamera StartCinescriptCameraAction;
+
+	// Build the first shot of Rapid Fire's visualization
+	TypicalAbility_BuildVisualization(VisualizeGameState, OutVisualizationTracks);
+
+	Context = VisualizeGameState.GetContext();
+	AbilityContext = XComGameStateContext_Ability(Context);
+
+	for( TrackIndex = 0; TrackIndex < OutVisualizationTracks.Length; ++TrackIndex )
+	{
+		if( OutVisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == AbilityContext.InputContext.SourceObject.ObjectID)
+		{
+			// Found the Source track
+			break;
+		}
+	}
+
+	for( ActionIndex = OutVisualizationTracks[TrackIndex].TrackActions.Length - 1; ActionIndex >= 0; --ActionIndex )
+	{
+		ExitCoverAction = X2Action_ExitCover(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+		StartCinescriptCameraAction = X2Action_StartCinescriptCamera(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+		if ( (ExitCoverAction != none) ||
+				(StartCinescriptCameraAction != none) )
+		{
+			OutVisualizationTracks[TrackIndex].TrackActions.Remove(ActionIndex, 1);
+		}
+	}
 }
 
 static function X2AbilityTemplate Demolition()
@@ -873,7 +974,7 @@ static function X2AbilityTemplate Demolition()
 	Template.AbilityCosts.AddItem(ActionPointCost);
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 4;
+	Cooldown.iNumTurns = default.DEMOLITION_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 
 	AmmoCost = new class'X2AbilityCost_Ammo';

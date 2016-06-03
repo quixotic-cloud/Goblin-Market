@@ -209,13 +209,15 @@ simulated function UIMechaListItem UpdateDataDescription(string _Desc,
 	SetWidgetType(EUILineItemType_Description);
 	Desc.SetHTMLText(_Desc);
 	Desc.Show();
+	Desc.SetWidth(Width - 10);
 	OnClickDelegate = _OnClickDelegate;
 	return self;
 }
 
 simulated function UIMechaListItem UpdateDataValue(string _Desc,
 								    String _ValueLabel,
-								    optional delegate<OnClickDelegate> _OnClickDelegate = none)
+								    optional delegate<OnClickDelegate> _OnClickDelegate = none,
+									optional bool bForce = false)
 {
 	SetWidgetType(EUILineItemType_Value);
 
@@ -229,11 +231,11 @@ simulated function UIMechaListItem UpdateDataValue(string _Desc,
 		//Value.SetPosition(10, 0);
 		Value.SetX(10);
 	}
-
-	Value.SetHTMLText(class'UIUtilities_Text'.static.AlignRight(_ValueLabel));
+		
+	Value.SetHTMLText(class'UIUtilities_Text'.static.AlignRight(_ValueLabel), , bForce);
 	Value.Show();
 
-	Desc.SetHTMLText(_Desc);
+	Desc.SetHTMLText(_Desc, bForce);
 	Desc.Show();
 	
 	OnClickDelegate = _OnClickDelegate;
@@ -487,6 +489,9 @@ simulated function SetDisabled(bool IsDisabled, optional string TooltipReason)
 		MC.FunctionBool("SetDisabled", IsDisabled);
 	}
 
+	if( Desc!= none )
+		Desc.SetDisabled(IsDisabled);
+
 	if(Spinner != none)
 		Spinner.SetDisabled(IsDisabled);
 
@@ -532,7 +537,7 @@ simulated function OnMouseEvent( int cmd, array<string> args )
 {
 	super.OnMouseEvent(cmd, args);
 
-	if( cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_UP || cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_DOUBLE_UP )
+	if( cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_UP || cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_DOUBLE_UP || cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_UP_DELAYED )
 		Click();
 	else if( cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_OUT || cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_DRAG_OUT )
 		OnLoseFocus();

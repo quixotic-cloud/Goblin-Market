@@ -9,6 +9,47 @@ var()	MaterialInterface	NewMaterial;
 /** Index in the Materials array to replace with NewMaterial when this action is activated. */
 var()	INT					MaterialIndex;
 
+/** Apply the Material to all material ids. */
+var()	bool				AllMaterialIdx;
+
+event Activated()
+{
+	local XComUnitPawn PawnToSet;
+	local SeqVar_Object TargetObj;
+	local MeshComponent MeshComp;
+	local int i;
+
+	foreach LinkedVariables(class'SeqVar_Object', TargetObj, "TargetPawns")
+	{
+		PawnToSet = XComUnitPawn(TargetObj.GetObjectValue());
+
+		foreach PawnToSet.AllOwnedComponents(class'MeshComponent', MeshComp)
+		{
+			if (AllMaterialIdx)
+			{
+				for (i = 0; i < MeshComp.GetNumElements(); ++i)
+					MeshComp.SetMaterial(i, NewMaterial);
+			}
+			else
+			{ 
+				MeshComp.SetMaterial(MaterialIndex, NewMaterial);
+			}	
+		}		
+	}
+}
+
+defaultproperties
+{
+	ObjName="Set Material On Human Pawn"
+	ObjCategory="Unit"
+	AllMaterialIdx = false
+	VariableLinks[0]=(ExpectedType=class'SeqVar_Object',LinkDesc="TargetPawns",bModifiesLinkedObject=true)
+	bCallHandler=false  // This is needed to disable handler message output
+}
+
+
+
+/*****************************************************Old Code*********************************************
 enum MeshEnum
 {
 	eMeshEnum_Body,
@@ -68,3 +109,4 @@ defaultproperties
 
 	bSetCustomizationParameters=false
 }
+*/

@@ -51,6 +51,8 @@ struct TInputDialogData
 var TInputDialogData m_kData;
 var UINavigationHelp NavHelp;
 
+var UIInputSteam SteamInput; 
+
 delegate TextInputClosedCallback(string newText);
 delegate TextInputAcceptedCallback(string newText);
 delegate TextInputCancelledCallback(string newText);
@@ -67,18 +69,30 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 {
 	super.InitScreen(InitController, InitMovie, InitName);
 
-	NavHelp = Spawn(class'UINavigationHelp', self).InitNavHelp('helpBarMC');
+	if( `XENGINE.m_SteamControllerManager.IsSteamControllerActive() )
+	{
+		SteamInput = new class'UIInputSteam';
+		SteamInput.InitLink(self);
+		Hide();
+	}
+	else
+	{
+		NavHelp = Spawn(class'UINavigationHelp', self).InitNavHelp('helpBarMC');
 
-	NavHelp.AddLeftHelp(class'UIUtilities_Text'.default.m_strGenericCancel, class'UIUtilities_Input'.static.GetBackButtonIcon(), OnMouseCancel);
-	NavHelp.AddRightHelp(class'UIUtilities_Text'.default.m_strGenericConfirm, class'UIUtilities_Input'.static.GetAdvanceButtonIcon(), OnMouseAccept);
+		NavHelp.AddLeftHelp(class'UIUtilities_Text'.default.m_strGenericCancel, class'UIUtilities_Input'.static.GetBackButtonIcon(), OnMouseCancel);
+		NavHelp.AddRightHelp(class'UIUtilities_Text'.default.m_strGenericConfirm, class'UIUtilities_Input'.static.GetAdvanceButtonIcon(), OnMouseAccept);
 
-	XComInputBase(PC.PlayerInput).RawInputListener = RawInputHandler;
+		XComInputBase(PC.PlayerInput).RawInputListener = RawInputHandler;
+	}
 }
 
 simulated function OnInit()
 {
 	super.OnInit();
-	SetData(m_kData.strTitle, m_kData.iMaxChars, m_kData.strInputBoxText, m_kData.DialogType, m_kData.bIsPassword);
+	if( SteamInput == none )
+	{
+		SetData(m_kData.strTitle, m_kData.iMaxChars, m_kData.strInputBoxText, m_kData.DialogType, m_kData.bIsPassword);
+	}
 }
 
 simulated function bool RawInputHandler(Name Key, int ActionMask, bool bCtrl, bool bAlt, bool bShift)
@@ -103,10 +117,13 @@ simulated function bool OnUnrealCommand(int cmd, int arg)
 
 	switch( cmd )
 	{
-		case class'UIUtilities_Input'.const.FXS_BUTTON_A:
+	case class'UIUtilities_Input'.const.FXS_KEY_ENTER:
+	case class'UIUtilities_Input'.const.FXS_KEY_SPACEBAR:
+	case class'UIUtilities_Input'.const.FXS_BUTTON_A:
 			OnAccept();
 			Movie.Pres.PlayUISound(eSUISound_MenuClose);
 			break;
+		case class'UIUtilities_Input'.const.FXS_KEY_ESCAPE:
 		case class'UIUtilities_Input'.const.FXS_BUTTON_B:
 			OnCancel();
 			Movie.Pres.PlayUISound(eSUISound_MenuClose);
@@ -262,12 +279,27 @@ simulated function SetData( string title, int maxChars, string textBoxText, int 
 {
 	Movie.ActionScriptVoid( MCPath $ ".SetData" );
 }
-simulated function string AS_GetInputText() {
-	return Movie.ActionScriptString( MCPath $ ".GetInputText" );
+simulated function string AS_GetInputText() 
+{
+	if( SteamInput != none )
+	{
+		return SteamInput.UserText;
+	}
+	else
+	{
+		return Movie.ActionScriptString(MCPath $ ".GetInputText");
+	}
 }
 simulated function string AS_GetTitleText()
 {
-	return Movie.ActionScriptString(MCPath $ ".GetTitleText");
+	if( SteamInput != none )
+	{
+		return ""; //Do we allow entry here? 
+	}
+	else
+	{
+		return Movie.ActionScriptString(MCPath $ ".GetTitleText");
+	}
 }
 //==============================================================================
 //		DEFAULTS:
@@ -278,5 +310,6 @@ defaultproperties
 	MCName = "theInputDialogueScreen";
 	InputState = eInputState_Consume;
 	bConsumeMouseEvents = true;
+	bAlwaysTick = true
 	bProcessMouseEventsIfNotFocused = true;
 }

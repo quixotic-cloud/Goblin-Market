@@ -41,6 +41,7 @@ var(X2ItemTemplate) int             TradingPostBatchSize;           // Number re
 var(X2ItemTemplate) Delegate<OnAcquiredDelegate> OnAcquiredFn;		// Any game state updates upon acquisition of this item in the HQ
 var(X2ItemTemplate) Delegate<OnBuiltDelegate> OnBuiltFn;			// Any gameplay effects upon building the item
 var(X2ItemTemplate) Delegate<OnEquippedDelegate> OnEquippedFn;		// Any gameplay effects upon equipping the item
+var(X2ItemTemplate) Delegate<OnEquippedDelegate> OnUnequippedFn;    // Any gameplay effects upon unequipping the item
 var(X2ItemTemplate) Delegate<IsObjectiveItemDelegate> IsObjectiveItemFn; // Is this item an objective item (goldenpath and quest category items are assumed to be)
 
 var(X2ItemTemplate) config int		PointsToComplete;
@@ -48,7 +49,9 @@ var(X2ItemTemplate) bool            CanBeBuilt;                     // Can XCom 
 var(X2ItemTemplate) bool			bOneTimeBuild;					// This item can only be built once (Story Items, Schematic Projects)
 var(X2ItemTemplate) bool			bBlocked;						// This item must be unblocked before it can be built
 
+var(X2ItemTemplate) name			CreatorTemplateName;			// This item is created by this template (normally a schematic or tech)
 var(X2ItemTemplate) name			UpgradeItem;					// This item can be upgraded into another item defined by the named template
+var(X2ItemTemplate) name			BaseItem;						// The item this one was upgraded from
 var(X2ItemTemplate) name			HideIfResearched;				// If this tech is researched, do not display in Build Items
 var(X2ItemTemplate) name			HideIfPurchased;				// If the referenced item is purchased, do not display in Build Items
 
@@ -61,6 +64,7 @@ var(X2ItemTemplate) array<name>		RewardDecks;					// This item template should b
 
 // Requirements and Cost
 var config StrategyRequirement		Requirements;
+var config array<StrategyRequirement> AlternateRequirements; // Other possible StrategyRequirements for this item
 var config StrategyCost				Cost;
 var StrategyRequirement				ArmoryDisplayRequirements;
 var int                             MPCost;                         // the cost when equiping this item in a multiplayer squad. -tsmith
@@ -68,6 +72,7 @@ var int                             MPCost;                         // the cost 
 // Sounds
 var(X2ItemTemplate) string			ItemRecoveredAsLootNarrative;
 var(X2ItemTemplate) string			ItemRecoveredAsLootNarrativeReqsNotMet;
+var(X2ItemTemplate) name			ItemRecoveredAsLootEventToTrigger;
 
 var() name            ItemCat;      //  must match one of the entries in X2ItemTemplateManager's ItemCategories
 var() string          strImage;     //  you can find pre-defined images in UIUtilities_Image.GetItemImagePath()
@@ -176,7 +181,7 @@ function string GetItemFriendlyNameNoStats()
 	}
 }
 
-function string GetItemFriendlyName(optional int ItemID = 0)
+function string GetItemFriendlyName(optional int ItemID = 0, optional bool bShowSquadUpgrade)
 {
 	local XComGameStateHistory History;
 	local XComGameState_HeadquartersXCom XComHQ;

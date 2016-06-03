@@ -79,10 +79,22 @@ protected native final function float GetCameraDistanceFromLookAtPoint();
 // returns true if the given point lies within the screen tether
 protected static native final function bool IsPointWithinTether(TPOV Camera, Vector LookatPoint);
 
+cpptext
+{
+	// Utility function to prevent the camera from being zoomed into or dropped lower than the
+	// ground floor
+	static void MoveCameraUpIfEmbeddedInFloor(FVector& CameraLocation);
+}
+
 /// <summary>
 /// Gets the current desired look at location. Override in derived classes
 /// </summary>
 protected function Vector GetCameraLookat();
+
+function bool IsLookAtValid()
+{
+	return !class'Helpers'.static.VectorContainsNaNOrInfinite(GetCameraLookat());
+}
 
 function native TPOV GetCameraLocationAndOrientation();
 

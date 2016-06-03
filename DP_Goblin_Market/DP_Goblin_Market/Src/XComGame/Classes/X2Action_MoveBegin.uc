@@ -198,11 +198,11 @@ Begin:
 	//If this unit is set to follow another unit, insert a delay into the beginning of the move
 	if (Unit.bNextMoveIsFollow)
 	{
-		sleep(DefaultFollowDelay);
+		sleep(DefaultFollowDelay * GetDelayModifier());
 	}
 	else
 	{
-		sleep(DefaultGroupFollowDelay * float(MovePathIndex)); //If we are part of a group, add an increasing delay based on which group index we are
+		sleep(DefaultGroupFollowDelay * float(MovePathIndex) * GetDelayModifier()); //If we are part of a group, add an increasing delay based on which group index we are
 	}
 
 	while( Unit.IdleStateMachine.IsEvaluatingStance() )
@@ -284,6 +284,7 @@ Begin:
 				UnitPawn.EnableRMA(true, true);
 				UnitPawn.EnableRMAInteractPhysics(true);
 				
+				AnimParams.PlayRate = GetMoveAnimationSpeed();
 				AnimParams.HasDesiredEndingAtom = true;
 				AnimParams.DesiredEndingAtom.Translation = RunStartDestination;
 				AnimParams.DesiredEndingAtom.Rotation = QuatFromRotator(MoveDirectionRotator);

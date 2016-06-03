@@ -399,6 +399,12 @@ function bool AddAlertData( int AlertedUnitID, EAlertCause NewAlertCause, AlertA
 		}
 	}
 
+	if (`XWORLD.IsTileOutOfRange(TileLocation))
+	{
+		`LogAI("AlertData - Ignoring Tile Location outside world bounds");
+		return false;
+	}
+
 	if( AlertDataIndex == INDEX_NONE )
 	{
 		// No Alert Data with absolute knowledge was found for the associated Unit

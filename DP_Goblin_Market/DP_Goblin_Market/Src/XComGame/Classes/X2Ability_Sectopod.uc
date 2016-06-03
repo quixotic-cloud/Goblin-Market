@@ -23,13 +23,12 @@ var int HIGH_STANCE_ENV_DAMAGE_AMOUNT;
 var int HIGH_STANCE_IMPULSE_AMOUNT;
 
 var privatewrite name WrathCannonAbilityName;
+var deprecated name WrathCannonStage1DelayEffectName;
 
 var name WrathCannonStage1EffectName;
-var name WrathCannonStage1DelayEffectName;
 
 var privatewrite name WrathCannonStage1AbilityName;
 var privatewrite name WrathCannonStage2AbilityName;
-var private name WrathCannonStage2TriggerName;
 
 const SECTOPOD_LOW_VALUE=0;	// Arbitrary value designated as LOW value
 const SECTOPOD_HIGH_VALUE=1;		// Arbitrary value designated as HIGH value
@@ -772,7 +771,6 @@ static function X2AbilityTemplate CreateTeamChangeHandlerAbility()
 
 	// remove these effects when hacked.
 	RemoveEffects = new class'X2Effect_RemoveEffects';
-	RemoveEffects.EffectNamesToRemove.AddItem(default.WrathCannonStage1DelayEffectName);
 	RemoveEffects.EffectNamesToRemove.AddItem(default.WrathCannonStage1EffectName);
 	Template.AddShooterEffect(RemoveEffects);
 
@@ -792,7 +790,6 @@ static function X2AbilityTemplate CreateWrathCannonStage1Ability()
 	local X2AbilityMultiTarget_Line         LineMultiTarget;
 	local X2AbilityTarget_Cursor CursorTarget;
 	local X2Condition_UnitProperty UnitProperty;
-	local X2Effect_DelayedAbilityActivation WrathCannonStage1DelayEffect;
 	local X2Effect_Persistent				WrathCannonStage1Effect;
 	local X2Effect_SetUnitValue				SetImmobilizedValue;
 
@@ -842,19 +839,12 @@ static function X2AbilityTemplate CreateWrathCannonStage1Ability()
 	CursorTarget.FixedAbilityRange = 15;
 	Template.AbilityTargetStyle = CursorTarget;
 
-	//Delayed Effect to cause the second Wrath Cannon stage to occur
-	WrathCannonStage1DelayEffect = new class 'X2Effect_DelayedAbilityActivation';
-	WrathCannonStage1DelayEffect.BuildPersistentEffect(1, false, false, , eGameRule_PlayerTurnBegin);
-	WrathCannonStage1DelayEffect.EffectName = default.WrathCannonStage1DelayEffectName;
-	WrathCannonStage1DelayEffect.TriggerEventName = default.WrathCannonStage2TriggerName;
-	WrathCannonStage1DelayEffect.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.GetMyLongDescription(), "", true, , Template.AbilitySourceName);
-	Template.AddShooterEffect(WrathCannonStage1DelayEffect);
-
 	WrathCannonStage1Effect = new class'X2Effect_Persistent';
 	WrathCannonStage1Effect.BuildPersistentEffect(1, true, true, true);
 	WrathCannonStage1Effect.EffectName = default.WrathCannonStage1EffectName;
 	WrathCannonStage1Effect.VisionArcDegreesOverride = 180.0f;
 	WrathCannonStage1Effect.EffectRemovedVisualizationFn = WrathCannonStage1RemovedVisualization;
+	WrathCannonStage1Effect.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.GetMyLongDescription(), "", true, , Template.AbilitySourceName);
 	Template.AddShooterEffect(WrathCannonStage1Effect);
 
 	// Immobilize Sectopod for the turn when the wrath cannon is activated.
@@ -980,6 +970,7 @@ static function X2DataTemplate CreateWrathCannonStage2Ability()
 	local X2AbilityMultiTarget_Line         LineMultiTarget;
 	local X2AbilityCost_ActionPoints ActionPointCost;
 	local X2AbilityTarget_Cursor CursorTarget;
+	local X2Condition_UnitProperty UnitProperty;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, default.WrathCannonStage2AbilityName);
 	Template.eAbilityIconBehaviorHUD = EAbilityIconBehavior_NeverShow;
@@ -994,15 +985,20 @@ static function X2DataTemplate CreateWrathCannonStage2Ability()
 	CursorTarget = new class'X2AbilityTarget_Cursor';
 	CursorTarget.FixedAbilityRange = 15;
 	Template.AbilityTargetStyle = CursorTarget;
+
+	UnitProperty = new class'X2Condition_UnitProperty';
+	UnitProperty.ExcludeImpaired = true;
+	Template.AbilityShooterConditions.AddItem(UnitProperty);
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
 	Template.AddShooterEffectExclusions();
 
 	// This ability fires when the event DelayedExecuteRemoved fires on this unit
 	DelayedEventListener = new class'X2AbilityTrigger_EventListener';
 	DelayedEventListener.ListenerData.Deferral = ELD_OnStateSubmitted;
-	DelayedEventListener.ListenerData.EventID = default.WrathCannonStage2TriggerName;
-	DelayedEventListener.ListenerData.Filter = eFilter_Unit;
+	DelayedEventListener.ListenerData.EventID = 'PlayerTurnBegun';
+	DelayedEventListener.ListenerData.Filter = eFilter_Player;
 	DelayedEventListener.ListenerData.EventFn = class'XComGameState_Ability'.static.AbilityTriggerEventListener_WrathCannon;
+	DelayedEventListener.ListenerData.Priority = 1;
 	Template.AbilityTriggers.AddItem(DelayedEventListener);
 
 	// Remove the Stage1 effect.
@@ -1224,9 +1220,7 @@ defaultproperties
 	WrathCannonAbilityName = "WrathCannon"
 	WrathCannonStage1AbilityName = "WrathCannonStage1"
 	WrathCannonStage2AbilityName = "WrathCannonStage2"
-	WrathCannonStage2TriggerName = "WrathCannonStage2Trigger"
 	WrathCannonStage1EffectName = "WrathCannonStage1Effect"
-	WrathCannonStage1DelayEffectName = "WrathCannonStage1Delay"
 	HeightChangeEffectName = "SectopodStandUp"
 	HighLowValueName = "HighLowValue"
 	HIGH_STANCE_ENV_DAMAGE_AMOUNT = 30

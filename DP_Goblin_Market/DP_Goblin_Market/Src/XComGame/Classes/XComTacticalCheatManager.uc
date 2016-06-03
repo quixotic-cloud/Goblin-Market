@@ -171,6 +171,7 @@ var bool bDebugSpawns;
 var bool bDebugConcealment;
 var bool bAIDisableIntent;
 var bool bAIShowLastAction;
+var bool bAbilitiesDoNotTriggerAlienRulerAction;
 
 var array<string> strLastAIAbility;
 
@@ -178,6 +179,7 @@ var X2Camera_LookAtLocation kLookAtCamera;
 
 var bool m_bEnableBuildingVisibility_Cheat;
 var bool m_bEnableCutoutBox_Cheat;
+var bool m_bEnablePeripheryHiding_Cheat;
 var bool m_bShowPOILocations_Cheat;
 var float m_fCutoutBoxSize_Cheat;
 
@@ -246,6 +248,8 @@ var bool DisablePodRevealLeaderCollisionFail;
 
 // if set, will force the specified object to be the target of the next overwatch ability (when it moves)
 var StateObjectReference ForcedOverwatchTarget;
+
+var bool bShowEscapeOptions;
 
 exec function ProfileTileRebuild(int MinX, int MinY, int MinZ, int MaxX, int MaxY, int MaxZ)
 {
@@ -337,6 +341,11 @@ exec function BuildingVisEnable(bool bEnable)
 exec function CutoutBoxEnable(bool bEnable)
 {
 	m_bEnableCutoutBox_Cheat = bEnable;
+}
+
+exec function PeripheryHidingEnable(bool bEnable)
+{
+	m_bEnablePeripheryHiding_Cheat = bEnable;
 }
 
 exec function ShowPOILocation(optional bool bEnable = true)
@@ -452,6 +461,32 @@ exec function TestNonUnitPathSolver()
 		NodePosition = WorldData.GetPositionFromTileCoordinates(Tile);
 		`BATTLE.DrawDebugLine(PreviousNodePosition, NodePosition, 255, 255, 255, true);
 	}
+}
+
+exec function StartRagdoll()
+{
+	local XGUnit ActiveUnit;
+
+	ActiveUnit = XComTacticalController(GetALocalPlayerController()).GetActiveUnit();
+	if( ActiveUnit == None )
+	{
+		return;
+	}
+
+	ActiveUnit.GetPawn().StartRagdoll();
+}
+
+exec function EndRagdoll()
+{
+	local XGUnit ActiveUnit;
+
+	ActiveUnit = XComTacticalController(GetALocalPlayerController()).GetActiveUnit();
+	if( ActiveUnit == None )
+	{
+		return;
+	}
+
+	ActiveUnit.GetPawn().EndRagdoll();
 }
 
 exec function ShowReachableTilesCache( bool bUseClosestUnitToCursor=false )
@@ -657,7 +692,7 @@ exec function GiveItem(string ItemTemplateName)
 		ItemTemplate.InventorySlot == eInvSlot_HeavyWeapon)
 	{
 		OldItem = Unit.GetItemInSlot(ItemTemplate.InventorySlot);
-		Unit.RemoveItemFromInventory(OldItem);		
+		Unit.RemoveItemFromInventory(OldItem, NewGameState);		
 
 		//Remove abilities that were being granted by the old item
 		for( AbilityIndex = Unit.Abilities.Length - 1; AbilityIndex > -1; --AbilityIndex )
@@ -873,6 +908,12 @@ exec function ClearDebug()
 	`SHAPEMGR.FlushPersistentShapes();
 	FlushPersistentDebugLines();
 	FlushDebugStrings();
+}
+//------------------------------------------------------------------------------------------------
+exec function ShowEscapeOptions()
+{
+	bShowEscapeOptions = !bShowEscapeOptions;
+	`Log(`ShowVar(bShowEscapeOptions));
 }
 
 //------------------------------------------------------------------------------------------------
@@ -1334,6 +1375,11 @@ exec function DebugAnims(optional bool bEnable = true, optional bool bEnableDisp
 	if (unitName == '')
 	{
 		m_DebugAnims_TargetName = GetActiveUnit().Name;
+	}
+	else if( unitName == 'all' )
+	{
+		m_DebugAnims_TargetName = '';
+		bDebugAnimsPawn = false; // Make sure we don't show pawn debuganims on top of the unit debuganims
 	}
 	else
 	{
@@ -2157,6 +2203,14 @@ exec function DrawClosestCoverPoint( float fX, float fY, float fZ, float fMaxDis
 		`Log("No closest cover found!");
 	}
 }
+function DrawSphereT(TTile TLoc, optional int iColor = 0, optional float fRadius = 0, optional bool bLookat = false)
+{
+	local Vector vLoc;
+	vLoc = `XWORLD.GetPositionFromTileCoordinates(TLoc);
+
+	DrawSphere(vLoc.X, vLoc.Y, vLoc.Z, iColor, fRadius, bLookat);
+}
+
 function DrawSphereV( vector vLoc, optional int iColor=0, optional float fRadius=0, optional bool bLookat=false)
 {
 	DrawSphere(vLoc.X, vLoc.Y, vLoc.Z, iColor, fRadius, bLookat);
@@ -2602,9 +2656,17 @@ exec function SetVolume( float fVolume )
 
 // Test function for setting AkAudio switches on the WorldInfo object.
 // This is useful for testing ambiance switches.  mdomowicz 2015_08_10
+// Ambience now uses AkAudio states, so this won't work for testing ambience.	dprice 2016-03-10
 exec function SetWorldInfoAkAudioSwitch( name nSwitchGroup, name nSwitchName )
 {
 	WorldInfo.SetSwitch( nSwitchGroup, nSwitchName );
+}
+
+// Test function for setting AkAudio states.
+// This is useful for testing ambiance states.  dprice 2016-03-10
+exec function SetAkAudioState( name nStateGroup, name nStateName )
+{
+	SetState( nStateGroup, nStateName );
 }
 
 exec function DebugExitCover( XGUnit kUnit, XGUnit kTarget )
@@ -4946,6 +5008,30 @@ exec function SetFirstSeenVODisabled(bool Disabled)
 	DisableFirstEncounterVO = Disabled;
 }
 
+exec function OverrideTacticalMusicSet(name NewMusicSet)
+{	
+	local X2TacticalGameRuleset Ruleset;
+	local XComGameState NewGameState;
+	local XComGameState_Cheats CheatState;
+
+	CheatState = class'XComGameState_Cheats'.static.GetCheatsObject();
+
+	if(NewMusicSet != CheatState.TacticalMusicSetOverride)
+	{
+		NewGameState = class'XComGameState_Cheats'.static.CreateCheatChangeState();
+		CheatState = XComGameState_Cheats(NewGameState.CreateStateObject(class'XComGameState_Cheats', CheatState.ObjectID));
+		CheatState.TacticalMusicSetOverride = NewMusicSet;
+		NewGameState.AddStateObject(CheatState);
+
+		Ruleset = `TACTICALRULES;
+		if(!Ruleset.SubmitGameState(NewGameState))
+		{
+			`Redscreen("Error updating cheat object state while updating SuppressHiddenMovementIndicator!");
+		}
+	}
+}
+
+
 exec function RemoveAllUnitLoot()
 {
 	local XComGameStateHistory History;
@@ -5906,6 +5992,72 @@ exec function ForceOverwatchTarget(int TargetId)
 	ForcedOverwatchTarget.ObjectId = TargetID;
 }
 
+exec function AIAlienRulersDoNotTrigger(bool bSetting)
+{
+	bAbilitiesDoNotTriggerAlienRulerAction = bSetting;
+}
+
+exec function PopulateAnalytics()
+{
+	local array<string> BaseMetrics;
+	local string Metric, EndgameMetric;
+	local int x, d;
+	local X2FiraxisLiveClient LiveClient;
+
+	LiveClient = `FXSLIVE;
+
+/*	BaseMetrics.AddItem( "ARCHON_KING_KILLED" );
+	BaseMetrics.AddItem( "SOLDIERS_KILLED_BY_ARCHON_KING" );
+	BaseMetrics.AddItem( "VIPER_KING_KILLED" );
+	BaseMetrics.AddItem( "SOLDIERS_KILLED_BY_VIPER_KING" );
+	BaseMetrics.AddItem( "BERSERKER_QUEEN_KILLED" );
+	BaseMetrics.AddItem( "SOLDIERS_KILLED_BY_BERSERKER_QUEEN" );
+	BaseMetrics.AddItem( "TOTAL_CENTRAL_KILLS" );
+	BaseMetrics.AddItem( "CENTRALS_KILLED" );
+	BaseMetrics.AddItem( "KILLS_WITH_HUNTER_RIFLES" );
+	BaseMetrics.AddItem( "KILLS_WITH_HUNTER_PISTOLS" );
+	BaseMetrics.AddItem( "KILLS_WITH_HUNTER_AXES" );
+	BaseMetrics.AddItem( "KILLS_WITH_ALIEN_ARMOR" );
+
+	BaseMetrics.AddItem( "ANDROMEDON_ROBOT_KILLED" );
+	BaseMetrics.AddItem( "SOLDIERS_KILLED_BY_ANDROMEDON_ROBOT" );
+	BaseMetrics.AddItem( "UNKNOWN_ENEMY_TYPE_KILLED" );
+	BaseMetrics.AddItem( "SOLDIERS_KILLED_BY_UNKNOWN_ENEMY_TYPE" );
+	BaseMetrics.AddItem( "TOTAL_HACKED_ROBOTIC_KILLS" );
+	BaseMetrics.AddItem( "TOTAL_CONTROLLED_ADVENT_KILLS" );
+	BaseMetrics.AddItem( "TOTAL_CONTROLLED_ALIEN_KILLS" );
+	BaseMetrics.AddItem( "TOTAL_UNKNOWN_KILLS" );
+	BaseMetrics.AddItem( "TOTAL_UNKNOWN_SOLDIER_CLASS_KILLS" );
+	BaseMetrics.AddItem( "KILLS_WITH_UNKNOWN_WEAPONS" );
+	BaseMetrics.AddItem( "TOTAL_ROOKIE_KILLS" );
+	BaseMetrics.AddItem( "UNKNOWN_SOLDIER_CLASS_KILLED" );
+	BaseMetrics.AddItem( "ROOKIE_SOLIDER_KILLED" );
+	BaseMetrics.AddItem( "UNKNOWN_RANK_KILLED" );
+	BaseMetrics.AddItem( "SOLDIERS_KILLED_BY_ENVIRONMENT" );
+	BaseMetrics.AddItem( "SOLDIERS_KILLED_BY_CONTROLLED_FRIENDLY" );
+	BaseMetrics.AddItem( "TOTAL_COMMANDER_KILLS" );*/
+	BaseMetrics.AddItem( "COMMANDERS_KILLED" );
+
+	for(x = 0; x < BaseMetrics.Length; ++x)
+	{
+		Metric = BaseMetrics[x];
+		EndgameMetric = "ENDGAME_"$Metric;
+
+		LiveClient.StatAddValue( name( EndgameMetric ), 0, eKVPSCOPE_GLOBAL );
+
+		for (d = 0; d < eDifficulty_MAX; ++d)
+		{
+			LiveClient.StatAddValue( name( Metric$"_"$d ), 0, eKVPSCOPE_GLOBAL );
+			LiveClient.StatAddValue( name( EndgameMetric$"_"$d ), 0, eKVPSCOPE_GLOBAL );
+		}
+	}
+}
+
+exec function ForceRulerOverlayHidden()
+{
+	`PRES.UIHideSpecialTurnOverlay();
+}
+
 DefaultProperties
 {
 	bGoldenPathHacks=false
@@ -5929,6 +6081,7 @@ DefaultProperties
 
 	m_bEnableBuildingVisibility_Cheat=true
 	m_bEnableCutoutBox_Cheat=true
+	m_bEnablePeripheryHiding_Cheat = true
 	m_bShowPOILocations_Cheat=false
 	m_fCutoutBoxSize_Cheat=0
 	DebugSpawnIndex=-2

@@ -5,6 +5,7 @@ var localized string ZombieFlyoverText;
 var privatewrite name TurnedZombieName;
 
 var name AnimationName;
+var name AltUnitToSpawnName;
 var float StartAnimationMinDelaySec;
 var float StartAnimationMaxDelaySec;
 
@@ -24,7 +25,7 @@ function name GetUnitToSpawnName(const out EffectAppliedData ApplyEffectParamete
 	HumanPawn = XComHumanPawn(XGUnit(History.GetVisualizer(TargetUnitState.ObjectID)).GetPawn());
 	if( HumanPawn != None )
 	{
-		UnitName = 'PsiZombieHuman';
+		UnitName = AltUnitToSpawnName;
 	}
 
 	return UnitName;
@@ -147,9 +148,7 @@ function AddSpawnVisualizationsToTracks(XComGameStateContext Context, XComGameSt
 	CopyDeadUnitAction.bWaitForOriginalUnitMessage = true;
 	CopyDeadUnitAction.OriginalUnit = XGUnit(History.GetVisualizer(EffectTargetUnit.ObjectID));
 	CopyDeadUnitAction.ReanimatorAbilityState = XComGameState_Ability(History.GetGameStateForObjectID(SpawnZombieEffect.ApplyEffectParameters.AbilityInputContext.AbilityRef.ObjectID));
-	CopyDeadUnitAction.ShouldCopyAppearance = SpawnedUnit.GetMyTemplateName() == 'PsiZombie' ||
-								  SpawnedUnit.GetMyTemplateName() == 'PsiZombieHuman' ||
-								  SpawnedUnit.GetMyTemplateName() == 'PsiZombieHumanF';
+	CopyDeadUnitAction.ShouldCopyAppearance = SpawnedUnit.GetMyTemplateName() == UnitToSpawnName || SpawnedUnit.GetMyTemplateName() == AltUnitToSpawnName;
 	CopyDeadUnitAction.StartAnimationMinDelaySec = StartAnimationMinDelaySec;
 	CopyDeadUnitAction.StartAnimationMaxDelaySec = StartAnimationMaxDelaySec;
 
@@ -163,6 +162,7 @@ function AddSpawnVisualizationsToTracks(XComGameStateContext Context, XComGameSt
 defaultproperties
 {
 	UnitToSpawnName="PsiZombie"
+	AltUnitToSpawnName="PsiZombieHuman"
 	TurnedZombieName="TurnedIntoZombie"
 	EffectName="SpawnZombieEffect"
 	AnimationName="HL_GetUp"

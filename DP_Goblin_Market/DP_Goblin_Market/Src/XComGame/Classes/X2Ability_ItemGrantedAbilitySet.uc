@@ -329,6 +329,7 @@ static function X2AbilityTemplate HazmatVestBonusAbility()
 	DamageImmunity = new class'X2Effect_DamageImmunity';
 	DamageImmunity.ImmuneTypes.AddItem('Fire');
 	DamageImmunity.ImmuneTypes.AddItem('Poison');
+	DamageImmunity.ImmuneTypes.AddItem('Acid');
 	DamageImmunity.ImmuneTypes.AddItem(class'X2Item_DefaultDamageTypes'.default.ParthenogenicPoisonType);
 	DamageImmunity.BuildPersistentEffect(1, true, false, false);
 	DamageImmunity.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.GetMyLongDescription(), Template.IconImage, false, , Template.AbilitySourceName);
@@ -1073,6 +1074,9 @@ static function X2AbilityTemplate MindShield()
 	ImmunityEffect = new class'X2Effect_DamageImmunity';
 	ImmunityEffect.EffectName = 'MindShieldImmunity';
 	ImmunityEffect.ImmuneTypes.AddItem('Mental');
+	ImmunityEffect.ImmuneTypes.AddItem(class'X2Item_DefaultDamageTypes'.default.DisorientDamageType);
+	ImmunityEffect.ImmuneTypes.AddItem('stun');
+	ImmunityEffect.ImmuneTypes.AddItem('Unconscious');
 	ImmunityEffect.BuildPersistentEffect(1, true, false, false);
 	ImmunityEffect.SetDisplayInfo(ePerkBuff_Bonus, Template.LocFriendlyName, Template.GetMyHelpText(), Template.IconImage, false, , Template.AbilitySourceName);
 	Template.AddTargetEffect(ImmunityEffect);
@@ -1426,6 +1430,7 @@ simulated function SKULLJACK_BuildVisualization(XComGameState VisualizeGameState
 	local XComGameState_Ability AbilityState;
 	local X2AbilityTemplate     AbilityTemplate;
 	local X2VisualizerInterface TargetVisualizerInterface;
+	local int i;
 
 	History = `XCOMHISTORY;
 
@@ -1494,6 +1499,13 @@ simulated function SKULLJACK_BuildVisualization(XComGameState VisualizeGameState
 	BuildTrack.StateObject_OldState = History.GetGameStateForObjectID(TargetUnitRef.ObjectID, eReturnType_Reference, VisualizeGameState.HistoryIndex - 1);
 	BuildTrack.StateObject_NewState = VisualizeGameState.GetGameStateForObjectID(TargetUnitRef.ObjectID);
 	BuildTrack.TrackActor = History.GetVisualizer(TargetUnitRef.ObjectID);
+
+	//  This is sort of a super hack, that allows DLC/mods to visualize extra stuff in here.
+	//  Visualize effects from index 1 as index 0 should be the base game damage effect.
+	for (i = 1; i < AbilityTemplate.AbilityTargetEffects.Length; ++i)
+	{
+		AbilityTemplate.AbilityTargetEffects[i].AddX2ActionsForVisualization(VisualizeGameState, BuildTrack, Context.FindTargetEffectApplyResult(AbilityTemplate.AbilityTargetEffects[i]));
+	}
 
 	if( Context.IsResultContextMiss() )
 	{
@@ -1866,6 +1878,7 @@ static function X2AbilityTemplate WallPhasing()
 	local X2AbilityCharges                      Charges;
 	local X2AbilityCost_Charges                 ChargeCost;
 	local X2Effect_TriggerEvent					ActivationWindowEvent;
+	local X2Condition_UnitEffects               EffectsCondition;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'WallPhasing');
 
@@ -1890,6 +1903,10 @@ static function X2AbilityTemplate WallPhasing()
 	ChargeCost = new class'X2AbilityCost_Charges';
 	ChargeCost.NumCharges = 1;
 	Template.AbilityCosts.AddItem(ChargeCost);
+
+	EffectsCondition = new class'X2Condition_UnitEffects';
+	EffectsCondition.AddExcludeEffect(class'X2AbilityTemplateManager'.default.BoundName, 'AA_UnitIsBound');
+	Template.AbilityShooterConditions.AddItem(EffectsCondition);
 
 	ActivationWindowEvent = new class'X2Effect_TriggerEvent';
 	ActivationWindowEvent.TriggerEventName = default.WraithActivationDurationEventName;

@@ -7,7 +7,7 @@ class XComTacticalGRI extends XComGameReplicationInfo
 
 //const MAXCLUSTERBOMBS=6; // This should match the number of fire anim_notify events within the cluster bomb firing animation.
 
-var XGCharacterGenerator 				m_CharacterGen;
+var deprecated XGCharacterGenerator 	m_CharacterGen;
 var XGBattle 					        m_kBattle;
 var protected XComOnlineProfileSettings m_kProfileSettings;
 
@@ -73,9 +73,6 @@ simulated function ReceivedGameClass()
 	local int i;
 
 	super.ReceivedGameClass();
-
-	// TODO: does this need to be spawned on the clients? maybe it should just be in the game info class. -tsmith 
-	m_CharacterGen = spawn( class 'XGCharacterGenerator' );
 
 	mSimpleShapeManager = Spawn(class'SimpleShapeManager');
 
@@ -167,6 +164,7 @@ simulated function BuildStartStateForPIE()
 	local XComGameState_BattleData BattleDataState;
 	local XComOnlineProfileSettings Profile;
 	local XComOnlineEventMgr OnlineEventMgr;
+	local XComGameState_HeadquartersXCom HeadquartersStateObject;
 
 	History = `XCOMHISTORY;
 	History.ResetHistory();
@@ -193,6 +191,19 @@ simulated function BuildStartStateForPIE()
 	else
 	{
 		class'XComOnlineProfileSettings'.static.AddDefaultSoldiersToStartState(TacticalStartState);
+	}
+
+	foreach TacticalStartState.IterateByClassType(class'XComGameState_HeadquartersXCom', HeadquartersStateObject)
+	{
+		break;
+	}
+
+	if (HeadquartersStateObject == none)
+	{
+		HeadquartersStateObject = XComGameState_HeadquartersXCom( TacticalStartState.CreateStateObject( class'XComGameState_HeadquartersXCom' ) );
+		HeadquartersStateObject.AdventLootWeight = class'XComGameState_HeadquartersXCom'.default.StartingAdventLootWeight;
+		HeadquartersStateObject.AlienLootWeight = class'XComGameState_HeadquartersXCom'.default.StartingAlienLootWeight;
+		TacticalStartState.AddStateObject( HeadquartersStateObject );
 	}
 	
 	//Find the battle data in the start state

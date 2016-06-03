@@ -107,3 +107,7 @@ event HandleNewUnitSelection()
 	}
 }
 
+defaultproperties
+{
+	bCauseTimeDilationWhenInterrupting = true
+}

@@ -56,6 +56,8 @@ simulated state Executing
 		}
 
 		Params.BlendTime = 0.0f;
+		Params.PlayRate = GetNonCriticalAnimationSpeed();
+
 		Rope.DynamicNode.PlayDynamicAnim(Params);
 	}
 	
@@ -63,6 +65,8 @@ Begin:
 	if (bIsVisualizingGremlin)
 	{
 		AnimParams.AnimName = 'HL_EvacStart';
+		AnimParams.PlayRate = GetNonCriticalAnimationSpeed();
+
 		FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams));
 		UnitPawn.UpdatePawnVisibility();
 		CompleteAction();
@@ -79,6 +83,7 @@ Begin:
 		SpawnAndPlayRopeAnim();
 
 		AnimParams.AnimName = 'HL_EvacStart';
+		AnimParams.PlayRate = GetNonCriticalAnimationSpeed();
 		FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams));
 
 		CompleteAction();

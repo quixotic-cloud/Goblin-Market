@@ -36,7 +36,7 @@ Begin:
 	// to allow the user to see the results of the ability and "settle" into the new state of the game
 	if (!bForceEndImmediately && !bNewUnitSelected)
 	{
-		Sleep(CinescriptCamera.CameraDefinition.ExtraAbilityEndDelay);
+		Sleep(CinescriptCamera.CameraDefinition.ExtraAbilityEndDelay * GetDelayModifier());
 	}
 
 	CompleteAction();

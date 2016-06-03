@@ -68,7 +68,19 @@ function EGameplayBlocking ModifyGameplayDestinationBlockingForTarget(const XCom
 	return ModifyGameplayPathBlockingForTarget(UnitState, TargetUnit);
 }
 
+simulated function AddX2ActionsForVisualization_Removed(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, const name EffectApplyResult, XComGameState_Effect RemovedEffect)
+{
+	if( EffectApplyResult == 'AA_Success' )
+	{
+		super.AddX2ActionsForVisualization_Removed(VisualizeGameState, BuildTrack, EffectApplyResult, RemovedEffect);
+		class'X2Action_UnBurrow'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext());
+	}
+}
+
 defaultproperties
 {
 	EffectRank=1 // This rank is set for blocking
+	EffectName="Burrowed"
+	CustomIdleOverrideAnim="NO_BurrowLoop"
+	bBringRemoveVisualizationForward=true
 }

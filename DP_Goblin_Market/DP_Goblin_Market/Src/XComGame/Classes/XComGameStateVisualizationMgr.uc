@@ -334,6 +334,7 @@ simulated native function X2Action GetCurrentTrackAction(const out Visualization
 /// will use bFromInterrupted to choose which one if there are running track actions from both.
 /// </summary>
 simulated native function X2Action GetCurrentTrackActionForVisualizer(const Actor Visualizer, bool bFromInterrupted = false);
+simulated native function X2Action GetCurrentTrackActionForState(const out StateObjectReference Receiver, optional int HistoryIndex = -1);
 
 /// <summary>
 /// Returns a reference to the currently running action, given an action class type. This searches only active lists and return actions without actors
@@ -496,6 +497,8 @@ simulated function DrawDebugLabel(Canvas kCanvas)
 	local string kStr;
 	local int iX, iY;
 	local XComCheatManager LocalCheatManager;
+	local bool bIsVisualizationStartIndexValid;
+	local int WaitForHistoryIndex;
 	
 	LocalCheatManager = XComCheatManager(GetALocalPlayerController().CheatManager);
 
@@ -533,7 +536,7 @@ simulated function DrawDebugLabel(Canvas kCanvas)
 						TrackAction = ActiveVisualizationBlocks[BlockIndex].Tracks[TrackIndex].TrackActions[TrackActionIndex];
 						kStr = kStr@"["@TrackAction@"("@TrackAction.GetStateName()@"{"@TrackAction.ExecutingTime@"} ) ] ";					
 					}
-					kStr = kStr$"\n";
+					kStr = kStr$"\n\n";
 				}
 				kStr = kStr$"\n";
 			}
@@ -550,7 +553,7 @@ simulated function DrawDebugLabel(Canvas kCanvas)
 			for( BlockIndex = InterruptedVisualizationBlocks.Length - 1; BlockIndex > -1; --BlockIndex )
 			{
 				AssociatedGameStateFrame = `XCOMHISTORY.GetGameStateFromHistory(InterruptedVisualizationBlocks[BlockIndex].HistoryIndex, eReturnType_Reference);
-				ContextString = AssociatedGameStateFrame.GetContext().SummaryString();
+				ContextString = AssociatedGameStateFrame.GetContext().SummaryString()@AssociatedGameStateFrame.HistoryIndex;
 
 				kStr = kStr$"___________Block"@BlockIndex@"(Interrupted)___________ ("@ContextString@")\n";
 				for( TrackIndex = 0; TrackIndex < InterruptedVisualizationBlocks[BlockIndex].Tracks.Length; ++TrackIndex )
@@ -561,7 +564,7 @@ simulated function DrawDebugLabel(Canvas kCanvas)
 						TrackAction = InterruptedVisualizationBlocks[BlockIndex].Tracks[TrackIndex].TrackActions[TrackActionIndex];
 						kStr = kStr@"["@TrackAction@"("@TrackAction.GetStateName()@") ] ";					
 					}
-					kStr = kStr$"\n";
+					kStr = kStr$"\n\n";
 				}
 				kStr = kStr$"\n";
 			}
@@ -578,7 +581,17 @@ simulated function DrawDebugLabel(Canvas kCanvas)
 			for (BlockIndex = 0; BlockIndex < PendingVisualizationBlocks.Length; ++BlockIndex)
 			{
 				AssociatedGameStateFrame = `XCOMHISTORY.GetGameStateFromHistory(PendingVisualizationBlocks[BlockIndex].HistoryIndex, eReturnType_Reference);
-				ContextString = AssociatedGameStateFrame.GetContext().SummaryString();
+
+				bIsVisualizationStartIndexValid = AssociatedGameStateFrame.GetContext( ).VisualizationStartIndex > 0 &&
+													AssociatedGameStateFrame.GetContext( ).VisualizationStartIndex > StartStateHistoryIndex;
+				WaitForHistoryIndex = bIsVisualizationStartIndexValid ? AssociatedGameStateFrame.GetContext( ).VisualizationStartIndex : -1;
+
+				ContextString = AssociatedGameStateFrame.GetContext().SummaryString()@AssociatedGameStateFrame.HistoryIndex@WaitForHistoryIndex;
+
+				if (AssociatedGameStateFrame.GetContext( ).bVisualizationFence)
+				{
+					kStr = kStr$"___________Fence---------------------------------------------------------------------------------------------------------------------------------\n";
+				}
 
 				kStr = kStr$"___________Block"@BlockIndex@"(Pending)___________ ("@ContextString@")\n";
 				for( TrackIndex = 0; TrackIndex < PendingVisualizationBlocks[BlockIndex].Tracks.Length; ++TrackIndex )
@@ -589,7 +602,7 @@ simulated function DrawDebugLabel(Canvas kCanvas)
 						TrackAction = PendingVisualizationBlocks[BlockIndex].Tracks[TrackIndex].TrackActions[TrackActionIndex];
 						kStr = kStr@"["@TrackAction@"("@TrackAction.GetStateName()@") ] ";					
 					}
-					kStr = kStr$"\n";
+					kStr = kStr$"\n\n";
 				}
 				kStr = kStr$"\n";
 			}
@@ -710,6 +723,8 @@ state ExecutingVisualization
 		local bool bResumeFromInterrupt;
 		local X2ReactionFireSequencer ReactionFireSequencer;
 		local int TrackActionIndex;
+		local bool bAnyNonWaitActionsExecuting;
+		local X2Action FirstWaitAction;
 
 		for( BlockIndex = ActiveVisualizationBlocks.Length - 1; BlockIndex > -1; --BlockIndex )
 		{
@@ -769,6 +784,9 @@ state ExecutingVisualization
 				bBlockFinished = true;
 				bBlockInterrupted = GetContextInterruptionStatus(BlockIndex) == eInterruptionStatus_Interrupt;
 				
+				bAnyNonWaitActionsExecuting = false;
+				FirstWaitAction = None;
+
 				for( TrackIndex = 0; TrackIndex < ActiveVisualizationBlocks[BlockIndex].Tracks.Length; ++TrackIndex )
 				{
 					ProcessTrack = ActiveVisualizationBlocks[BlockIndex].Tracks[TrackIndex];
@@ -779,6 +797,15 @@ state ExecutingVisualization
 						if( CurrentTrackAction.IsInState('Executing') )
 						{
 							CurrentTrackAction.UpdateExecutingTime(fDeltaT);
+
+							if( !CurrentTrackAction.IsWaitingOnActionTrigger() )
+							{
+								bAnyNonWaitActionsExecuting = true;
+							}
+							else if( FirstWaitAction == None )
+							{
+								FirstWaitAction = CurrentTrackAction;
+							}
 						}
 
 						if( CurrentTrackAction.IsInState('WaitingToStart') )
@@ -805,6 +832,12 @@ state ExecutingVisualization
 						MarkVisualizationTrackComplete(ProcessTrack);
 						ActiveVisualizationBlocks[BlockIndex].Tracks[TrackIndex] = ProcessTrack; // Since MarkVisualizationTrackComplete can change the Track
 					}
+				}
+
+				// if the only executing action(s) is a Wait, release the wait. This prevents long timeouts when there is no pending inter-track message
+				if( !bAnyNonWaitActionsExecuting && FirstWaitAction != None )
+				{
+					FirstWaitAction.TriggerWaitCondition();
 				}
 
 				UpdateTrackActorTimeDilation(BlockIndex, false);

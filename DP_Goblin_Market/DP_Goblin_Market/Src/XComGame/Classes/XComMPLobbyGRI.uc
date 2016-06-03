@@ -135,14 +135,14 @@ simulated function CreateDefaultLoadout(XComGameState NewGameState, XComGameStat
 	local X2CharacterTemplate           CharacterTemplate;
 	local TSoldier                      CharacterGeneratorResult;
 	local XGCharacterGenerator          CharacterGenerator;
-
-	//Feed from soldier selection screen eventually
-	CharacterGenerator = spawn( class 'XGCharacterGenerator' );
 	
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('Soldier');	
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	for( PlayerIdx = 0; PlayerIdx < BattleData.PlayerTurnOrder.Length; ++PlayerIdx)
 	{

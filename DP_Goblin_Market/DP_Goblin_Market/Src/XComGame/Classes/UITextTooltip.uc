@@ -234,8 +234,16 @@ public function RemoveTooltipByID(int TargetID)
 		if( TextTooltipData[i].ID == TargetID )
 		{
 			TextTooltipData.Remove(i, 1);
-			if( bIsVisible && DataIndex == i )
-				Hide();
+			if( DataIndex == i )
+			{
+				DataIndex = INDEX_NONE;
+				PreviousDataIndex = INDEX_NONE; // Reset previous data index to force a data update
+
+				if( bIsVisible )
+				{
+					Hide();
+				}
+			}
 		}
 	}
 }
@@ -248,8 +256,16 @@ public function RemoveTooltipByPath(string NewPath)
 		if( TextTooltipData[i].TargetPath == NewPath )
 		{
 			TextTooltipData.Remove(i, 1);
-			if( bIsVisible && DataIndex == i )
-				Hide();
+			if( DataIndex == i )
+			{
+				DataIndex = INDEX_NONE;
+				PreviousDataIndex = INDEX_NONE; // Reset previous data index to force a data update
+
+				if( bIsVisible )
+				{
+					Hide();
+				}
+			}
 		}
 	}
 }
@@ -262,8 +278,16 @@ public function RemoveTooltipByPartialPath(string NewPath)
 		if( InStr(TextTooltipData[i].TargetPath, NewPath, , true) > INDEX_NONE )
 		{
 			TextTooltipData.Remove(i, 1);
-			if( bIsVisible && DataIndex == i )
-				Hide();
+			if( DataIndex == i )
+			{
+				DataIndex = INDEX_NONE;
+				PreviousDataIndex = INDEX_NONE; // Reset previous data index to force a data update
+
+				if( bIsVisible )
+				{
+					Hide();
+				}
+			}
 		}
 	}
 }
@@ -284,4 +308,5 @@ defaultproperties
 
 	DataIndex = -1;
 	PreviousDataIndex = -1;
+	bAlwaysTick = true
 }

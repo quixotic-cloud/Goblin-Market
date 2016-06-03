@@ -185,13 +185,27 @@ simulated function UpdateData()
 simulated function UpdateDisplay()
 {
 	local UIMechaListItem SpawnedItem;
-	local int i, NumIntelOptions;
+	local int i, NumIntelOptions, OptionIndex;
 	local X2HackRewardTemplateManager HackRewardTemplateManager;
 	local X2HackRewardTemplate OptionTemplate;
 	local array<MissionIntelOption> IntelOptions;
+	local array<MissionIntelOption> PurchasedOptions;
+	local MissionIntelOption PurchasedOption;
 
 	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
 	IntelOptions = GetMissionIntelOptions();
+	PurchasedOptions = GetPurchasedIntelOptions();
+
+	foreach PurchasedOptions(PurchasedOption)
+	{
+		// Remove any options which have already been purchased
+		OptionIndex = IntelOptions.Find('IntelRewardName', PurchasedOption.IntelRewardName);
+		if (OptionIndex != INDEX_NONE)
+		{
+			IntelOptions.Remove(OptionIndex, 1);
+		}
+	}
+
 	NumIntelOptions = IntelOptions.length;
 
 	if (List.itemCount > NumIntelOptions)
@@ -327,7 +341,7 @@ simulated function FinalAssaultCB(EUIAction eAction)
 {
 	if (eAction == eUIAction_Accept)
 	{
-		BuyIntelOptions();
+		BuyAndSaveIntelOptions();
 		super.OnLaunchClicked(ConfirmButton);
 	}
 	else
@@ -353,6 +367,11 @@ simulated function EUIState GetLabelColor()
 simulated function array<MissionIntelOption> GetMissionIntelOptions()
 {
 	return GetMission().IntelOptions;
+}
+
+simulated function array<MissionIntelOption> GetPurchasedIntelOptions()
+{
+	return GetMission().PurchasedIntelOptions;
 }
 
 simulated function bool CanAffordIntelOptions()
@@ -383,7 +402,7 @@ simulated function int GetTotalIntelCost()
 	return TotalCost;
 }
 
-simulated function BuyIntelOptions()
+simulated function BuyAndSaveIntelOptions()
 {
 	local XComGameStateHistory History;
 	local XComGameState NewGameState;
@@ -392,31 +411,25 @@ simulated function BuyIntelOptions()
 	local MissionIntelOption IntelOption;
 
 	History = `XCOMHISTORY;
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Buy Mission Intel Options");
+	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Buy and Save Selected Mission Intel Options");
+	
 	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
 	XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
 	NewGameState.AddStateObject(XComHQ);
+	
+	MissionState = GetMission();
+	MissionState = XComGameState_MissionSite(NewGameState.CreateStateObject(class'XComGameState_MissionSite', MissionState.ObjectID));
+	NewGameState.AddStateObject(MissionState);
 
+	// Save and buy the intel options, and add their tactical tags
 	foreach SelectedOptions(IntelOption)
 	{
 		XComHQ.TacticalGameplayTags.AddItem(IntelOption.IntelRewardName);
 		XComHQ.PayStrategyCost(NewGameState, IntelOption.Cost, XComHQ.MissionOptionScalars);
+		MissionState.PurchasedIntelOptions.AddItem(IntelOption);
 	}
-
-	// Save the purchased options
-	MissionState = GetMission();
-	MissionState = XComGameState_MissionSite(NewGameState.CreateStateObject(class'XComGameState_MissionSite', MissionState.ObjectID));
-	NewGameState.AddStateObject(MissionState);
-	MissionState.PurchasedIntelOptions = SelectedOptions;
-
-	if (NewGameState.GetNumGameStateObjects() > 0)
-	{
-		`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
-	}
-	else
-	{
-		History.CleanupPendingGameState(NewGameState);
-	}
+	
+	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
 }
 
 simulated function AddIgnoreButton()

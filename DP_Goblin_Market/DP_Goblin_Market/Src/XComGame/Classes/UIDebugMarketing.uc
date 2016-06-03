@@ -37,6 +37,7 @@ var UICheckbox  Checkbox_Narrative;
 var UICheckbox  Checkbox_FOW;
 var UICheckbox  Checkbox_BuildingVisibility;
 var UICheckbox  Checkbox_CutoutBox;
+var UICheckbox	Checkbox_PeripheryHiding;
 var UICheckbox  Checkbox_Pathing;
 var UICheckbox  Checkbox_SoldierChatter;
 var UICheckbox  Checkbox_DisableMusic;
@@ -166,6 +167,12 @@ function InitializeMarketingControls()
 	Checkbox_CutoutBox.SetTextStyle(class'UICheckbox'.const.STYLE_TEXT_ON_THE_RIGHT).SetPosition(PositionX, PositionY);
 
 	PositionY += Spacing;
+	
+	Checkbox_PeripheryHiding = Spawn(class'UICheckbox', FrameInfoContainer);
+	Checkbox_PeripheryHiding.InitCheckbox('Checkbox_PeripheryHiding', "Periphery Hiding OFF", false, ToggleCheckbox);
+	Checkbox_PeripheryHiding.SetTextStyle(class'UICheckbox'.const.STYLE_TEXT_ON_THE_RIGHT).SetPosition(PositionX, PositionY);
+
+	PositionY += Spacing;
 
 	Checkbox_Pathing = Spawn(class'UICheckbox', FrameInfoContainer);
 	Checkbox_Pathing.InitCheckbox('Checkbox_Pathing', "Pathing & Cover UI OFF", false, ToggleCheckbox);
@@ -230,7 +237,8 @@ simulated function InitCheckboxes()
 			Checkbox_LootEffects.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_LootEffects') != INDEX_NONE);
 			Checkbox_FOW.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_FOW') != INDEX_NONE);
 			Checkbox_BuildingVisibility.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_BuildingVisibility') != INDEX_NONE);
-			Checkbox_CutoutBox.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_CutoutBox') != INDEX_NONE);			
+			Checkbox_CutoutBox.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_CutoutBox') != INDEX_NONE);
+			Checkbox_PeripheryHiding.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_PeripheryHiding') != INDEX_NONE);
 			Checkbox_Pathing.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_Pathing') != INDEX_NONE);
 			Checkbox_SoldierChatter.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_SoldierChatter') != INDEX_NONE);
 			Checkbox_DisableAmbience.SetChecked(ProfileSettings.Data.MarketingPresets.CheckboxSettings.Find('Checkbox_DisableAmbience') != INDEX_NONE);
@@ -258,7 +266,8 @@ simulated function InitCheckboxes()
 			Checkbox_LootEffects.SetChecked(class'XComGameState_Cheats'.static.GetCheatsObject().DisableLooting);
 			Checkbox_FOW.SetChecked(!`XWORLD.bEnableFOW);
 			Checkbox_BuildingVisibility.SetChecked(!TacticalCheatManager.m_bEnableBuildingVisibility_Cheat);
-			Checkbox_CutoutBox.SetChecked(!TacticalCheatManager.m_bEnableCutoutBox_Cheat);			
+			Checkbox_CutoutBox.SetChecked(!TacticalCheatManager.m_bEnableCutoutBox_Cheat);		
+			Checkbox_PeripheryHiding.SetChecked(!TacticalCheatManager.m_bEnablePeripheryHiding_Cheat);
 			Checkbox_Pathing.SetChecked(TacticalCheatManager.bHidePathingPawn);
 			Checkbox_SoldierChatter.SetChecked(!`XPROFILESETTINGS.Data.m_bEnableSoldierSpeech);
 			Checkbox_DisableAmbience.SetChecked(GeneralCheatManager.bAmbienceDisabled);
@@ -406,6 +415,17 @@ simulated function ApplyChanges(UIButton button)
 		{
 			ProfileSettings.Data.MarketingPresets.CheckboxSettings.RemoveItem('Checkbox_CutoutBox');
 			TacticalCheatManager.CutoutBoxEnable(true);
+		}
+
+		if (Checkbox_PeripheryHiding.bChecked)
+		{
+			ProfileSettings.Data.MarketingPresets.CheckboxSettings.AddItem('Checkbox_PeripheryHiding');
+			TacticalCheatManager.PeripheryHidingEnable(false);
+		}
+		else
+		{
+			ProfileSettings.Data.MarketingPresets.CheckboxSettings.RemoveItem('Checkbox_PeripheryHiding');
+			TacticalCheatManager.PeripheryHidingEnable(true);
 		}
 
 		if(Checkbox_Pathing.bChecked)

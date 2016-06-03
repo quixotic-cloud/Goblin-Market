@@ -22,6 +22,8 @@ var int     iInitialShedChance;
 var int     iPerTurnShedChance;
 var bool    bInfiniteDuration;
 var bool    bTickWhenApplied;
+var bool    bCanTickEveryAction;               // If true and the character templates supports it, this effect will tick after every target action
+var bool    bConvertTurnsToActions;            // If ticking per-action instead of per-turn, iNumTurns will be multiplied by the number of actions per turn
 var bool    bRemoveWhenSourceDies;
 var bool    bRemoveWhenTargetDies;
 var bool	bRemoveWhenSourceDamaged;
@@ -60,12 +62,15 @@ var name VFXSocket;								// The name of a socket to which the particle system 
 var name VFXSocketsArrayName;                   // Name associated with an array of sockets the particle system will attach to. (optional)
 var float VisionArcDegreesOverride;				// This will limit the sight arc of the character.  If 2 effects have this it chooses the smaller arc.
 
+var class<XComGameState_Effect> GameStateEffectClass;   //  The class to use when instantiating a state object
+
 var delegate<AddEffectVisualization> VisualizationFn;
 var delegate<AddEffectVisualization> CleansedVisualizationFn;
 var delegate<AddEffectVisualization> EffectTickedVisualizationFn;
 var delegate<AddEffectVisualization> EffectRemovedVisualizationFn;
 var delegate<AddEffectVisualization> EffectRemovedSourceVisualizationFn;
 var delegate<AddEffectVisualization_Death> DeathVisualizationFn;
+var delegate<AddEffectVisualization> ModifyTracksFn;
 var delegate<EffectRemoved> EffectRemovedFn;
 var delegate<EffectAdded> EffectAddedFn;
 var delegate<EffectTicked> EffectTickedFn;
@@ -156,13 +161,15 @@ simulated function bool OnEffectTicked(const out EffectAppliedData ApplyEffectPa
 	local bool bIsFullTurnComplete;
 
 	bIsFullTurnComplete = FullTurnComplete(kNewEffectState);
+	OldTargetState = `XCOMHISTORY.GetGameStateForObjectID(ApplyEffectParameters.TargetStateObjectRef.ObjectID);
 
-	if(bIsFullTurnComplete || (FirstApplication && bTickWhenApplied))
+	if(bIsFullTurnComplete 
+		|| (FirstApplication && bTickWhenApplied) 
+		|| (IsTickEveryAction(OldTargetState)))
 	{
 		TickContext = XComGameStateContext_TickEffect(NewGameState.GetContext());
 		if (ApplyOnTick.Length > 0)
 		{
-			OldTargetState = `XCOMHISTORY.GetGameStateForObjectID(ApplyEffectParameters.TargetStateObjectRef.ObjectID);
 			NewTargetState = NewGameState.CreateStateObject(OldTargetState.Class, OldTargetState.ObjectID);
 			
 			TickContext.arrTickSuccess.Length = 0;
@@ -423,7 +430,7 @@ simulated final function name HandleApplyEffect(const out EffectAppliedData Appl
 				else
 				{
 					// the existing effect is better (or they have equivalent potency), so refresh the existing effect and do not add the new effect
-					PersistentEffectStateObject = XComGameState_Effect(NewGameState.CreateStateObject(class'XComGameState_Effect', ExistingEffect.ObjectID));
+					PersistentEffectStateObject = XComGameState_Effect(NewGameState.CreateStateObject(ExistingEffect.Class, ExistingEffect.ObjectID));
 					PersistentEffectStateObject.OnRefresh(ApplyEffectParameters, NewGameState);
 					NewGameState.AddStateObject(PersistentEffectStateObject);
 
@@ -461,7 +468,7 @@ simulated final function name HandleApplyEffect(const out EffectAppliedData Appl
 			}
 		}
 
-		PersistentEffectStateObject = XComGameState_Effect(NewGameState.CreateStateObject(class'XComGameState_Effect'));
+		PersistentEffectStateObject = XComGameState_Effect(NewGameState.CreateStateObject(GameStateEffectClass != none ? GameStateEffectClass : class'XComGameState_Effect'));
 		PersistentEffectStateObject.OnCreation( ApplyEffectParameters, WatchRule, NewGameState );
 		NewGameState.AddStateObject(PersistentEffectStateObject);
 		NewEffectState = PersistentEffectStateObject;
@@ -494,9 +501,26 @@ function bool IsThisEffectBetterThanExistingEffect(const out XComGameState_Effec
 	return false;
 }
 
+// Returns true if this function will tick after abilities marked as effected ticking are activated
+function bool IsTickEveryAction(XComGameState_BaseObject TargetObject)
+{
+	local XComGameState_Unit TargetUnitState;
+
+	TargetUnitState = XComGameState_Unit(TargetObject);
+	if(TargetUnitState != none)
+	{
+		return bCanTickEveryAction && TargetUnitState.GetMyTemplate().bCanTickEffectsEveryAction;
+	}
+	else
+	{
+		return false; // non-units do not take actions, and therefore cannot tick per action
+	}
+}
+
 function int GetStartingNumTurns(const out EffectAppliedData ApplyEffectParameters)
 {
 	local XComGameState_Ability AbilityState;
+	local XComGameState_BaseObject TargetState;
 	local XComGameStateHistory History;
 
 	// if the Ability that spawned this effect has a limited duration, we want to use that duration
@@ -514,6 +538,14 @@ function int GetStartingNumTurns(const out EffectAppliedData ApplyEffectParamete
 		return 1;
 	}
 
+	// if the effect will tick per action instead of per turn, then modify the turns remaining counter
+	// to reflect that.
+	TargetState = History.GetGameStateForObjectID(ApplyEffectParameters.TargetStateObjectRef.ObjectID);
+	if(bConvertTurnsToActions && IsTickEveryAction(TargetState))
+	{
+		iNumTurns *= class'X2CharacterTemplateManager'.default.StandardActionsPerTurn;
+	}
+
 	// return the configured duration for this effect
 	return iNumTurns;
 }
@@ -528,7 +560,7 @@ function GetToHitModifiers(XComGameState_Effect EffectState, XComGameState_Unit 
 function bool UniqueToHitModifiers() { return false; }
 function GetToHitAsTargetModifiers(XComGameState_Effect EffectState, XComGameState_Unit Attacker, XComGameState_Unit Target, XComGameState_Ability AbilityState, class<X2AbilityToHitCalc> ToHitType, bool bMelee, bool bFlanking, bool bIndirectFire, out array<ShotModifierInfo> ShotModifiers);
 function bool UniqueToHitAsTargetModifiers() { return false; }
-function int GetAttackingDamageModifier(XComGameState_Effect EffectState, XComGameState_Unit Attacker, Damageable TargetDamageable, XComGameState_Ability AbilityState, const out EffectAppliedData AppliedData, const int CurrentDamage) { return 0; }
+function int GetAttackingDamageModifier(XComGameState_Effect EffectState, XComGameState_Unit Attacker, Damageable TargetDamageable, XComGameState_Ability AbilityState, const out EffectAppliedData AppliedData, const int CurrentDamage, optional XComGameState NewGameState) { return 0; }
 function int GetDefendingDamageModifier(XComGameState_Effect EffectState, XComGameState_Unit Attacker, Damageable TargetDamageable, XComGameState_Ability AbilityState, const out EffectAppliedData AppliedData, const int CurrentDamage, X2Effect_ApplyWeaponDamage WeaponDamageEffect) { return 0; }
 function int GetExtraArmorPiercing(XComGameState_Effect EffectState, XComGameState_Unit Attacker, Damageable TargetDamageable, XComGameState_Ability AbilityState, const out EffectAppliedData AppliedData) { return 0; }
 function int GetExtraShredValue(XComGameState_Effect EffectState, XComGameState_Unit Attacker, Damageable TargetDamageable, XComGameState_Ability AbilityState, const out EffectAppliedData AppliedData) { return 0; }
@@ -636,4 +668,6 @@ defaultproperties
 	EffectRank = 0
 	EffectHierarchyValue = -1
 	VisionArcDegreesOverride = 360.0f
+	bConvertTurnsToActions = true
+	GameStateEffectClass = class'XComGameState_Effect'
 }

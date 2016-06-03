@@ -51,7 +51,7 @@ Begin:
 		LookAtCamera.LookAtLocation = GetZoneLocation();
 
 		`CAMERASTACK.AddCamera(LookAtCamera);
-		while( LookAtCamera != None && !LookAtCamera.HasArrived )
+		while( LookAtCamera != None && !LookAtCamera.HasArrived && LookAtCamera.IsLookAtValid() )
 		{
 			Sleep(0.0f);
 		}

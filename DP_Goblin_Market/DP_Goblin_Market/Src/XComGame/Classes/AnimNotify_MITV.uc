@@ -47,7 +47,7 @@ cpptext
 {
 	// AnimNotify interface.
 	virtual void Notify( class UAnimNodeSequence* NodeSeq );
-	virtual FString GetEditorComment() { return "Start MITV"; }
+	virtual FString GetEditorComment();
 	virtual FColor GetEditorColor() { return FColor(70,130,180); }
 
 	void HandleShared( AXComUnitPawnNativeBase* XComPawn, USkeletalMeshComponent *SkelComponent );

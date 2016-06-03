@@ -747,6 +747,9 @@ simulated function array<string> GetWeaponColorList()
 }
 reliable client function WeaponColorSelector()
 {
+	//If an extra click sneaks in, multiple color selectors will be created on top of each other and leak. 
+	if( ColorSelector != none ) return; 
+
 	CreateCustomizationState();
 	HideListItems();
 	CustomizeList.Hide();
@@ -843,11 +846,15 @@ simulated function OnCancel()
 
 simulated function CloseColorSelector(optional bool bCancelColorSelection)
 {
-	if(bCancelColorSelection)
+	if( bCancelColorSelection )
+	{
 		ColorSelector.OnCancelColor();
-
-	ColorSelector.Remove();
-	ColorSelector = none;
+	}
+	else
+	{
+		ColorSelector.Remove();
+		ColorSelector = none;
+	}
 
 	// restore mouse events to slot list
 	SlotsListContainer.GetChildByName('BG').ProcessMouseEvents(SlotsList.OnChildMouseEvent);

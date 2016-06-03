@@ -66,17 +66,18 @@ simulated function UpdateData()
 
 	// INFO
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strEditInfo, eUIState_Normal), OnCustomizeInfo);
+	GetListItem(i++).UpdateDataDescription(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_FirstName)$ m_strEditInfo, OnCustomizeInfo);
 
 	// PROPS
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strEditProps, eUIState_Normal), OnCustomizeProps);
+	//Using first name to sit in for the props category 
+	GetListItem(i++).UpdateDataDescription(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_NickName)$ m_strEditProps, OnCustomizeProps);
 
 	// FACE
 	//-----------------------------------------------------------------------------------------
 	ColorState = bIsSuperSoldier ? eUIState_Disabled : eUIState_Normal;
 	GetListItem(i++)
-		.UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strFace, ColorState), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Face, ColorState, FontSize), CustomizeFace)
+		.UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Face)$ m_strFace, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Face, ColorState, FontSize), CustomizeFace)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// HAIRSTYLE
@@ -85,7 +86,7 @@ simulated function UpdateData()
 	ColorState = (bIsSuperSoldier || bIsObstructed) ? eUIState_Disabled : eUIState_Normal;
 
 	GetListItem(i++)
-		.UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strHair, ColorState), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Hairstyle, ColorState, FontSize), CustomizeHair)
+		.UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Hairstyle)$ m_strHair, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Hairstyle, ColorState, FontSize), CustomizeHair)
 		.SetDisabled(bIsSuperSoldier || bIsObstructed, bIsSuperSoldier ? m_strIsSuperSoldier : m_strRemoveHelmet);
 
 	// FACIAL HAIR
@@ -96,7 +97,7 @@ simulated function UpdateData()
 		ColorState = (bIsSuperSoldier || bIsObstructed) ? eUIState_Disabled : eUIState_Normal;
 
 		GetListItem(i++)
-			.UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strFacialHair, ColorState), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_FacialHair, ColorState, FontSize), CustomizeFacialHair)
+			.UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_FacialHair)$m_strFacialHair, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_FacialHair, ColorState, FontSize), CustomizeFacialHair)
 			.SetDisabled(bIsSuperSoldier || bIsObstructed, bIsSuperSoldier ? m_strIsSuperSoldier : m_strRemoveHelmetOrLowerProp);
 	}
 
@@ -108,7 +109,7 @@ simulated function UpdateData()
 	ColorState = bIsObstructed ? eUIState_Disabled : eUIState_Normal;
 
 	GetListItem(i++)
-		.UpdateDataColorChip(class'UIUtilities_Text'.static.GetColoredText(m_strHairColor, ColorState), CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_HairColor), HairColorSelector)
+		.UpdateDataColorChip(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_HairColor)$ m_strHairColor, CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_HairColor), HairColorSelector)
 		.SetDisabled(bIsSuperSoldier || bIsObstructed, bIsSuperSoldier ? m_strIsSuperSoldier : m_strRemoveHelmet);
 
 	ColorState = bIsSuperSoldier ? eUIState_Disabled : eUIState_Normal;
@@ -116,46 +117,46 @@ simulated function UpdateData()
 	// EYE COLOR
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataColorChip(class'UIUtilities_Text'.static.GetColoredText(m_strEyeColor, ColorState), CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_EyeColor), EyeColorSelector)
+		.UpdateDataColorChip(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_EyeColor)$m_strEyeColor, CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_EyeColor), EyeColorSelector)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// RACE
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strRace, ColorState), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Race, ColorState, FontSize), CustomizeRace)
+		.UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Race)$ m_strRace, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Race, ColorState, FontSize), CustomizeRace)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// SKIN COLOR
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataColorChip(class'UIUtilities_Text'.static.GetColoredText(m_strSkinColor, ColorState), CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_Skin), SkinColorSelector)
+		.UpdateDataColorChip(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Skin)$ m_strSkinColor, CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_Skin), SkinColorSelector)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// ARMOR PRIMARY COLOR
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataColorChip(class'UIUtilities_Text'.static.GetColoredText(m_strMainColor, eUIState_Normal),
+	GetListItem(i++).UpdateDataColorChip(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_PrimaryArmorColor)$ m_strMainColor,
 		CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_PrimaryArmorColor), PrimaryArmorColorSelector);
 
 	// ARMOR SECONDARY COLOR
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataColorChip(class'UIUtilities_Text'.static.GetColoredText(m_strSecondaryColor, eUIState_Normal),
+	GetListItem(i++).UpdateDataColorChip(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_SecondaryArmorColor)$ m_strSecondaryColor,
 		CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_SecondaryArmorColor), SecondaryArmorColorSelector);
 
 	// WEAPON PRIMARY COLOR
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataColorChip(class'UIUtilities_Text'.static.GetColoredText(m_strWeaponColor, eUIState_Normal),
+	GetListItem(i++).UpdateDataColorChip(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_WeaponColor)$ m_strWeaponColor,
 		CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_WeaponColor), WeaponColorSelector);
 
 	// VOICE
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strVoice, eUIState_Normal), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Voice, eUIState_Normal, FontSize), CustomizeVoice);
+	GetListItem(i++).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Voice)$ m_strVoice, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Voice, eUIState_Normal, FontSize), CustomizeVoice);
 
 	// DISABLE VETERAN OPTIONS
 	ColorState = bDisableVeteranOptions ? eUIState_Disabled : eUIState_Normal;
 
 	// ATTITUDE (VETERAN)
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strAttitude, ColorState),
+	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Personality)$ m_strAttitude,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Personality, ColorState, FontSize), CustomizePersonality);
 
 	//  CHARACTER POOL OPTIONS
@@ -163,32 +164,34 @@ simulated function UpdateData()
 	//If in the armory, allow exporting character to the pool
 	if (bInArmory) 
 	{
-		GetListItem(i++).UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strExportCharacter, eUIState_Normal), OnExportSoldier);
+		GetListItem(i++).UpdateDataDescription(m_strExportCharacter, OnExportSoldier);
 	}
 	else //Otherwise, allow customizing their potential appearances
 	{
 		if(!bInMP)
 		{
 			if(Unit.IsSoldier())
-				GetListItem(i++).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strCustomizeClass, eUIState_Normal),
+				GetListItem(i++).UpdateDataValue(m_strCustomizeClass,
 					CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Class, eUIState_Normal, FontSize), CustomizeClass);
 
-			GetListItem(i++).UpdateDataCheckbox(class'UIUtilities_Text'.static.GetColoredText(m_strAllowTypeSoldier, eUIState_Normal), m_strAllowed, CustomizeManager.UpdatedUnitState.bAllowedTypeSoldier, OnCheckbox_Type_Soldier);
-			GetListItem(i++).UpdateDataCheckbox(class'UIUtilities_Text'.static.GetColoredText(m_strAllowTypeVIP, eUIState_Normal), m_strAllowed, CustomizeManager.UpdatedUnitState.bAllowedTypeVIP, OnCheckbox_Type_VIP);
-			GetListItem(i++).UpdateDataCheckbox(class'UIUtilities_Text'.static.GetColoredText(m_strAllowTypeDarkVIP, eUIState_Normal), m_strAllowed, CustomizeManager.UpdatedUnitState.bAllowedTypeDarkVIP, OnCheckbox_Type_DarkVIP);
+			GetListItem(i++).UpdateDataCheckbox(m_strAllowTypeSoldier, m_strAllowed, CustomizeManager.UpdatedUnitState.bAllowedTypeSoldier, OnCheckbox_Type_Soldier);
+			GetListItem(i++).UpdateDataCheckbox(m_strAllowTypeVIP, m_strAllowed, CustomizeManager.UpdatedUnitState.bAllowedTypeVIP, OnCheckbox_Type_VIP);
+			GetListItem(i++).UpdateDataCheckbox(m_strAllowTypeDarkVIP, m_strAllowed, CustomizeManager.UpdatedUnitState.bAllowedTypeDarkVIP, OnCheckbox_Type_DarkVIP);
 
-			GetListItem(i).UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strTimeAdded @ CustomizeManager.UpdatedUnitState.PoolTimestamp, eUIState_Disabled), None);
+			GetListItem(i).UpdateDataDescription(m_strTimeAdded @ CustomizeManager.UpdatedUnitState.PoolTimestamp, None);
 			GetListItem(i++).SetDisabled(true);
 		}
 	}
 
 	if (currentSel > -1 && currentSel < List.ItemCount)
 	{
-		List.Navigator.SetSelected(GetListItem(currentSel));
+		//Don't use GetItem(..), because it overwrites enable.disable option indiscriminately. 
+		List.Navigator.SetSelected(List.GetItem(currentSel));
 	}
 	else
 	{
-		List.Navigator.SetSelected(GetListItem(0));
+		//Don't use GetItem(..), because it overwrites enable.disable option indiscriminately. 
+		List.Navigator.SetSelected(List.GetItem(0));
 	}
 	//-----------------------------------------------------------------------------------------
 }
@@ -216,13 +219,13 @@ simulated function OnExportSoldier()
 simulated function OnCustomizeInfo()
 {
 	CustomizeManager.UpdateCamera();
-	Movie.Pres.UICustomize_Info();
+	Movie.Pres.UICustomize_Info(Unit);
 }
 // --------------------------------------------------------------------------
 simulated function OnCustomizeProps()
 {
 	CustomizeManager.UpdateCamera();
-	Movie.Pres.UICustomize_Props();
+	Movie.Pres.UICustomize_Props(Unit);
 }
 // --------------------------------------------------------------------------
 simulated function CustomizeFace()
@@ -274,6 +277,8 @@ simulated function EyeColorSelector()
 	CustomizeManager.UpdateCamera(eUICustomizeCat_EyeColor);
 	ColorSelector = GetColorSelector(CustomizeManager.GetColorList(eUICustomizeCat_EyeColor),
 		PreviewEyeColor, SetEyeColor, int(CustomizeManager.GetCategoryDisplay(eUICustomizeCat_EyeColor)));
+
+	CustomizeManager.AccessedCategoryCheckDLC(eUICustomizeCat_EyeColor);
 }
 simulated function PreviewEyeColor(int iIndex)
 {
@@ -306,6 +311,8 @@ reliable client function PrimaryArmorColorSelector()
 	CustomizeManager.UpdateCamera(eUICustomizeCat_PrimaryArmorColor);
 	ColorSelector = GetColorSelector(CustomizeManager.GetColorList(eUICustomizeCat_PrimaryArmorColor),
 		PreviewPrimaryArmorColor, SetPrimaryArmorColor, int(CustomizeManager.GetCategoryDisplay(eUICustomizeCat_PrimaryArmorColor)));
+
+	CustomizeManager.AccessedCategoryCheckDLC(eUICustomizeCat_PrimaryArmorColor);
 }
 function PreviewPrimaryArmorColor(int iColorIndex)
 {

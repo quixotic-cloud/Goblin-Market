@@ -225,7 +225,8 @@ private function BuildNewUnit(XComGameState AddToGameState, name UseTemplate)
 	
 	//Fill in the unit's stats and appearance
 	NewUnitState.RandomizeStats();	
-	CharGen = XComGameInfo(class'Engine'.static.GetCurrentWorldInfo().Game).m_CharacterGen;	
+	CharGen = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);	
+	`assert(CharGen != none);
 	CharacterGeneratorResult = CharGen.CreateTSoldier(UseTemplate);
 	NewUnitState.SetTAppearance(CharacterGeneratorResult.kAppearance);
 	NewUnitState.SetCharacterName(CharacterGeneratorResult.strFirstName, CharacterGeneratorResult.strLastName, CharacterGeneratorResult.strNickName);
@@ -961,9 +962,6 @@ static function CompleteTrainRookie(XComGameState AddToGameState, StateObjectRef
 	local XComGameState_Unit UnitState;
 	local XComGameState_StaffSlot StaffSlotState;
 	local XComGameStateHistory History;
-	local X2SoldierClassTemplate ClassTemplate;
-	local array<SoldierClassAbilityType> AbilityTree;
-	local int i;
 
 	History = `XCOMHISTORY;
 	ProjectState = XComGameState_HeadquartersProjectTrainRookie(`XCOMHISTORY.GetGameStateForObjectID(ProjectRef.ObjectID));
@@ -990,15 +988,6 @@ static function CompleteTrainRookie(XComGameState AddToGameState, StateObjectRef
 			UnitState.ApplySquaddieLoadout(AddToGameState, XComHQ);
 			UnitState.ApplyBestGearLoadout(AddToGameState); // Make sure the squaddie has the best gear available
 			UnitState.SetStatus(eStatus_Active);
-			
-			// Add new abilities to the Unit
-			ClassTemplate = UnitState.GetSoldierClassTemplate();
-			AbilityTree = ClassTemplate.GetAbilityTree(0);
-			for (i = 0; i < AbilityTree.Length; ++i)
-			{
-				UnitState.BuySoldierProgressionAbility(AddToGameState, 0, i);
-			}
-			
 			AddToGameState.AddStateObject(UnitState);
 
 			// Remove the soldier from the staff slot
@@ -1084,7 +1073,7 @@ static function CompleteRespecSoldier(XComGameState AddToGameState, StateObjectR
 			for (i = 0; i < UnitState.GetSoldierClassTemplate().GetAbilityTree(0).Length; ++i) // Then give them their squaddie ability back
 			{
 				UnitState.BuySoldierProgressionAbility(AddToGameState, 0, i);
-			}				
+			}
 			UnitState.SetStatus(eStatus_Active);
 			//UnitState.EquipOldItems(AddToGameState);
 			AddToGameState.AddStateObject(UnitState);

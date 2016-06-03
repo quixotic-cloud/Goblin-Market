@@ -72,6 +72,8 @@ public:
 
 	void ActorDestroyedHandler(AActor* ActorBeingDestroyed);
 
+	void DuplicateHistoryDiff( UXComGameStateHistory *OtherHistory );
+
 private:
 	bool ShouldValidateContext(const UXComGameStateContext_Ability* Context);
 }
@@ -229,7 +231,7 @@ native final function Cleanup();
 /// Clears all history frames, wipes the visualizer map, and sets the NextObjectID to 0
 /// </summary>
 /// <param name="EventManager">If NONE, will use the engine's singleton instead</param>
-native final function ResetHistory(optional X2EventManager EventManager);
+native final function ResetHistory(optional X2EventManager EventManager, optional bool RemovePersistentListeners = true);
 
 /// <summary>
 /// Calls destroy on all visualizer actors. Meant to be called in combination with ResetHistory so that the visualizers go away with the history

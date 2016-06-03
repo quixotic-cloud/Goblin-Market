@@ -5,6 +5,8 @@ class X2Effect_ApplyBlazingPinionsTargetToWorld extends X2Effect_Persistent conf
 
 var config string BlazingPinionsParticleSystemFill_Name;
 
+var string OverrideParticleSystemFill_Name;
+
 private function DoTargetFX(XComGameState_Effect TargetEffect, out VisualizationTrack BuildTrack, XComGameStateContext Context, name EffectApplyResult, bool bStopEffect)
 {
 	local X2Action_PlayEffect EffectAction;
@@ -23,6 +25,10 @@ private function DoTargetFX(XComGameState_Effect TargetEffect, out Visualization
 		{
 			EffectAction = X2Action_PlayEffect(class'X2Action_PlayEffect'.static.AddToVisualizationTrack(BuildTrack, Context));
 			EffectAction.EffectName = default.BlazingPinionsParticleSystemFill_Name;
+			if( OverrideParticleSystemFill_Name != "" )
+			{
+				EffectAction.EffectName = OverrideParticleSystemFill_Name;
+			}
 			EffectAction.bStopEffect = bStopEffect;
 			EffectAction.EffectLocation = TargetEffect.ApplyEffectParameters.AbilityInputContext.TargetLocations[i];
 		}
@@ -58,4 +64,5 @@ simulated function AddX2ActionsForVisualization_Removed(XComGameState VisualizeG
 defaultproperties
 {
 	EffectName="ApplyBlazingPinionsTargetToWorld"
+	OverrideParticleSystemFill_Name=""
 }

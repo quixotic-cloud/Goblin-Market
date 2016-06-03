@@ -136,6 +136,7 @@ simulated function SaveButton(UIButton kButton)
 	}
 	`assert(iChecked == arrProgression.Length);
 	OriginatingSlot.m_arrSoldierProgression = arrProgression;
+	OriginatingSlot.RefreshDropdowns();     //  if abilities changed a slot's availability, it should update it now
 
 	Movie.Stack.Pop(self);
 }

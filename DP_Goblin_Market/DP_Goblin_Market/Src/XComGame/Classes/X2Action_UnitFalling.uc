@@ -22,8 +22,9 @@ var private float fImpulseMag;
 var private X2Camera_FallingCam FallingCamera;
 
 var private CustomAnimParams AnimParams;
+var private float SingleTileFallStartTime;
 
-
+var bool StartingAllowAnimations;
 
 function Init(const out VisualizationTrack InTrack)
 {
@@ -123,6 +124,7 @@ Begin:
 
 	UnitPawn.EnableFootIK(false);
 
+	StartingAllowAnimations = UnitPawn.GetAnimTreeController().GetAllowNewAnimations();
 	UnitPawn.GetAnimTreeController().SetAllowNewAnimations(true);
 
 	// Lets put him in the first couple frames of the get up animation to get him to land on his back
@@ -152,7 +154,9 @@ Begin:
 		UnitPawn.UpdateRagdollLinearDriveDestination(LandingLocation);
 		UnitPawn.DeathRestingLocation = LandingLocation;
 
-		while (UnitPawn.GetCollisionComponentLocation().Z >(LandingLocation.Z + fPawnHalfHeight + 5))
+		SingleTileFallStartTime = ExecutingTime;
+		while (UnitPawn.GetCollisionComponentLocation().Z >(LandingLocation.Z + fPawnHalfHeight + 5) && 
+			   (ExecutingTime - SingleTileFallStartTime < 1.0) )  // mini timeout to prevent long fall times
 		{
 			Sleep( 0.00f );
 			MaybeNotifyEnvironmentDamage( );
@@ -182,7 +186,7 @@ Begin:
 	UnitPawn.UpdateRagdollLinearDriveDestination(EndingLocation);
 	UnitPawn.DeathRestingLocation = EndingLocation;
 
-	Sleep(1.0f); // let them ragdoll for a bit, for effect.
+	Sleep(1.0f * GetDelayModifier()); // let them ragdoll for a bit, for effect.
 
 	//Experimental, there are no shipping game mechanics that knock back but allow the target to survive.
 	if (!NewUnitState.IsDead() && !NewUnitState.IsIncapacitated())
@@ -226,6 +230,8 @@ Begin:
 		Unit.IdleStateMachine.CheckForStanceUpdate();
 	}
 	
+	UnitPawn.GetAnimTreeController().SetAllowNewAnimations(StartingAllowAnimations);
+
 	CompleteAction();
 }
 

@@ -95,7 +95,9 @@ simulated function String GetButtonString(int ItemIndex)
 simulated function array<MissionIntelOption> GetMissionIntelOptions()
 {
 //	return GetMission().IntelOptions;
-	return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(UIMission(Screen).MissionRef.ObjectID)).IntelOptions;
+  	local UIMission Screen;                                 
+	Screen=UIMission(`SCREENSTACK.GetFirstInstanceOf(Class'UIMission'));
+	return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(Screen.MissionRef.ObjectID)).IntelOptions;
 }
 
 //Sends the bought items to game to make changes. Will be replaced by IntelOptions mission code

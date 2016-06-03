@@ -412,7 +412,7 @@ function int CalcSquadPointValueFromGameState(XComGameState GameState)
 	return iTotalSquadCost;
 }
 
-function SetSquadConcealment(bool bNewSquadConceal)
+function SetSquadConcealment(bool bNewSquadConceal, optional name TriggerEventName)
 {
 	local XComGameState NewGameState;
 
@@ -420,6 +420,10 @@ function SetSquadConcealment(bool bNewSquadConceal)
 	{
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Set Squad Concealment" @ bNewSquadConceal);
 		SetSquadConcealmentNewGameState(bNewSquadConceal, NewGameState);
+		if (TriggerEventName != '')
+		{
+			`XEVENTMGR.TriggerEvent(TriggerEventName, self, self, NewGameState);
+		}
 		`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
 	}
 }

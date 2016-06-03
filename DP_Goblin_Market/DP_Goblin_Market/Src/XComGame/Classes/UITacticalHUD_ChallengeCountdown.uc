@@ -12,10 +12,10 @@ simulated function UITacticalHUD_ChallengeCountdown InitCountdown()
 	InitPanel();
 
 	Timer = XComGameState_TimerData(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
-	if (Timer != none)
+	if ((Timer != none) && Timer.bIsChallengeModeTimer)
 	{
 		//Reset the timer until the user begins the mission.
-		Timer.SetRealTimeTimer(-1);
+		Timer.ResetTimer();
 
 		m_CountdownText = Spawn(class'UIX2PanelHeader', self);
 		m_CountdownText.InitPanelHeader('', m_strTimeRemaining, "");
@@ -36,7 +36,7 @@ simulated event Tick(float DeltaTime)
 	local string Separator;
 
 	Timer = XComGameState_TimerData(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
-	if (Timer != none && Timer.TimeLimit >= 0)
+	if (Timer != none && Timer.bIsChallengeModeTimer && Timer.TimeLimit >= 0)
 	{
 		Show();
 		TotalSeconds = Timer.GetCurrentTime();

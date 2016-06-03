@@ -24,16 +24,16 @@ var(X2WeaponTemplate) bool            bMergeAmmo            <ToolTip="If this it
 var(X2WeaponTemplate) name            ArmorTechCatForAltArchetype <ToolTip="If this field is set, it will load the AltGameArchetype when the unit is wearing armor that matches it.">;
 
 //  Combat related stuff
-var(X2WeaponTemplate) config int             iEnvironmentDamage    <ToolTip = "damage to environmental effects; should be 50, 100, or 150.">;
+var(X2WeaponTemplate) config int      iEnvironmentDamage    <ToolTip = "damage to environmental effects; should be 50, 100, or 150.">;
 var(X2WeaponTemplate) int             iRange                 <ToolTip = "-1 will mean within the unit's sight, 0 means melee">;
 var(X2WeaponTemplate) int             iRadius                <ToolTip = "radius in METERS for AOE range">;
 var(X2WeaponTemplate) float           fCoverage              <ToolTip = "percentage of tiles within the radius to affect">;
 var(X2WeaponTemplate) int             iTypicalActionCost     <ToolTip = "typical cost in action points to fire the weapon (only used by some abilities)">;
-var(X2WeaponTemplate) config int             iClipSize              <ToolTip="ammo amount before a reload is required">;
-var(X2WeaponTemplate) config bool            InfiniteAmmo           <ToolTip="no reloading required!">;
-var(X2WeaponTemplate) config int             Aim;
+var(X2WeaponTemplate) config int      iClipSize              <ToolTip="ammo amount before a reload is required">;
+var(X2WeaponTemplate) config bool     InfiniteAmmo           <ToolTip="no reloading required!">;
+var(X2WeaponTemplate) config int      Aim;
 var(X2WeaponTemplate) config WeaponDamageValue BaseDamage;       
-var(X2WeaponTemplate) config int             CritChance;
+var(X2WeaponTemplate) config int      CritChance;
 var(X2WeaponTemplate) name            DamageTypeTemplateName <ToolTip = "Template name for the type of ENVIRONMENT damage this weapon does">;
 var(X2WeaponTemplate) array<int>      RangeAccuracy          <ToolTip = "Array of accuracy modifiers, where index is tiles distant from target.">;
 var(X2WeaponTemplate) config array<WeaponDamageValue> ExtraDamage;
@@ -42,6 +42,7 @@ var(X2WeaponTemplate) bool			  bSoundOriginatesFromOwnerLocation <ToolTip="True 
 var(X2WeaponTemplate) bool			  bIsLargeWeapon         <ToolTip="Used in Weapon Upgrade UI to determine distance from camera.">;
 var(X2WeaponTemplate) name            OverwatchActionPoint   <ToolTip="Action point type to reserve when using Overwatch with this weapon.">;
 var(X2WeaponTemplate) int             iIdealRange     <ToolTip="the unit's ideal range when using this weapon; only used by the AI. (NYI)">;
+var(X2WeaponTemplate) bool            bCanBeDodged;
 
 var(X2WeaponTemplate) bool              bOverrideConcealmentRule;
 var(X2WeaponTemplate) EConcealmentRule  OverrideConcealmentRule;       //  this is only used if bOverrideConcealmentRule is true
@@ -67,12 +68,13 @@ var(X2WeaponTemplate) PrecomputedPathData WeaponPrecomputedPathData;
 var(X2WeaponTemplate) bool            bDisplayWeaponAndAmmo     <ToolTip="If set true, this will display in the lower right corner if set as a primary weapon.">;
 
 // Item stat flags
-var(X2WeaponTemplate) bool				bHideDamageStat;
+var(X2WeaponTemplate) bool			    bHideDamageStat;
 var(X2WeaponTemplate) bool				bHideClipSizeStat;
 
 var protectedwrite array<AbilityIconOverride> AbilityIconOverrides;
 
 var array<AbilityAnimationOverride>		AbilitySpecificAnimations;
+var (X2WeaponTemplate) bool             bHideWithNoAmmo <ToolTip="If true, the weapon mesh will be hidden upon loading a save if it has no ammo.">;
 
 native function Name GetAnimationNameFromAbilityName(Name AbilityName);
 native function SetAnimationNameForAbility(Name AbilityName, Name AnimationName);
@@ -202,6 +204,29 @@ function int GetUIStatMarkup(ECharStatType Stat, optional XComGameState_Item Wea
 	return super.GetUIStatMarkup(Stat);
 }
 
+function string DetermineGameArchetypeForUnit(XComGameState_Item ItemState, XComGameState_Unit UnitState)
+{
+	local string UseArchetype;
+	local XComGameState_Item ArmorState;
+	local X2ArmorTemplate ArmorTemplate;
+
+	UseArchetype = super.DetermineGameArchetypeForUnit(ItemState, UnitState);
+	if (ArmorTechCatForAltArchetype != '' && UseArchetype == GameArchetype)
+	{
+		ArmorState = UnitState.GetItemInSlot(eInvSlot_Armor);
+		if (ArmorState != none)
+		{
+			ArmorTemplate = X2ArmorTemplate(ArmorState.GetMyTemplate());
+			if (ArmorTemplate != none)
+			{
+				if (ArmorTemplate.ArmorTechCat == ArmorTechCatForAltArchetype)
+					UseArchetype = AltGameArchetype;
+			}
+		}
+	}
+	return UseArchetype;
+}
+
 DefaultProperties
 {
 	ItemCat="weapon"
@@ -215,4 +240,5 @@ DefaultProperties
 	fKnockbackDamageRadius = -1.0f
 	bDisplayWeaponAndAmmo=true
 	iTypicalActionCost=1
+	bCanBeDodged=true
 }

@@ -74,7 +74,8 @@ function bool IsPathLocationRestricted(vector TileLocation)
 	return false;
 }
 
-static function bool IsInvalidPathLocation( vector TestLocation )
+
+static function bool IsInvalidPathLocation(vector TestLocation)
 {
 	local XComSpawnRestrictor Restrictor;
 
@@ -87,6 +88,9 @@ static function bool IsInvalidPathLocation( vector TestLocation )
 	}
 	return false;
 }
+
+//Native variant of IsInvalidPathLocation for optimization
+static function native bool IsInvalidPathLocationNative(const out vector TestLocation);
 
 DefaultProperties
 {

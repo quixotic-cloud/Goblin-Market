@@ -24,6 +24,11 @@ var config float GREMLIN_ARRIVAL_TIMEOUT;   //  seconds
 
 var config int FIELD_MEDIC_BONUS;
 var config int GUARDIAN_PROC;
+var config int COMBAT_PROTOCOL_CHARGES;
+var config int REVIVAL_PROTOCOL_CHARGES;
+var config int RESTORATIVE_MIST_CHARGES;
+var config int CAPACITOR_DISCHARGE_CHARGES;
+var config int HAYWIRE_PROTOCOL_COOLDOWN;
 
 static function array<X2DataTemplate> CreateTemplates()
 {
@@ -138,6 +143,7 @@ static function X2AbilityTemplate AidProtocol()
 
 	EffectsCondition = new class'X2Condition_UnitEffects';
 	EffectsCondition.AddExcludeEffect('AidProtocol', 'AA_UnitIsImmune');
+	EffectsCondition.AddExcludeEffect('MimicBeaconEffect', 'AA_UnitIsImmune');
 	Template.AbilityTargetConditions.AddItem(EffectsCondition);
 
 	Template.AddTargetEffect(AidProtocolEffect());
@@ -187,7 +193,7 @@ static function X2AbilityTemplate AidProtocol()
 	return Template;
 }
 
-function XComGameState AttachGremlinToTarget_BuildGameState( XComGameStateContext Context )
+static function XComGameState AttachGremlinToTarget_BuildGameState( XComGameStateContext Context )
 {
 	local XComGameStateContext_Ability AbilityContext;
 	local XComGameState NewGameState;
@@ -231,7 +237,7 @@ function XComGameState AttachGremlinToTarget_BuildGameState( XComGameStateContex
 	return NewGameState;
 }
 
-simulated function GremlinSingleTarget_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+static simulated function GremlinSingleTarget_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
 {
 	local XComGameStateHistory History;
 	local XComGameStateContext_Ability  Context;
@@ -445,7 +451,7 @@ static function X2AbilityTemplate CombatProtocol()
 	Template.ShotHUDPriority = class'UIUtilities_Tactical'.const.CLASS_CORPORAL_PRIORITY;
 
 	Charges = new class 'X2AbilityCharges';
-	Charges.InitialCharges = 2;
+	Charges.InitialCharges = default.COMBAT_PROTOCOL_CHARGES;
 	Template.AbilityCharges = Charges;
 
 	ChargeCost = new class'X2AbilityCost_Charges';
@@ -664,7 +670,7 @@ static function X2AbilityTemplate RevivalProtocol()
 	Template.AbilityCosts.AddItem(ActionPointCost);
 
 	Charges = new class'X2AbilityCharges';
-	Charges.InitialCharges = 1;
+	Charges.InitialCharges = default.REVIVAL_PROTOCOL_CHARGES;
 	Template.AbilityCharges = Charges;
 
 	ChargeCost = new class'X2AbilityCost_Charges';
@@ -1079,7 +1085,7 @@ static function X2AbilityTemplate RestorativeMist()
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'RestorativeMist');
 
 	Charges = new class'X2AbilityCharges';
-	Charges.InitialCharges = 1;
+	Charges.InitialCharges = default.RESTORATIVE_MIST_CHARGES;
 	Template.AbilityCharges = Charges;
 
 	ChargeCost = new class'X2AbilityCost_Charges';
@@ -1215,7 +1221,7 @@ static function X2DataTemplate CapacitorDischarge()
 	Template.AbilityCosts.AddItem(ActionPointCost);
 
 	Charges = new class'X2AbilityCharges';
-	Charges.InitialCharges = 1;
+	Charges.InitialCharges = default.CAPACITOR_DISCHARGE_CHARGES;
 	Template.AbilityCharges = Charges;
 
 	ChargeCost = new class'X2AbilityCost_Charges';
@@ -1258,7 +1264,7 @@ static function X2DataTemplate CapacitorDischarge()
 	DamageEffect.TargetConditions.AddItem(DamageCondition);
 	Template.AddMultiTargetEffect(DamageEffect);
 
-	Template.AddMultiTargetEffect(class'X2StatusEffects'.static.CreateDisorientedStatusEffect(true));
+	Template.AddMultiTargetEffect(class'X2StatusEffects'.static.CreateDisorientedStatusEffect(true, , false));
 
 	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
 	Template.PostActivationEvents.AddItem('ItemRecalled');
@@ -1794,10 +1800,12 @@ simulated function GremlinRestoration_BuildVisualization(XComGameState Visualize
 		{
 			PlayAnimation = X2Action_PlayAnimation(class'X2Action_PlayAnimation'.static.AddToVisualizationTrack(BuildTrack, Context));
 			PlayAnimation.Params.AnimName = 'NO_RevivalProtocol';
+			PlayAnimation.Params.PlayRate = PlayAnimation.GetNonCriticalAnimationSpeed();
 			PlayAnimation.bFinishAnimationWait = true;
 		}
 		PlayAnimation = X2Action_PlayAnimation(class'X2Action_PlayAnimation'.static.AddToVisualizationTrack(BuildTrack, Context));
 		PlayAnimation.Params.AnimName = 'NO_MedicalProtocol';
+		PlayAnimation.Params.PlayRate = PlayAnimation.GetNonCriticalAnimationSpeed();
 		PlayAnimation.bFinishAnimationWait = true;
 
 		//  tell multi target to go ahead
@@ -1887,7 +1895,7 @@ static function X2AbilityTemplate HaywireProtocol()
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_haywireprotocol";
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 4;
+	Cooldown.iNumTurns = default.HAYWIRE_PROTOCOL_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 
 	Template.CancelAbilityName = 'CancelHaywire';
@@ -1974,11 +1982,13 @@ static function X2AbilityTemplate Sentinel()
 static function X2Effect_RemoveEffectsByDamageType RemoveAllEffectsByDamageType()
 {
 	local X2Effect_RemoveEffectsByDamageType RemoveEffectTypes;
+	local name HealType;
+
 	RemoveEffectTypes = new class'X2Effect_RemoveEffectsByDamageType';
-	RemoveEffectTypes.DamageTypesToRemove.AddItem('Fire');
-	RemoveEffectTypes.DamageTypesToRemove.AddItem('Poison');
-	RemoveEffectTypes.DamageTypesToRemove.AddItem(class'X2Effect_ParthenogenicPoison'.default.ParthenogenicPoisonType);
-	RemoveEffectTypes.DamageTypesToRemove.AddItem('Acid');
+	foreach class'X2Ability_DefaultAbilitySet'.default.MedikitHealEffectTypes(HealType)
+	{
+		RemoveEffectTypes.DamageTypesToRemove.AddItem(HealType);
+	}
 	return RemoveEffectTypes;
 }
 

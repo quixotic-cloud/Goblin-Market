@@ -135,6 +135,13 @@ native function bool CanEarnXp() const;
 
 native function bool Validate(XComGameState HistoryGameState, INT GameStateIndex) const;
 
+/// <summary>
+///	This method is designed to be overridden by types that set the bSingletonStateType to true.
+/// There is an optimization to the saveing process that keeps a snapshot of the history every time the game saves.
+/// This method is to update the snapshot instance of the singleton gamestate with the values from current version of the history.
+/// </summary>
+native function SingletonCopyForHistoryDiffDuplicate( XComGameState_BaseObject NewState );
+
 cpptext
 {
 	UBOOL IsRelevantToGetAll();

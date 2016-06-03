@@ -22,7 +22,7 @@ var bool	ExcludeTurret;
 var bool    IsAdvent;
 var bool    ExcludeNoCover;         //  checks if the target has cover or not
 var bool    ExcludeNoCoverToSource; //  checks the cover between the target and source
-var bool    ExcludeFullHealth;      //  ignore target if it is at full HP, unless it IsBurning, IsAcidBurning, or IsPoisoned
+var bool    ExcludeFullHealth;      //  ignore target if it is at full HP, unless it is affected by a persistent damage type listed in X2Ability_DefaultAbilitySet's MedikitHealEffectTypes
 var bool    IsBleedingOut;
 var bool    IsUnspotted;
 var bool    CanBeCarried;

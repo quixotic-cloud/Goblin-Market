@@ -18,6 +18,7 @@ var transient int NumPossibleTints;
 //      Using a hacky member variable because I can't override CreateEntity -sbatista
 var private XComGameState_Item InternalWeaponState;
 var XComUnitPawn UnitPawn; // strategy doesn't have XGUnit, so this can track our owner
+var array<ActorComponent> PawnAttachments;
 
 simulated event PostBeginPlay()
 {
@@ -40,11 +41,9 @@ simulated function Actor CreateEntity(optional XComGameState_Item ItemState=none
 	local SkeletalMeshComponent SkelMeshComp, WeaponMesh, PawnMesh;
 	local XComGameState_Unit UnitState;
 	local XComGameStateHistory History;
-	local XComGameState_Item ArmorState;
 	local XComGameState_Item PrimaryWeapon;
 	local X2WeaponTemplate WeaponTemplate;
-	local X2ArmorTemplate ArmorTemplate;
-	local bool bAltArchetype;
+	local string strArchetype;
 	local int i;
 
 	if(Role == ROLE_Authority)
@@ -60,18 +59,12 @@ simulated function Actor CreateEntity(optional XComGameState_Item ItemState=none
 
 		UnitState = XComGameState_Unit(History.GetGameStateForObjectID(InternalWeaponState.OwnerStateObject.ObjectID));
 		WeaponTemplate = X2WeaponTemplate(InternalWeaponState.GetMyTemplate());
-		//  Some weapons use the AltGameArchetype from their template based on the armor the unit is wearing.
-		if(UnitState != none && WeaponTemplate != none && WeaponTemplate.ArmorTechCatForAltArchetype != '')
-		{				
-			ArmorState = UnitState.GetItemInSlot(eInvSlot_Armor);
-			ArmorTemplate = X2ArmorTemplate(ArmorState.GetMyTemplate());
-			if(ArmorTemplate != none)
-			{
-				bAltArchetype = ArmorTemplate.ArmorTechCat == WeaponTemplate.ArmorTechCatForAltArchetype;
-			}
+		if (WeaponTemplate != none)
+		{
+			strArchetype = WeaponTemplate.DetermineGameArchetypeForUnit(InternalWeaponState, UnitState);
+			Template = XComWeapon(`CONTENT.RequestGameArchetype(strArchetype));
 		}
-		Template = XComWeapon(InternalWeaponState.GetGameArchetype(bAltArchetype));
-		WeaponAttachments = InternalWeaponState.GetWeaponAttachments();		
+		WeaponAttachments = InternalWeaponState.GetWeaponAttachments();
 
 		if (UnitPawn != none)
 			kOwner = UnitPawn;
@@ -80,6 +73,9 @@ simulated function Actor CreateEntity(optional XComGameState_Item ItemState=none
 			m_kOwner = XGUnit(History.GetVisualizer(ItemState.OwnerStateObject.ObjectID)); //Attempt to locate the owner of this item
 			kOwner = m_kOwner != none ? m_kOwner.GetPawn() : none;
 		}
+
+		if (Template == none)           //  if the weapon is a cosmetic unit, for example
+			return none;
 
  		kNewWeapon = Spawn(Template.Class, kOwner,,,,Template);
 		
@@ -104,6 +100,7 @@ simulated function Actor CreateEntity(optional XComGameState_Item ItemState=none
 						if (WeaponAttachments[i].AttachToPawn)
 						{
 							PawnMesh.AttachComponentToSocket(MeshComp, WeaponAttachments[i].AttachSocket);
+							PawnAttachments.AddItem(MeshComp);
 						}
 						else
 						{
@@ -118,6 +115,7 @@ simulated function Actor CreateEntity(optional XComGameState_Item ItemState=none
 						if (WeaponAttachments[i].AttachToPawn)
 						{
 							PawnMesh.AttachComponentToSocket(SkelMeshComp, WeaponAttachments[i].AttachSocket);
+							PawnAttachments.AddItem(SkelMeshComp);
 						}
 						else
 						{
@@ -149,11 +147,24 @@ simulated function Actor CreateEntity(optional XComGameState_Item ItemState=none
 			else
 				PrimaryWeapon = UnitState.GetPrimaryWeapon();
 
-			if(PrimaryWeapon != none && ItemState.ObjectID != PrimaryWeapon.ObjectID && 
-			   (ItemState.InventorySlot == eInvSlot_SecondaryWeapon || ItemState.InventorySlot == eInvSlot_HeavyWeapon)) //Only transfer the primary's customization settings to certain slots
+			if(PrimaryWeapon != none && ItemState.ObjectID != PrimaryWeapon.ObjectID)
 			{
-				//Inherit all settings from the primary
-				SetAppearance(PrimaryWeapon.WeaponAppearance);
+				switch(ItemState.InventorySlot)
+				{
+					case eInvSlot_SecondaryWeapon:
+					case eInvSlot_TertiaryWeapon:
+					case eInvSlot_QuaternaryWeapon:
+					case eInvSlot_QuinaryWeapon:
+					case eInvSlot_SenaryWeapon:
+					case eInvSlot_SeptenaryWeapon:
+					case eInvSlot_HeavyWeapon:
+						//Inherit all settings from the primary
+						SetAppearance(PrimaryWeapon.WeaponAppearance);
+						break;
+					default:
+						SetAppearance(ItemState.WeaponAppearance);
+						break;
+				}
 			}
 			else
 			{
@@ -326,9 +337,26 @@ simulated event XComWeapon GetEntity()
 event Destroyed()
 {
 	local XGWeapon VisualizerCheck;
+	local SkeletalMeshComponent PawnMesh;
+	local int i;
 
 	m_kEntity.SetHidden(true);
 	m_kEntity.Destroy();
+
+	if( UnitPawn != None )
+	{
+		PawnMesh = UnitPawn.Mesh;
+
+		if( PawnMesh != None )
+		{
+			for( i = 0; i < PawnAttachments.Length; ++i )
+			{
+				PawnMesh.DetachComponent(PawnAttachments[i]);
+			}
+			PawnAttachments.Length = 0;
+		}
+	}
+
 
 	//Clear us out of the visualizer map kept on the history. But only if we are the current entry for this object ID!
 	VisualizerCheck = XGWeapon(`XCOMHISTORY.GetVisualizer(ObjectID));
@@ -426,6 +454,62 @@ simulated function int GetRemainingAmmo()
 	Item = XComGameState_Item(`XCOMHISTORY.GetGameStateForObjectID(ObjectID));
 	
 	return Item.Ammo;
+}
+
+//  This is NOT to be used to replace CreateEntity, this is for outside systems that need a dummy lookalike of the weapon
+simulated function DecorateWeaponMesh(SkeletalMeshComponent WeaponMesh)   // this would be CONST if it were native - we do not want to change ANYTHING on the XGWeapon
+{
+	local XComGameState_Item OurWeapon;
+	local MeshComponent AttachedComponent;
+	local array<WeaponAttachment> WeaponAttachments;
+	local StaticMeshComponent StaticMeshComp;
+	local SkeletalMeshComponent SkelMeshComp;
+	local int i;
+
+	if (WeaponMesh != none)
+	{
+		OurWeapon = XComGameState_Item(`XCOMHISTORY.GetGameStateForObjectID(ObjectID));
+		`assert(OurWeapon != none);
+		WeaponAttachments = OurWeapon.GetWeaponAttachments();
+		for (i = 0; i < WeaponAttachments.Length; ++i)
+		{
+			//  don't attach things to the pawn for this function
+			if (WeaponAttachments[i].AttachToPawn)
+				continue;
+
+			if (WeaponAttachments[i].LoadedObject != none)
+			{
+				if( OurWeapon.CosmeticUnitRef.ObjectID < 1 ) //Don't attach items that have a cosmetic unit associated with them
+				{
+					if (WeaponAttachments[i].LoadedObject.IsA('StaticMesh'))
+					{
+						StaticMeshComp = new(WeaponMesh) class'StaticMeshComponent';
+						StaticMeshComp.SetStaticMesh(StaticMesh(WeaponAttachments[i].LoadedObject));
+						StaticMeshComp.bCastStaticShadow = false;
+						WeaponMesh.AttachComponentToSocket(StaticMeshComp, WeaponAttachments[i].AttachSocket);
+					}
+					else if (WeaponAttachments[i].LoadedObject.IsA('SkeletalMesh'))
+					{
+						SkelMeshComp = new(WeaponMesh) class'SkeletalMeshComponent';
+						SkelMeshComp.SetSkeletalMesh(SkeletalMesh(WeaponAttachments[i].LoadedObject));
+						SkelMeshComp.bCastStaticShadow = false;
+						WeaponMesh.AttachComponentToSocket(SkelMeshComp, WeaponAttachments[i].AttachSocket);
+					}
+				}
+			}
+		}
+
+		UpdateMaterials(WeaponMesh);
+	
+		for(i = 0; i < WeaponMesh.Attachments.Length; ++i)
+		{
+			AttachedComponent = MeshComponent(WeaponMesh.Attachments[i].Component);
+			if(AttachedComponent != none)
+			{
+				UpdateMaterials(AttachedComponent);
+			}
+		}
+	}
 }
 
 //------------------------------------------------------------------------------------------------

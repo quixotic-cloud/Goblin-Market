@@ -22,12 +22,11 @@ static function X2DataTemplate CreateKevlarArmor()
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Kevlar_Armor";
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 	Template.ArmorTechCat = 'conventional';
 	Template.Tier = 0;
 	Template.AkAudioSoldierArmorSwitch = 'Conventional';
 	Template.EquipSound = "StrategyUI_Armor_Equip_Conventional";
-
-	Template.UpgradeItem = 'MediumPlatedArmor';
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.HealthLabel, eStat_HP, 0, true);
 
@@ -54,7 +53,8 @@ static function X2DataTemplate CreateMediumPlatedArmor()
 	Template.EquipNarrative = "X2NarrativeMoments.Strategy.CIN_ArmorIntro_PlatedMedium";
 	Template.EquipSound = "StrategyUI_Armor_Equip_Plated";
 
-	Template.UpgradeItem = 'MediumPoweredArmor';
+	Template.CreatorTemplateName = 'MediumPlatedArmor_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'KevlarArmor'; // Which item this will be upgraded from
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.HealthLabel, eStat_HP, class'X2Ability_ItemGrantedAbilitySet'.default.MEDIUM_PLATED_HEALTH_BONUS, true);
 
@@ -131,6 +131,9 @@ static function X2DataTemplate CreateMediumPoweredArmor()
 	Template.AkAudioSoldierArmorSwitch = 'Warden';
 	Template.EquipNarrative = "X2NarrativeMoments.Strategy.CIN_ArmorIntro_PoweredMedium";
 	Template.EquipSound = "StrategyUI_Armor_Equip_Powered";
+
+	Template.CreatorTemplateName = 'MediumPoweredArmor_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'MediumPlatedArmor'; // Which item this will be upgraded from
 
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.HealthLabel, eStat_HP, class'X2Ability_ItemGrantedAbilitySet'.default.MEDIUM_POWERED_HEALTH_BONUS, true);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.ArmorLabel, eStat_ArmorMitigation, class'X2Ability_ItemGrantedAbilitySet'.default.MEDIUM_POWERED_MITIGATION_AMOUNT);

@@ -13,26 +13,30 @@ var private vector Centerpoint;
 
 event Activated()
 {
+	Centerpoint = GetXComTeamCenterpoint();
+}
+
+static function vector GetXComTeamCenterpoint()
+{
 	local XComGameStateHistory History;
 	local XComWorldData WorldData;
 	local XComGameState_Unit Unit;
+	local Vector Center;
 	local int UnitCount;
 
 	History = `XCOMHISTORY;
 	WorldData = `XWORLD;
 
-	Centerpoint = vect(0, 0, 0);
-
 	foreach History.IterateByClassType(class'XComGameState_Unit', Unit)
 	{
 		if(Unit.GetTeam() == eTeam_XCom && Unit.IsAlive())
 		{
-			Centerpoint += WorldData.GetPositionFromTileCoordinates(Unit.TileLocation);
+			Center += WorldData.GetPositionFromTileCoordinates(Unit.TileLocation);
 			UnitCount++;
 		}
 	}
 
-	Centerpoint /= UnitCount;
+	return Center / UnitCount;
 }
 
 defaultproperties

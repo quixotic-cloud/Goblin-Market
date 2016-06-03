@@ -111,6 +111,9 @@ var privatewrite bool          bConfigIsUpToDate;
 
 var privatewrite EOnlineStatusType OnlineStatus;
 
+var privatewrite bool			bProfileDirty; //Marks profile as needing to be saved. Used for deferred saving, preventing multiple requests from issuing multiple tasks in a single frame.
+var privatewrite bool			bForceShowSaveIcon; //Saved option for deferred profile saving, indiciating if SaveIcon needs to be shown.
+
 var bool bSaveExplanationScreenHasShown;
 var private int                m_iCurrentGame;
 
@@ -136,6 +139,7 @@ var bool CampaignbTutorialEnabled;
 var bool CampaignbSuppressFirstTimeNarrative;
 var array<name> CampaignSecondWaveOptions;
 var array<name> CampaignRequiredDLC;
+var array<name> CampaignOptionalNarrativeDLC;
 
 var bool bTutorial;  // Actively running the tutorial in Demo Direct mode using the replay system
 var bool bDemoMode;	// Demo mode uses the Tutorial Code path but doesn't not draw helper markers
@@ -216,6 +220,10 @@ var private array< delegate<OnSaveDeviceLost> > m_SaveDeviceLostDelegates;
 
 // Challenge Mode Data
 var array<INT>          m_ChallengeModeEventMap;
+
+// cached array of DLCs
+var bool m_bCheckedForInfos;
+var array<X2DownloadableContentInfo> m_cachedDLCInfos;
 
 
 // Helper function for dealing with pre localized dates
@@ -480,7 +488,7 @@ simulated function SuperSoldier_UpdateUnit(ConfigurableSoldier SoldierConfig, XC
 	{
 		Unit.RankUpSoldier(UseGameState, SoldierConfig.SoldierClassTemplate);
 	}
-
+	Unit.bNeedsNewClassPopup = false;
 	UnitSoldierClassTemplate = Unit.GetSoldierClassTemplate();
 
 	for(Progression.iRank = 0; Progression.iRank < UnitSoldierClassTemplate.GetMaxConfiguredRank(); ++Progression.iRank)
@@ -1978,8 +1986,8 @@ simulated function SelectStorageDevice()
 	}
 }
 
-function SaveProfileSettings(optional bool bForceShowSaveIndicator=false)
-{	
+function SaveProfileSettingsImmediate()
+{
 	local delegate<SaveProfileSettingsComplete> dSaveProfileSettingsComplete;
 	local bool bWritingProfileSettings;
 	local bool bWroteSettingsToBuffer;
@@ -1988,27 +1996,27 @@ function SaveProfileSettings(optional bool bForceShowSaveIndicator=false)
 	PlayerInterfaceEx = OnlineSub.PlayerInterfaceEx;
 
 	ProfileSettings = XComOnlineProfileSettings(LocalEngine.GetProfileSettings());
-	if( bHasProfileSettings && ProfileSettings != none && ProfileSettings.Data != none )
-	{	
-		`log("Saving profile to disk",,'XCom_Online');
+	if (bHasProfileSettings && ProfileSettings != none && ProfileSettings.Data != none)
+	{
+		`log("Saving profile to disk", , 'XCom_Online');
 
 		ProfileSettings.PreSaveData();
 
 		bWroteSettingsToBuffer = WriteProfileSettingsToBuffer();
 
-		if( bWroteSettingsToBuffer )
+		if (bWroteSettingsToBuffer)
 		{
 			ProfileIsSerializing = true;
 
 			StorageDeviceIndex = PlayerInterfaceEx.GetDeviceSelectionResults(LocalUserIndex, StorageDeviceName);
 			bWritingProfileSettings = OnlineSub.PlayerInterface.WritePlayerStorage(LocalUserIndex, ProfileSettings, StorageDeviceIndex);
 
-			if( bWritingProfileSettings && (bShowSaveIndicatorForProfileSaves || bForceShowSaveIndicator) )
+			if (bWritingProfileSettings && (bShowSaveIndicatorForProfileSaves || bForceShowSaveIcon))
 				ShowSaveIndicator(true);
 		}
 		else
 		{
-			`log("Cannot save profile settings: WriteProfileSettingsToBuffer failed!",,'XCom_Online');
+			`log("Cannot save profile settings: WriteProfileSettingsToBuffer failed!", , 'XCom_Online');
 			foreach m_SaveProfileSettingsCompleteDelegates(dSaveProfileSettingsComplete)
 			{
 				dSaveProfileSettingsComplete(false);
@@ -2017,12 +2025,21 @@ function SaveProfileSettings(optional bool bForceShowSaveIndicator=false)
 	}
 	else
 	{
-		`log("Cannot save profile settings: No profile available!",,'XCom_Online');
+		`log("Cannot save profile settings: No profile available!", , 'XCom_Online');
 		foreach m_SaveProfileSettingsCompleteDelegates(dSaveProfileSettingsComplete)
 		{
 			dSaveProfileSettingsComplete(false);
 		}
 	}
+
+	bProfileDirty = false;
+	bForceShowSaveIcon = false;
+}
+
+function SaveProfileSettings(optional bool bForceShowSaveIndicator=false)
+{	
+	bProfileDirty = true;
+	bForceShowSaveIcon = bForceShowSaveIcon || bForceShowSaveIndicator;
 }
 
 function DebugSaveProfileSettingsCompleteDelegate()
@@ -2324,6 +2341,11 @@ event Tick(float DeltaTime)
 	if( bSaveDataOwnerErrPending )
 	{
 		ShowPostLoadMessages();
+	}
+
+	if (bProfileDirty)
+	{
+		SaveProfileSettingsImmediate();
 	}
 }
 
@@ -2937,6 +2959,7 @@ native function array<X2DownloadableContentInfo> GetDLCInfos(bool bNewDLCOnly);
 /** Create a time stamp string in the format used for X-Com saves */
 native static function FormatTimeStamp(out string TimeStamp, int Year, int Month, int Day, int Hour, int Minute);
 native static function string FormatTimeStampFor12HourClock(string TimeStamp);
+native static function FormatTimeStampSingleLine12HourClock(out string TimeStamp, int Year, int Month, int Day, int Hour, int Minute);
 
 
 /** Provided for the save / load UI - where saves need to be ordered from most recent to oldest*/
@@ -3387,6 +3410,13 @@ function OnGameInviteAccepted(const out OnlineGameSearchResult InviteResult, boo
 		return;
 	}
 
+	if (CheckInviteGameVersionMismatch(XComOnlineGameSettings(InviteResult.GameSettings)))
+	{
+		InviteFailed(SystemMessage_VersionMismatch, true);
+		return;
+	}
+
+
 	// Mark that we accepted an invite. and active game is now marked failed
 	SetShuttleToMPInviteLoadout(true);
 	bAcceptedInviteDuringGameplay = true;
@@ -3422,6 +3452,26 @@ function OnGameInviteAccepted(const out OnlineGameSearchResult InviteResult, boo
 	{
 		`log(`location @ "Waiting for whatever to finish and transition back to the MP Shell before entering the Loadout screen.");
 	}
+}
+
+function bool CheckInviteGameVersionMismatch(XComOnlineGameSettings InviteGameSettings)
+{
+	local string ByteCodeHash;
+	local int InstalledDLCHash;
+	local int InstalledModsHash;
+	local string INIHash;
+
+	ByteCodeHash = class'Helpers'.static.NetGetVerifyPackageHashes();
+	InstalledDLCHash = class'Helpers'.static.NetGetInstalledMPFriendlyDLCHash();
+	InstalledModsHash = class'Helpers'.static.NetGetInstalledModsHash();
+	INIHash = class'Helpers'.static.NetGetMPINIHash();
+
+	`log(`location @ "InviteGameSettings=" $ InviteGameSettings.ToString(),, 'XCom_Online');
+	`log(`location @ `ShowVar(ByteCodeHash) @ `ShowVar(InstalledDLCHash) @ `ShowVar(InstalledModsHash) @ `ShowVar(INIHash),, 'XCom_Online');
+	return  ByteCodeHash != InviteGameSettings.GetByteCodeHash() ||
+			InstalledDLCHash != InviteGameSettings.GetInstalledDLCHash() ||
+			InstalledModsHash != InviteGameSettings.GetInstalledModsHash() ||
+			INIHash != InviteGameSettings.GetINIHash();
 }
 
 function bool IsPlayerInLobby()
@@ -3608,6 +3658,9 @@ public function string GetSystemMessageTitle(ESystemMessageType eMessageType)
 	sSystemMessage = m_sSystemMessageTitles[eMessageType];
 	return sSystemMessage;
 }
+
+//Returns the state object cache from Temp history. TempHistory should only ever be used locally, never stored.
+native function XComGameState LatestSaveState(out XComGameStateHistory TempHistory);
 
 // cpptext & defaultproperties
 //==================================================================================================================

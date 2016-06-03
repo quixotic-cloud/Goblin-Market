@@ -44,7 +44,7 @@ simulated static function string ItemUIImage()
 //      types. Eventually the XComGameState_<classname> objects will replace them entirely
 //
 
-simulated static function CreateVisualizer(XComGameState_Item ItemState, bool bSetAsVisualizer=true, optional XComUnitPawn UnitPawnOverride = None)
+simulated static function XGItem CreateVisualizer(XComGameState_Item ItemState, bool bSetAsVisualizer=true, optional XComUnitPawn UnitPawnOverride = None)
 {
 	local class<XGItem> ItemClass;
 	local XGItem CreatedItem;
@@ -71,7 +71,11 @@ simulated static function CreateVisualizer(XComGameState_Item ItemState, bool bS
 		{
 			`XCOMHISTORY.SetVisualizer(ItemState.ObjectID, CreatedItem);
 		}
+
+		return CreatedItem;
 	}
+
+	return none;
 }
 //=======================================================================================
 

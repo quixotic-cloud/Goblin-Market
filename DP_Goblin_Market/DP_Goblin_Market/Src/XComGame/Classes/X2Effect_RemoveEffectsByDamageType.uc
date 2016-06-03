@@ -33,6 +33,14 @@ function name DamageTypesRelevant(const out EffectAppliedData ApplyEffectParamet
 		}
 	}
 
+	foreach EffectNamesToRemove(TypeToRemove)
+	{
+		if (UnitState.IsUnitAffectedByEffectName(TypeToRemove))
+		{
+			return 'AA_Success';
+		}
+	}
+
 	//The unit isn't affected by anything we heal. Don't apply.
 	return 'AA_UnitIsNotInjured';
 }

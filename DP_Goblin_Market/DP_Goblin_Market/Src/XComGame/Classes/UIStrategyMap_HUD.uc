@@ -236,6 +236,14 @@ simulated function UpdateData()
 	CachedDoom = AlienHQ.GetCurrentDoom();
 
 	`HQPRES.m_kAvengerHUD.ShowEventQueue(true);
+	
+	// Force any alerts which somehow got buried to the top of the stack
+	if (`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+	{
+		// The alert is not at the top of the stack, because earlier in this function we return if the top is not UIStrategyMap
+		`HQPRES.ScreenStack.MoveToTopOfStack(class'UIAlert');
+		`HQPRES.ScreenStack.ForceStackOrder(`HQPRES.Get2DMovie());
+	}
 }
 
 simulated function UpdateLoseTimer()

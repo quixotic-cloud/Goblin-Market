@@ -359,28 +359,31 @@ function PopReactionFire(XComGameStateContext_Ability FiringAbilityContext)
 {
 	local int Index;	
 
-	--ReactionFireCount;
-
-	for(Index = 0; Index < ReactionFireInstances.Length; ++Index)
+	if( ReactionFireCount > 0 )
 	{
-		if(ReactionFireInstances[Index].ShooterObjectID == FiringAbilityContext.InputContext.SourceObject.ObjectID &&
-		   ReactionFireInstances[Index].TargetObjectID == FiringAbilityContext.InputContext.PrimaryTarget.ObjectID)
-		{	
-			ReactionFireInstances[Index].bStarted = true; //Mark as shown even though we were skipped. Maybe warn on this?
-			ReactionFireInstances[Index].bReadyForNext = true; //Mark as shown even though we were skipped. Maybe warn on this?
+		--ReactionFireCount;
 
-			//If we're the last reaction fire, then we can pop the camera. Otherwise wait for the next push
-			if (Index == (ReactionFireInstances.Length - 1))
+		for( Index = 0; Index < ReactionFireInstances.Length; ++Index )
+		{
+			if( ReactionFireInstances[Index].ShooterObjectID == FiringAbilityContext.InputContext.SourceObject.ObjectID &&
+			   ReactionFireInstances[Index].TargetObjectID == FiringAbilityContext.InputContext.PrimaryTarget.ObjectID )
 			{
-				`CAMERASTACK.RemoveCamera(ReactionFireInstances[Index].ShooterCam);
+				ReactionFireInstances[Index].bStarted = true; //Mark as shown even though we were skipped. Maybe warn on this?
+				ReactionFireInstances[Index].bReadyForNext = true; //Mark as shown even though we were skipped. Maybe warn on this?
+
+				//If we're the last reaction fire, then we can pop the camera. Otherwise wait for the next push
+				if( Index == (ReactionFireInstances.Length - 1) )
+				{
+					`CAMERASTACK.RemoveCamera(ReactionFireInstances[Index].ShooterCam);
+				}
 			}
 		}
-	}
 
-	if(ReactionFireCount <= 0)
-	{
-		ReactionFireInstances.Length = 0;
-		EndReactionFireSequence(FiringAbilityContext);
+		if( ReactionFireCount <= 0 )
+		{
+			ReactionFireInstances.Length = 0;
+			EndReactionFireSequence(FiringAbilityContext);
+		}
 	}
 }
 

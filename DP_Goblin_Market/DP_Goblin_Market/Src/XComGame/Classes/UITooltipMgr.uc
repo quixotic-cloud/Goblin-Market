@@ -385,4 +385,5 @@ DefaultProperties
 	InputState = eInputState_None; 
 	bHideOnLoseFocus = false;
 	bEnableTooltips = true;
+	bAlwaysTick = true
 }

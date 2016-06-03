@@ -54,6 +54,7 @@ struct native AmbientNarrativeInfo
 var() array<AmbientNarrativeInfo>    PlayedAmbientNarrativeMoments;  // used for track which ambient narrative moments we've played
 var() array<AmbientNarrativeInfo>	 PlayedLootNarrativeMoments; // used for recovered items
 var() array<AmbientNarrativeInfo>	 PlayedArmorIntroNarrativeMoments; // used for armor intros
+var() array<AmbientNarrativeInfo>	 PlayedEquipItemNarrativeMoments; // used for equipping items
 
 var() array<string>	PlayedTacticalNarrativeMomentsCurrentMapOnly;
 
@@ -365,6 +366,7 @@ static function SetUpHeadquarters(XComGameState StartState, optional bool bTutor
 	local XComGameState_Skyranger SkyrangerState;
 	local XComGameState_Continent ContinentState;
 	local XComGameState_Haven HavenState;
+	local XComGameState_HeadquartersResistance ResHQ;
 	
 	//HQ location selection
 	local int RandomIndex;
@@ -524,6 +526,12 @@ static function SetUpHeadquarters(XComGameState StartState, optional bool bTutor
 	CreateStartingScientist(StartState);
 	CreateStartingBradford(StartState);
 	CreateStartingClerks(StartState);
+
+	// Create ResHQ recruits here, so character pool soldiers propagate to staff first
+	foreach StartState.IterateByClassType(class'XComGameState_HeadquartersResistance', ResHQ)
+	{
+		ResHQ.CreateRecruits(StartState);
+	}
 
 	//Create the starting resources
 	CreateStartingResources(StartState, bTutorialEnabled);
@@ -1434,6 +1442,7 @@ static function CreateStartingSoldiers(XComGameState StartState, optional bool b
 	local TDateTime TutKIADate;
 	local StateObjectReference EmptyRef;
 	local X2MissionSourceTemplate MissionSource;
+	local XComOnlineProfileSettings ProfileSettings;
 
 	assert(StartState != none);
 
@@ -1454,12 +1463,14 @@ static function CreateStartingSoldiers(XComGameState StartState, optional bool b
 	}
 	`assert( Analytics != none );
 
-	CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
+	ProfileSettings = `XPROFILESETTINGS;
 
 	// Starting soldiers
 	for( Index = 0; Index < class'XGTacticalGameCore'.default.NUM_STARTING_SOLDIERS; ++Index )
 	{
-		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, default.InitialSoldiersCharacterPoolSelectionMode);
+		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, ProfileSettings.Data.m_eCharPoolUsage);
+		CharacterGenerator = `XCOMGRI.Spawn(NewSoldierState.GetMyTemplate().CharacterGeneratorClass);
+		`assert(CharacterGenerator != none);
 
 		if(bTutorialEnabled && Index == 0)
 		{
@@ -1491,12 +1502,12 @@ static function CreateStartingSoldiers(XComGameState StartState, optional bool b
 			NewSoldierState.SetCharacterName(class'XLocalizedData'.default.TutorialSoldierFirstName, class'XLocalizedData'.default.TutorialSoldierLastName, TutSoldier.strNickName);
 			NewSoldierState.SetCountry(TutSoldier.nmCountry);
 			NewSoldierState.SetXPForRank(1);
+			NewSoldierState.GenerateBackground();
 			NewSoldierState.StartingRank = 1;
 			NewSoldierState.iNumMissions = 1;
 			XComHQ.TutorialSoldier = NewSoldierState.GetReference();
 		}
 		
-		NewSoldierState.GiveRandomPersonality();
 		NewSoldierState.RandomizeStats();
 		NewSoldierState.ApplyInventoryLoadout(StartState);
 
@@ -1523,7 +1534,7 @@ static function CreateStartingSoldiers(XComGameState StartState, optional bool b
 		MissionSource = X2MissionSourceTemplate(class'X2StrategyElementTemplateManager'.static.GetStrategyElementTemplateManager().FindStrategyElementTemplate('MissionSource_Start'));
 
 		// Osei
-		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, default.InitialSoldiersCharacterPoolSelectionMode);
+		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, ProfileSettings.Data.m_eCharPoolUsage);
 		TutSoldier = CharacterGenerator.CreateTSoldier('Soldier', default.DeadTutorialSoldier1Gender, default.DeadTutorialSoldier1Country);
 		NewSoldierState.SetTAppearance(default.DeadTutorialSoldier1Appearance);
 		NewSoldierState.SetCharacterName(class'XLocalizedData'.default.DeadTutorialSoldier1FirstName, class'XLocalizedData'.default.DeadTutorialSoldier1LastName, TutSoldier.strNickName);
@@ -1555,7 +1566,7 @@ static function CreateStartingSoldiers(XComGameState StartState, optional bool b
 		Analytics.AddValue( class'XComGameState_Analytics'.const.ANALYTICS_UNIT_ABILITIES_RECIEVED, 0, NewSoldierState.GetReference( ) );
 
 		// Ramirez
-		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, default.InitialSoldiersCharacterPoolSelectionMode);
+		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, ProfileSettings.Data.m_eCharPoolUsage);
 		TutSoldier = CharacterGenerator.CreateTSoldier('Soldier', default.DeadTutorialSoldier2Gender, default.DeadTutorialSoldier2Country);
 		NewSoldierState.SetTAppearance(default.DeadTutorialSoldier2Appearance);
 		NewSoldierState.SetCharacterName(class'XLocalizedData'.default.DeadTutorialSoldier2FirstName, class'XLocalizedData'.default.DeadTutorialSoldier2LastName, TutSoldier.strNickName);
@@ -1609,12 +1620,13 @@ static function CreateStartingEngineer(XComGameState StartState)
 		break;
 	}
 
-	CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
-
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('HeadEngineer');
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	ShenState = CharacterTemplate.CreateInstanceFromTemplate(StartState);
 	ShenState.SetSkillLevel(2);
@@ -1659,12 +1671,13 @@ static function CreateStartingScientist(XComGameState StartState)
 		break;
 	}
 
-	CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
-
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('HeadScientist');
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	TyganState = CharacterTemplate.CreateInstanceFromTemplate(StartState);
 	TyganState.SkillValue = TyganState.GetMyTemplate().SkillLevelThresholds[2];
@@ -1704,12 +1717,13 @@ static function CreateStartingBradford(XComGameState StartState)
 		break;
 	}
 
-	CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
-
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('StrategyCentral');
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	CentralState = CharacterTemplate.CreateInstanceFromTemplate(StartState);	
 	CentralState.SetCharacterName(class'XLocalizedData'.default.OfficerBradfordFirstName, class'XLocalizedData'.default.OfficerBradfordLastName, "");
@@ -1737,12 +1751,14 @@ static function CreateStartingClerks(XComGameState StartState)
 		break;
 	}
 
-	CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
-
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('Clerk');
+	`assert(CharacterTemplate != none);
+
+	CharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	for(Idx = 0; Idx < default.NumClerks_ActOne; ++Idx)
 	{
@@ -1776,10 +1792,12 @@ function UpdateClerkCount(int ActNum, XComGameState UpdateGameState)
 			break;
 	}
 
-	CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('Clerk');
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	while(Clerks.Length < MaxClerks)
 	{
@@ -1968,7 +1986,8 @@ function array<XComGameState_Unit> GetDeployableSoldiers(optional bool bDontIncl
 
 		if(Soldier != none)
 		{
-			if(Soldier.IsSoldier() && Soldier.IsAlive() && (Soldier.GetStatus() == eStatus_Active || Soldier.GetStatus() == eStatus_PsiTraining || (bAllowWoundedSoldiers && Soldier.IsInjured())))
+			if(Soldier.IsSoldier() && Soldier.IsAlive() && (Soldier.GetStatus() == eStatus_Active || Soldier.GetStatus() == eStatus_PsiTraining || 
+				((bAllowWoundedSoldiers || Soldier.IgnoresInjuries()) && Soldier.IsInjured())))
 			{
 				if(!bDontIncludeSquad || (bDontIncludeSquad && !IsUnitInSquad(Soldier.GetReference())))
 				{
@@ -3512,6 +3531,29 @@ function bool HasItemByName(name ItemTemplateName)
 }
 
 //---------------------------------------------------------------------------------------
+function bool HasItemInInventoryOrLoadout(X2ItemTemplate ItemTemplate, optional int Quantity = 1)
+{
+	local array<XComGameState_Unit> Soldiers;
+	local int iSoldier;
+	
+	if (HasItem(ItemTemplate, Quantity))
+	{
+		return true;
+	}
+
+	Soldiers = GetSoldiers();
+	for (iSoldier = 0; iSoldier < Soldiers.Length; iSoldier++)
+	{
+		if (Soldiers[iSoldier].HasItemOfTemplateType(ItemTemplate.DataName))
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+//---------------------------------------------------------------------------------------
 function bool HasUnModifiedItem(XComGameState AddToGameState, X2ItemTemplate ItemTemplate, out XComGameState_Item ItemState, optional bool bLoot = false, optional XComGameState_Item CombatSimTest)
 {
 	local int idx;
@@ -3605,7 +3647,7 @@ function bool PutItemInInventory(XComGameState AddToGameState, XComGameState_Ite
 	}
 	else
 	{
-		if(!ItemState.IsStartingItem() && !ItemState.GetMyTemplate().bInfiniteItem)
+		if(!ItemState.GetMyTemplate().bInfiniteItem)
 		{
 			if( HasUnModifiedItem(AddToGameState, ItemTemplate, InventoryItemState, bLoot, ItemState) )
 			{
@@ -3772,7 +3814,7 @@ function bool GetItemFromInventory(XComGameState AddToGameState, StateObjectRefe
 
 	if(InventoryItemState != none)
 	{
-		if((!InventoryItemState.IsStartingItem() && !InventoryItemState.GetMyTemplate().bInfiniteItem) || InventoryItemState.HasBeenModified())
+		if(!InventoryItemState.GetMyTemplate().bInfiniteItem || InventoryItemState.HasBeenModified())
 		{
 			if(InventoryItemState.Quantity > 1)
 			{
@@ -3816,7 +3858,7 @@ function bool RemoveItemFromInventory(XComGameState AddToGameState, StateObjectR
 
 	if(InventoryItemState != none)
 	{
-		if(!InventoryItemState.IsStartingItem() && !InventoryItemState.GetMyTemplate().bInfiniteItem)
+		if(!InventoryItemState.GetMyTemplate().bInfiniteItem)
 		{
 			if (ResourceItems.Find(InventoryItemState.GetMyTemplateName()) != INDEX_NONE) // If this item is a resource, use the AddResource method instead
 			{
@@ -3922,8 +3964,7 @@ function array<StateObjectReference> GetTradingPostItems()
 
 		if(ItemState != none)
 		{
-			if(ItemState.GetMyTemplate().TradingPostValue > 0 && !ItemState.GetMyTemplate().StartingItem && 
-			   !ItemState.GetMyTemplate().bInfiniteItem && !ItemState.IsNeededForGoldenPath())
+			if(ItemState.GetMyTemplate().TradingPostValue > 0 && !ItemState.GetMyTemplate().bInfiniteItem && !ItemState.IsNeededForGoldenPath())
 			{
 				TradingPostItems.AddItem(ItemState.GetReference());
 			}
@@ -4017,6 +4058,305 @@ function int GetNumItemBeingBuilt(X2ItemTemplate ItemTemplate)
 	}
 
 	return iCount;
+}
+
+// Used by schematics and techs to upgrade all of the instances of an item based on a creator template
+static function UpgradeItems(XComGameState NewGameState, name CreatorTemplateName)
+{
+	local XComGameStateHistory History;
+	local XComGameState_HeadquartersXCom XComHQ;
+	local X2ItemTemplateManager ItemTemplateManager;
+	local X2ItemTemplate BaseItemTemplate, UpgradeItemTemplate;
+	local X2WeaponUpgradeTemplate WeaponUpgradeTemplate;
+	local XComGameState_Item InventoryItemState, BaseItemState, UpgradedItemState;
+	local array<X2ItemTemplate> CreatedItems, ItemsToUpgrade;
+	local array<X2WeaponUpgradeTemplate> WeaponUpgrades;
+	local array<XComGameState_Item> InventoryItems;
+	local array<XComGameState_Unit> Soldiers;
+	local EInventorySlot InventorySlot;
+	local XComGameState_Unit SoldierState, HighestRankSoldier;
+	local int idx, iSoldier, iItems;
+	local Object constRef;
+
+	History = `XCOMHISTORY;
+	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
+
+	foreach NewGameState.IterateByClassType(class'XComGameState_HeadquartersXCom', XComHQ)
+	{
+		break;
+	}
+
+	if (XComHQ == none)
+	{
+		XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+		XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+		NewGameState.AddStateObject(XComHQ);
+	}
+
+	CreatedItems = ItemTemplateManager.GetAllItemsCreatedByTemplate(CreatorTemplateName);
+
+	for (idx = 0; idx < CreatedItems.Length; idx++)
+	{
+		UpgradeItemTemplate = CreatedItems[idx];
+
+		ItemsToUpgrade.Length = 0; // Reset ItemsToUpgrade for this upgrade item iteration
+		GetItemsToUpgrade(UpgradeItemTemplate, ItemsToUpgrade);
+
+		// If the new item is infinite, just add it directly to the inventory
+		if (UpgradeItemTemplate.bInfiniteItem)
+		{
+			// But only add the infinite item if it isn't already in the inventory
+			if (!XComHQ.HasItem(UpgradeItemTemplate))
+			{
+				UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
+				NewGameState.AddStateObject(UpgradedItemState);
+				XComHQ.AddItemToHQInventory(UpgradedItemState);
+			}
+		}
+		else
+		{
+			// Otherwise cycle through each of the base item templates
+			foreach ItemsToUpgrade(BaseItemTemplate)
+			{
+				// Check if the base item is in the XComHQ inventory
+				BaseItemState = XComHQ.GetItemByName(BaseItemTemplate.DataName);
+
+				// If it is not, we have nothing to replace, so move on
+				if (BaseItemState != none)
+				{
+					// Otherwise match the base items quantity
+					UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
+					NewGameState.AddStateObject(UpgradedItemState);
+					UpgradedItemState.Quantity = BaseItemState.Quantity;
+
+					// Then add the upgrade item and remove all of the base items from the inventory
+					XComHQ.PutItemInInventory(NewGameState, UpgradedItemState);
+					XComHQ.RemoveItemFromInventory(NewGameState, BaseItemState.GetReference(), BaseItemState.Quantity);
+					NewGameState.RemoveStateObject(BaseItemState.GetReference().ObjectID);
+				}
+			}
+		}
+
+		// Check the inventory for any unequipped items with weapon upgrades attached, make sure they get updated
+		for (iItems = 0; iItems < XComHQ.Inventory.Length; iItems++)
+		{
+			InventoryItemState = XComGameState_Item(History.GetGameStateForObjectID(XComHQ.Inventory[iItems].ObjectID));
+			foreach ItemsToUpgrade(BaseItemTemplate)
+			{
+				if (InventoryItemState.GetMyTemplateName() == BaseItemTemplate.DataName && InventoryItemState.GetMyWeaponUpgradeTemplates().Length > 0)
+				{
+					UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
+					NewGameState.AddStateObject(UpgradedItemState);
+					UpgradedItemState.WeaponAppearance = InventoryItemState.WeaponAppearance;
+					UpgradedItemState.Nickname = InventoryItemState.Nickname;
+
+					// Transfer over all weapon upgrades to the new item
+					WeaponUpgrades = InventoryItemState.GetMyWeaponUpgradeTemplates();
+					foreach WeaponUpgrades(WeaponUpgradeTemplate)
+					{
+						UpgradedItemState.ApplyWeaponUpgradeTemplate(WeaponUpgradeTemplate);
+					}
+
+					// Delete the old item, and add the new item to the inventory
+					NewGameState.RemoveStateObject(InventoryItemState.GetReference().ObjectID);
+					XComHQ.Inventory.RemoveItem(InventoryItemState.GetReference());
+					XComHQ.PutItemInInventory(NewGameState, UpgradedItemState);
+				}
+			}
+		}
+
+		// Then check every soldier's inventory and replace the old item with a new one
+		Soldiers = XComHQ.GetSoldiers();
+		for (iSoldier = 0; iSoldier < Soldiers.Length; iSoldier++)
+		{
+			InventoryItems = Soldiers[iSoldier].GetAllInventoryItems(NewGameState, false);
+
+			foreach InventoryItems(InventoryItemState)
+			{
+				foreach ItemsToUpgrade(BaseItemTemplate)
+				{
+					if (InventoryItemState.GetMyTemplateName() == BaseItemTemplate.DataName)
+					{
+						UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
+						NewGameState.AddStateObject(UpgradedItemState);
+						UpgradedItemState.WeaponAppearance = InventoryItemState.WeaponAppearance;
+						UpgradedItemState.Nickname = InventoryItemState.Nickname;
+						InventorySlot = InventoryItemState.InventorySlot; // save the slot location for the new item
+
+						// Remove the old item from the soldier and transfer over all weapon upgrades to the new item
+						SoldierState = XComGameState_Unit(NewGameState.CreateStateObject(class'XComGameState_Unit', Soldiers[iSoldier].ObjectID));
+						NewGameState.AddStateObject(SoldierState);
+						SoldierState.RemoveItemFromInventory(InventoryItemState, NewGameState);
+						WeaponUpgrades = InventoryItemState.GetMyWeaponUpgradeTemplates();
+						foreach WeaponUpgrades(WeaponUpgradeTemplate)
+						{
+							UpgradedItemState.ApplyWeaponUpgradeTemplate(WeaponUpgradeTemplate);
+						}
+
+						// Delete the old item
+						NewGameState.RemoveStateObject(InventoryItemState.GetReference().ObjectID);
+
+						// Then add the new item to the soldier in the same slot
+						SoldierState.AddItemToInventory(UpgradedItemState, InventorySlot, NewGameState);
+
+						// Store the highest ranking soldier to get the upgraded item
+						if (HighestRankSoldier == none || SoldierState.GetRank() > HighestRankSoldier.GetRank())
+						{
+							HighestRankSoldier = SoldierState;
+						}
+					}
+				}
+			}
+		}
+
+		// Play a narrative if there is one and there is a valid soldier. Since we haven't actually submitted
+		// the state yet, add an event that will trigger when we do, otherwise the soldier won't actually have 
+		// the item we want to show
+		if (HighestRankSoldier != none && X2EquipmentTemplate(UpgradeItemTemplate).EquipNarrative != "")
+		{
+			constRef = HighestRankSoldier;
+			class'X2EventManager'.static.GetEventManager().RegisterForEvent(constRef, 'ItemUpgradedNarrative', OnUpgradeItemNarrative, ELD_OnStateSubmitted);
+			class'X2EventManager'.static.GetEventManager().TriggerEvent('ItemUpgradedNarrative', UpgradeItemTemplate, HighestRankSoldier, NewGameState);
+		}
+	}
+}
+
+// callback to play the item upgrade narrative only after the item upgrade has actually been applied to the history
+private static function EventListenerReturn OnUpgradeItemNarrative(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
+{
+	local XComGameState_HeadquartersXCom XComHQ;
+	local XComGameState_Unit Unit;
+	local X2ItemTemplate UpgradeItemTemplate;
+	local XComNarrativeMoment EquipNarrativeMoment;
+	local Object constRef;
+
+	Unit = XComGameState_Unit(EventSource);
+	UpgradeItemTemplate = X2ItemTemplate(EventData);
+	
+	EquipNarrativeMoment = XComNarrativeMoment(`CONTENT.RequestGameArchetype(X2EquipmentTemplate(UpgradeItemTemplate).EquipNarrative));
+	if (EquipNarrativeMoment != None)
+	{
+		XComHQ = XComGameState_HeadquartersXCom(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+
+		if (UpgradeItemTemplate.ItemCat == 'armor')
+		{
+			if (XComHQ.CanPlayArmorIntroNarrativeMoment(EquipNarrativeMoment))
+			{
+				XComHQ.UpdatePlayedArmorIntroNarrativeMoments(EquipNarrativeMoment);
+				`HQPRES.UIArmorIntroCinematic(EquipNarrativeMoment.nmRemoteEvent, 'CIN_ArmorIntro_Done', Unit.GetReference());
+			}
+		}
+		else if (XComHQ.CanPlayEquipItemNarrativeMoment(EquipNarrativeMoment))
+		{
+			XComHQ.UpdateEquipItemNarrativeMoments(EquipNarrativeMoment);
+			`HQPRES.UINarrative(EquipNarrativeMoment);
+		}
+	}
+
+	constRef = Unit;
+	class'X2EventManager'.static.GetEventManager().UnRegisterFromEvent(constRef, 'OnUpdateArmorIntroCinematic');
+
+	return ELR_NoInterrupt;
+}
+
+// Recursively calculates the list of items to upgrade based on the final upgraded item template
+private static function GetItemsToUpgrade(X2ItemTemplate UpgradeItemTemplate, out array<X2ItemTemplate> ItemsToUpgrade)
+{
+	local X2ItemTemplateManager ItemTemplateManager;
+	local X2ItemTemplate BaseItemTemplate, AdditionalBaseItemTemplate;
+	local array<X2ItemTemplate> BaseItems;
+
+	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
+
+	// Search for any base items which specify this item as their upgrade. This accounts for the old version of schematics, mainly for Day 0 DLC
+	BaseItems = ItemTemplateManager.GetAllBaseItemTemplatesFromUpgrade(UpgradeItemTemplate.DataName);
+	foreach BaseItems(AdditionalBaseItemTemplate)
+	{
+		if (ItemsToUpgrade.Find(AdditionalBaseItemTemplate) == INDEX_NONE)
+		{
+			ItemsToUpgrade.AddItem(AdditionalBaseItemTemplate);
+		}
+	}
+	
+	// If the base item was also the result of an upgrade, we need to save that base item as well to ensure the entire chain is upgraded
+	BaseItemTemplate = ItemTemplateManager.FindItemTemplate(UpgradeItemTemplate.BaseItem);
+	if (BaseItemTemplate != none)
+	{
+		ItemsToUpgrade.AddItem(BaseItemTemplate);
+		GetItemsToUpgrade(BaseItemTemplate, ItemsToUpgrade);
+	}
+}
+
+// Gives an item as though it was just constructed. Gives the highest available upgraded version of the item.
+static function GiveItem(XComGameState NewGameState, out X2ItemTemplate ItemTemplate)
+{
+	local XComGameStateHistory History;
+	local XComGameState_HeadquartersXCom XComHQ;
+	local XComGameState_Item ItemState;
+	
+	if (ItemTemplate != none)
+	{
+		foreach NewGameState.IterateByClassType(class'XComGameState_HeadquartersXCom', XComHQ)
+		{
+			break;
+		}
+
+		if (XComHQ == none)
+		{
+			History = `XCOMHISTORY;
+			XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+			XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+			NewGameState.AddStateObject(XComHQ);
+		}
+
+		// Find the highest available upgraded version of the item
+		XComHQ.UpdateItemTemplateToHighestAvailableUpgrade(ItemTemplate);
+		ItemState = ItemTemplate.CreateInstanceFromTemplate(NewGameState);
+		NewGameState.AddStateObject(ItemState);
+
+		// Act as though it was just built, and immediately add it to the inventory
+		ItemState.OnItemBuilt(NewGameState);
+		XComHQ.PutItemInInventory(NewGameState, ItemState);
+
+		`XEVENTMGR.TriggerEvent('ItemConstructionCompleted', ItemState, ItemState, NewGameState);
+	}
+}
+
+// Calculates the highest available upgrade for an item template
+function UpdateItemTemplateToHighestAvailableUpgrade(out X2ItemTemplate ItemTemplate)
+{
+	local X2ItemTemplateManager ItemTemplateManager;
+	local X2ItemTemplate UpgradedItemTemplate;
+	local XComGameState_Tech CompletedTechState;
+	local array<XComGameState_Tech> CompletedTechs;
+
+	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
+
+	// Get the item template which has this item as a base (should be only one)
+	UpgradedItemTemplate = ItemTemplateManager.GetUpgradedItemTemplateFromBase(ItemTemplate.DataName);
+	if (UpgradedItemTemplate != none)
+	{
+		if (HasItemByName(UpgradedItemTemplate.CreatorTemplateName)) // Check if an item which upgrades the base has been built
+		{
+			// The upgrading item has been built, so replace the template
+			ItemTemplate = UpgradedItemTemplate;
+			UpdateItemTemplateToHighestAvailableUpgrade(ItemTemplate); // Use recursion to keep climbing the upgrade chain
+		}
+		else
+		{
+			CompletedTechs = GetAllCompletedTechStates();
+			foreach CompletedTechs(CompletedTechState) // Check if a tech which upgrades the base has been researched
+			{
+				if (CompletedTechState.GetMyTemplateName() == UpgradedItemTemplate.CreatorTemplateName)
+				{
+					// The upgrading tech has been researched, so replace the template
+					ItemTemplate = UpgradedItemTemplate;
+					UpdateItemTemplateToHighestAvailableUpgrade(ItemTemplate); // Use recursion to keep climbing the upgrade chain
+					break;
+				}
+			}
+		}
+	}
 }
 
 //#############################################################################################
@@ -4351,6 +4691,41 @@ function bool MeetsItemQuantityRequirements(array<ArtifactCost> RequiredItemQuan
 }
 
 //---------------------------------------------------------------------------------------
+function bool MeetsEquipmentRequirements(array<name> RequiredEquipment, optional bool bDontRequireAllEquipment = false)
+{
+	local X2ItemTemplateManager ItemMgr;
+	local X2EquipmentTemplate EquipmentTemplate;
+	local bool bEquipmentFound;
+	local int idx;
+
+	ItemMgr = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
+
+	for (idx = 0; idx < RequiredEquipment.Length; idx++)
+	{
+		EquipmentTemplate = X2EquipmentTemplate(ItemMgr.FindItemTemplate(RequiredEquipment[idx]));
+
+		if (EquipmentTemplate != none)
+		{
+			bEquipmentFound = HasItemInInventoryOrLoadout(EquipmentTemplate);
+			if (bEquipmentFound && bDontRequireAllEquipment)
+			{
+				return true;
+			}
+			else if (!bEquipmentFound && !bDontRequireAllEquipment)
+			{
+				return false;
+			}
+		}
+		else
+		{
+			`Redscreen("Bad Equipment Prereq name:" @ string(RequiredEquipment[idx]));
+		}
+	}
+
+	return (bDontRequireAllEquipment ? false : true);
+}
+
+//---------------------------------------------------------------------------------------
 function bool MeetsFacilityRequirements(array<name> RequiredFacilities)
 {
 	local X2StrategyElementTemplateManager StratMgr;
@@ -4557,6 +4932,7 @@ event bool MeetsAllStrategyRequirements(StrategyRequirement Requirement)
 	return (MeetsSpecialRequirements(Requirement.SpecialRequirementsFn) &&
 			MeetsTechRequirements(Requirement.RequiredTechs) && 
 			(MeetsItemRequirements(Requirement.RequiredItems) || MeetsItemRequirements(Requirement.AlternateRequiredItems, true)) &&
+			MeetsEquipmentRequirements(Requirement.RequiredEquipment, Requirement.bDontRequireAllEquipment) &&
 			MeetsItemQuantityRequirements(Requirement.RequiredItemQuantities) &&
 			MeetsFacilityRequirements(Requirement.RequiredFacilities) && 
 			MeetsUpgradeRequirements(Requirement.RequiredUpgrades) && 
@@ -4566,16 +4942,39 @@ event bool MeetsAllStrategyRequirements(StrategyRequirement Requirement)
 }
 
 //---------------------------------------------------------------------------------------
-function bool MeetsEnoughRequirementsToBeVisible(StrategyRequirement Requirement)
+function bool MeetsEnoughRequirementsToBeVisible(StrategyRequirement Requirement, optional array<StrategyRequirement> AlternateRequirements)
 {
-	return (MeetsSpecialRequirements(Requirement.SpecialRequirementsFn) && 
-			(MeetsTechRequirements(Requirement.RequiredTechs) || Requirement.bVisibleIfTechsNotMet) &&
-			((MeetsItemRequirements(Requirement.RequiredItems) || MeetsItemRequirements(Requirement.AlternateRequiredItems, true)) || Requirement.bVisibleIfItemsNotMet) &&
-			(MeetsFacilityRequirements(Requirement.RequiredFacilities) || Requirement.bVisibleIfFacilitiesNotMet) &&
-			(MeetsUpgradeRequirements(Requirement.RequiredUpgrades) || Requirement.bVisibleIfUpgradesNotMet) &&
-			(MeetsObjectiveRequirements(Requirement.RequiredObjectives) || Requirement.bVisibleIfObjectivesNotMet) &&
-			(MeetsScienceAndEngineeringGates(Requirement.RequiredScienceScore, Requirement.RequiredEngineeringScore) || Requirement.bVisibleIfPersonnelGatesNotMet) &&
-			(MeetsSoldierGates(Requirement.RequiredHighestSoldierRank, Requirement.RequiredSoldierClass, Requirement.RequiredSoldierRankClassCombo) || Requirement.bVisibleIfSoldierRankGatesNotMet));
+	local StrategyRequirement AltRequirement;
+
+	if (MeetsVisibilityRequirements(Requirement))
+	{
+		return true;
+	}
+	else if (AlternateRequirements.Length > 0)
+	{
+		foreach AlternateRequirements(AltRequirement)
+		{
+			if (MeetsVisibilityRequirements(AltRequirement))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+private function bool MeetsVisibilityRequirements(StrategyRequirement Requirement)
+{
+	return (MeetsSpecialRequirements(Requirement.SpecialRequirementsFn) &&
+		(MeetsTechRequirements(Requirement.RequiredTechs) || Requirement.bVisibleIfTechsNotMet) &&
+		((MeetsItemRequirements(Requirement.RequiredItems) || MeetsItemRequirements(Requirement.AlternateRequiredItems, true)) || Requirement.bVisibleIfItemsNotMet) &&
+		(MeetsEquipmentRequirements(Requirement.RequiredEquipment, Requirement.bDontRequireAllEquipment) || Requirement.bVisibleIfRequiredEquipmentNotMet) &&
+		(MeetsFacilityRequirements(Requirement.RequiredFacilities) || Requirement.bVisibleIfFacilitiesNotMet) &&
+		(MeetsUpgradeRequirements(Requirement.RequiredUpgrades) || Requirement.bVisibleIfUpgradesNotMet) &&
+		(MeetsObjectiveRequirements(Requirement.RequiredObjectives) || Requirement.bVisibleIfObjectivesNotMet) &&
+		(MeetsScienceAndEngineeringGates(Requirement.RequiredScienceScore, Requirement.RequiredEngineeringScore) || Requirement.bVisibleIfPersonnelGatesNotMet) &&
+		(MeetsSoldierGates(Requirement.RequiredHighestSoldierRank, Requirement.RequiredSoldierClass, Requirement.RequiredSoldierRankClassCombo) || Requirement.bVisibleIfSoldierRankGatesNotMet));
 }
 
 //---------------------------------------------------------------------------------------
@@ -4589,9 +4988,29 @@ function bool CanAffordAllStrategyCosts(StrategyCost Cost, array<StrategyCostSca
 }
 
 //---------------------------------------------------------------------------------------
-function bool MeetsRequirmentsAndCanAffordCost(StrategyRequirement Requirement, StrategyCost Cost, array<StrategyCostScalar> CostScalars, optional float DiscountPercent)
+function bool MeetsRequirmentsAndCanAffordCost(StrategyRequirement Requirement, StrategyCost Cost, array<StrategyCostScalar> CostScalars, optional float DiscountPercent, optional array<StrategyRequirement> AlternateRequirements)
 {
-	return (MeetsAllStrategyRequirements(Requirement) && CanAffordAllStrategyCosts(Cost, CostScalars, DiscountPercent));
+	local StrategyRequirement AltRequirement;
+	
+	if (CanAffordAllStrategyCosts(Cost, CostScalars, DiscountPercent))
+	{
+		if (MeetsAllStrategyRequirements(Requirement))
+		{
+			return true;
+		}
+		else if (AlternateRequirements.Length > 0)
+		{
+			foreach AlternateRequirements(AltRequirement)
+			{
+				if (MeetsAllStrategyRequirements(AltRequirement))
+				{
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
 }
 
 //---------------------------------------------------------------------------------------
@@ -5201,7 +5620,7 @@ function bool IsTechAvailableForResearch(StateObjectReference TechRef, optional 
 		return false;
 	}
 			
-	if(!HasPausedProject(TechRef) && !MeetsEnoughRequirementsToBeVisible(TechState.GetMyTemplate().Requirements))
+	if(!HasPausedProject(TechRef) && !MeetsEnoughRequirementsToBeVisible(TechState.GetMyTemplate().Requirements, TechState.GetMyTemplate().AlternateRequirements))
 	{
 		return false;
 	}
@@ -5268,7 +5687,7 @@ function array<StateObjectReference> GetAvailableTechsForResearch(optional bool 
 			{
 				if ((!HasActiveShadowProject() || TechState.ObjectID != GetCurrentShadowTech().ObjectID) && IsTechAvailableForResearch(TechState.GetReference(), bShadowProject))
 				{
-					if (!bMeetsRequirements || MeetsRequirmentsAndCanAffordCost(TechState.GetMyTemplate().Requirements, TechState.GetMyTemplate().Cost, ResearchCostScalars))
+					if (!bMeetsRequirements || MeetsRequirmentsAndCanAffordCost(TechState.GetMyTemplate().Requirements, TechState.GetMyTemplate().Cost, ResearchCostScalars, 0.0, TechState.GetMyTemplate().AlternateRequirements))
 					{
 						AvailableTechs.AddItem(TechState.GetReference());
 					}
@@ -5278,7 +5697,7 @@ function array<StateObjectReference> GetAvailableTechsForResearch(optional bool 
 			{
 				if ((!HasResearchProject() || TechState.ObjectID != GetCurrentResearchTech().ObjectID) && IsTechAvailableForResearch(TechState.GetReference(), bShadowProject))
 				{
-					if (!bMeetsRequirements || MeetsRequirmentsAndCanAffordCost(TechState.GetMyTemplate().Requirements, TechState.GetMyTemplate().Cost, ResearchCostScalars))
+					if (!bMeetsRequirements || MeetsRequirmentsAndCanAffordCost(TechState.GetMyTemplate().Requirements, TechState.GetMyTemplate().Cost, ResearchCostScalars, 0.0, TechState.GetMyTemplate().AlternateRequirements))
 					{
 						AvailableTechs.AddItem(TechState.GetReference());
 					}
@@ -5329,6 +5748,24 @@ function array<StateObjectReference> GetAvailableProvingGroundProjects()
 	}
 
 	return AvailableProjects;
+}
+
+//---------------------------------------------------------------------------------------
+function array<XComGameState_Tech> GetAllCompletedTechStates()
+{
+	local XComGameStateHistory History;
+	local XComGameState_Tech TechState;
+	local array<XComGameState_Tech> CompletedTechs;
+	local int idx;
+
+	History = `XCOMHISTORY;
+	for (idx = 0; idx < TechsResearched.length; idx++)
+	{
+		TechState = XComGameState_Tech(History.GetGameStateForObjectID(TechsResearched[idx].ObjectID));
+		CompletedTechs.AddItem(TechState);
+	}
+
+	return CompletedTechs;
 }
 
 //---------------------------------------------------------------------------------------
@@ -5746,7 +6183,7 @@ function EmptyShadowChamber(XComGameState NewGameState)
 
 //---------------------------------------------------------------------------------------
 // Return list of schematics from the inventory. 
-function array<X2SchematicTemplate> GetFoundSchematics()
+function array<X2SchematicTemplate> GetPurchasedSchematics()
 {
 	local array<X2SchematicTemplate> Schematics; 
 	local X2SchematicTemplate SchematicTemplate; 
@@ -5777,7 +6214,7 @@ function bool HasFoundSchematics()
 {
 	local array<X2SchematicTemplate> Schematics;
 
-	Schematics = GetFoundSchematics();
+	Schematics = GetPurchasedSchematics();
 
 	return (Schematics.length > 0);
 }
@@ -6842,7 +7279,10 @@ final function UpdateFlightStatus(optional bool bInstantCamInterp = false)
 		{
 			// cleanup the current continent before flying to the new one
 			ScanSiteState = XComGameState_ScanningSite(History.GetGameStateForObjectID(XComHQ.CurrentLocation.ObjectID));
-			ScanSiteState.OnXComLeaveSite();
+			if (ScanSiteState != none)
+			{
+				ScanSiteState.OnXComLeaveSite();
+			}
 			
 			if (bUFOChaseInProgress && CurrentlyInFlight)
 			{
@@ -7565,6 +8005,50 @@ function UpdatePlayedArmorIntroNarrativeMoments(XComNarrativeMoment Moment)
 		NarrativeInfo.QualifiedName = QualifiedName;
 		NarrativeInfo.PlayCount = 1;
 		PlayedArmorIntroNarrativeMoments.AddItem(NarrativeInfo);
+	}
+}
+
+//---------------------------------------------------------------------------------------
+function bool CanPlayEquipItemNarrativeMoment(XComNarrativeMoment Moment)
+{
+	local int NarrativeInfoIdx;
+	local string QualifiedName;
+
+	QualifiedName = PathName(Moment);
+
+	NarrativeInfoIdx = PlayedEquipItemNarrativeMoments.Find('QualifiedName', QualifiedName);
+
+	if (NarrativeInfoIdx == INDEX_NONE || /*!Moment.bFirstTimeAtIndexZero ||*/ (PlayedEquipItemNarrativeMoments[NarrativeInfoIdx].PlayCount < 1))
+	{
+		return true;
+	}
+
+	return false;
+}
+
+//---------------------------------------------------------------------------------------
+function UpdateEquipItemNarrativeMoments(XComNarrativeMoment Moment)
+{
+	local int NarrativeInfoIdx;
+	local string QualifiedName;
+	local AmbientNarrativeInfo NarrativeInfo;
+
+	QualifiedName = PathName(Moment);
+
+	NarrativeInfoIdx = PlayedEquipItemNarrativeMoments.Find('QualifiedName', QualifiedName);
+
+	if (NarrativeInfoIdx != INDEX_NONE)
+	{
+		NarrativeInfo = PlayedEquipItemNarrativeMoments[NarrativeInfoIdx];
+		`assert(NarrativeInfo.QualifiedName == QualifiedName);
+		NarrativeInfo.PlayCount++;
+		PlayedEquipItemNarrativeMoments[NarrativeInfoIdx] = NarrativeInfo;
+	}
+	else
+	{
+		NarrativeInfo.QualifiedName = QualifiedName;
+		NarrativeInfo.PlayCount = 1;
+		PlayedEquipItemNarrativeMoments.AddItem(NarrativeInfo);
 	}
 }
 

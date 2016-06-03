@@ -143,6 +143,11 @@ event PostBuildGameState(XComGameState NewGameState)
 	local XComGameStateContext AbilityContext;
 	local MovedObjectStatePair MovedStateObj;
 
+	if (!`TACTICALRULES.TacticalGameIsInPlay()) // Tactical no longer actually running
+	{
+		return;
+	}
+
 	MovedStateObjects.Length = 0;
 	class'X2TacticalGameRulesetDataStructures'.static.GetMovedStateObjectList(NewGameState, MovedStateObjects);
 	

@@ -1,5 +1,7 @@
 class X2Effect_Solace extends X2Effect_Persistent;
 
+var private array<name> DamageTypeImmunities;
+
 function bool IsEffectCurrentlyRelevant(XComGameState_Effect EffectGameState, XComGameState_Unit TargetUnit)
 {
 	local XComGameState_Unit SourceUnit;
@@ -23,7 +25,7 @@ function bool ProvidesDamageImmunity(XComGameState_Effect EffectState, name Dama
 {
 	local XComGameState_Unit TargetUnit;
 
-	if (DamageType == 'Mental')
+	if (DamageTypeImmunities.Find(DamageType) != INDEX_NONE)
 	{
 		TargetUnit = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(EffectState.ApplyEffectParameters.TargetStateObjectRef.ObjectID));
 		return IsEffectCurrentlyRelevant(EffectState, TargetUnit);
@@ -73,4 +75,8 @@ DefaultProperties
 {
 	EffectName="Solace"
 	DuplicateResponse=eDupe_Ignore
+	DamageTypeImmunities(0)="Mental"
+	DamageTypeImmunities(1)="Disorient"
+	DamageTypeImmunities(2)="stun"
+	DamageTypeImmunities(3)="Unconscious"
 }

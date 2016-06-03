@@ -27,6 +27,8 @@ var config float PSI_BOMB_STAGE1_START_WARNING_FX_SEC;
 var config float PSI_BOMB_STAGE2_START_EXPLOSION_FX_SEC;
 var config float PSI_BOMB_STAGE2_NOTIFY_TARGETS_SEC;
 
+var config int TELEPORTMP_LOCAL_COOLDOWN;
+
 var name CyberusTemplateName;
 
 var name Stage1PsiBombEffectName;
@@ -48,6 +50,10 @@ static function array<X2DataTemplate> CreateTemplates()
 	Templates.AddItem(CreatePsiBombStage1Ability());
 	Templates.AddItem(CreatePsiBombStage2Ability());
 	Templates.AddItem(CreateImmunitiesAbility());
+
+	// MP Versions of Abilities
+	Templates.AddItem(CreateTeleportMPAbility());
+	Templates.AddItem(CreateTriggerSuperpositionDamageListenerMPAbility());
 	
 	return Templates;
 }
@@ -112,7 +118,7 @@ static function X2DataTemplate CreateTeleportAbility()
 	return Template;
 }
 
-simulated function Teleport_ModifyActivatedAbilityContext(XComGameStateContext Context)
+static simulated function Teleport_ModifyActivatedAbilityContext(XComGameStateContext Context)
 {
 	local XComGameState_Unit UnitState;
 	local XComGameStateContext_Ability AbilityContext;
@@ -159,7 +165,7 @@ simulated function Teleport_ModifyActivatedAbilityContext(XComGameStateContext C
 	AbilityContext.InputContext.MovementPaths.AddItem(InputData);
 }
 
-simulated function XComGameState Teleport_BuildGameState(XComGameStateContext Context)
+static simulated function XComGameState Teleport_BuildGameState(XComGameStateContext Context)
 {
 	local XComGameState NewGameState;
 	local XComGameState_Unit UnitState;
@@ -1187,6 +1193,105 @@ static function X2AbilityTemplate CreateImmunitiesAbility()
 	Template.AddTargetEffect(DamageImmunity);
 
 	Template.AddTargetEffect(new class'X2Effect_ShouldCodexDropLoot');
+
+	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
+
+	return Template;
+}
+
+// #######################################################################################
+// -------------------- MP Abilities -----------------------------------------------------
+// #######################################################################################
+
+static function X2DataTemplate CreateTeleportMPAbility()
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityCost_ActionPoints ActionPointCost;
+	local X2AbilityCooldown_LocalAndGlobal Cooldown;
+	local X2AbilityTarget_Cursor CursorTarget;
+	local X2AbilityMultiTarget_Radius RadiusMultiTarget;
+	local X2AbilityTrigger_PlayerInput InputTrigger;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'TeleportMP');
+
+	Template.AbilitySourceName = 'eAbilitySource_Standard';
+	Template.eAbilityIconBehaviorHUD = EAbilityIconBehavior_AlwaysShow;
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_codex_teleport";
+	Template.MP_PerkOverride = 'Teleport';
+
+	ActionPointCost = new class'X2AbilityCost_ActionPoints';
+	ActionPointCost.iNumPoints = 1;
+	Template.AbilityCosts.AddItem(ActionPointCost);
+
+	Cooldown = new class'X2AbilityCooldown_LocalAndGlobal';
+	Cooldown.iNumTurns = default.TELEPORTMP_LOCAL_COOLDOWN;
+	Cooldown.NumGlobalTurns = default.TELEPORT_GLOBAL_COOLDOWN;
+	Template.AbilityCooldown = Cooldown;
+
+	Template.TargetingMethod = class'X2TargetingMethod_Teleport';
+
+	InputTrigger = new class'X2AbilityTrigger_PlayerInput';
+	Template.AbilityTriggers.AddItem(InputTrigger);
+
+	Template.AbilityToHitCalc = default.DeadEye;
+
+	CursorTarget = new class'X2AbilityTarget_Cursor';
+	CursorTarget.bRestrictToSquadsightRange = true;
+	//	CursorTarget.FixedAbilityRange = default.CYBERUS_TELEPORT_RANGE;     // yes there is.
+	Template.AbilityTargetStyle = CursorTarget;
+
+	RadiusMultiTarget = new class'X2AbilityMultiTarget_Radius';
+	RadiusMultiTarget.fTargetRadius = 0.25; // small amount so it just grabs one tile
+	Template.AbilityMultiTargetStyle = RadiusMultiTarget;
+
+	// Shooter Conditions
+	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
+	Template.AddShooterEffectExclusions();
+
+	//// Damage Effect
+	Template.AbilityMultiTargetConditions.AddItem(default.LivingTargetUnitOnlyProperty);
+	//TeleportDamageEffect = new class'X2Effect_ApplyWeaponDamage';
+	//TeleportDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.CYBERUS_TELEPORT_BASEDAMAGE;
+	//TeleportDamageEffect.EnvironmentalDamageAmount = default.TELEPORT_ENVIRONMENT_DAMAGE_AMOUNT;
+	//TeleportDamageEffect.EffectDamageValue.DamageType = 'Melee';
+	//Template.AddMultiTargetEffect(TeleportDamageEffect);
+
+	Template.ModifyNewContextFn = Teleport_ModifyActivatedAbilityContext;
+	Template.BuildNewGameStateFn = Teleport_BuildGameState;
+	Template.BuildVisualizationFn = Teleport_BuildVisualization;
+	Template.CinescriptCameraType = "Cyberus_Teleport";
+
+	return Template;
+}
+
+static function X2AbilityTemplate CreateTriggerSuperpositionDamageListenerMPAbility()
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityTrigger_EventListener EventListener;
+	local X2Effect_RunBehaviorTree RetractBehaviorEffect;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'TriggerSuperpositionDamageListenerMP');
+	Template.eAbilityIconBehaviorHUD = EAbilityIconBehavior_NeverShow;
+	Template.Hostility = eHostility_Neutral;
+	Template.MP_PerkOverride = 'TriggerSuperpositionDamageListener';
+
+	Template.bDontDisplayInAbilitySummary = true;
+
+	Template.AdditionalAbilities.AddItem('TriggerSuperposition');
+
+	// This ability fires when the unit takes damage
+	EventListener = new class'X2AbilityTrigger_EventListener';
+	EventListener.ListenerData.Deferral = ELD_OnStateSubmitted;
+	EventListener.ListenerData.EventID = 'UnitTakeEffectDamage';
+	EventListener.ListenerData.EventFn = class'XComGameState_Ability'.static.AbilityTriggerEventListener_DamagedByEnemyTeleport;
+	EventListener.ListenerData.Filter = eFilter_Unit;
+	Template.AbilityTriggers.AddItem(EventListener);
+
+	Template.AbilityTargetStyle = default.SelfTarget;
+
+	RetractBehaviorEffect = new class'X2Effect_RunBehaviorTree';
+	RetractBehaviorEffect.BehaviorTreeName = 'TryTriggerSuperposition';
+	Template.AddTargetEffect(RetractBehaviorEffect);
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
 

@@ -953,7 +953,7 @@ function bool IsNarrativeTriggerActive(const out NarrativeTrigger EventTrigger, 
 	return true;
 }
 
-function BuildVisualizationForNarrative(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+static function BuildVisualizationForNarrative(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
 {
 	local VisualizationTrack BuildTrack;
 	local X2Action_PlayNarrative NarrativeAction;

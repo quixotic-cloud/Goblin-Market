@@ -18,7 +18,12 @@ function DoEvent( ParticleEventManager EventMgr, ParticleSystemComponent InComp,
 {
 	local XComSoundEmitter SoundEmitter;
 
-	SoundEmitter = class'WorldInfo'.static.GetWorldInfo().Spawn(class'XComSoundEmitter', , , InHitLocation);
+	SoundEmitter = class'XComEngine'.static.FindSoundEmitterForParticleSystem(InComp);
+	if( SoundEmitter == none )
+	{
+		SoundEmitter = class'WorldInfo'.static.GetWorldInfo().Spawn(class'XComSoundEmitter', , , InHitLocation);
+	}
+	
 	SoundEmitter.AssociatedParticleEffect = InComp;
 	SoundEmitter.bIsPersistentSound = true; //Base our life off of the particle system
 	SoundEmitter.PlaySound(Sound, true, true, true, InHitLocation, true);

@@ -7,6 +7,7 @@ class X2Action_CameraFollowUnit extends X2Action
 
 // ability that this action should be framing
 var XComGameStateContext_Ability AbilityToFrame;
+var bool bLockFloorZ;
 
 // the camera that will frame the ability
 var X2Camera_FollowMovingUnit FollowCamera;
@@ -41,10 +42,11 @@ Begin:
 		FollowCamera.Unit = XGUnit(Track.TrackActor);
 		FollowCamera.MoveAbility = AbilityToFrame;
 		FollowCamera.Priority = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager().FindAbilityTemplate(AbilityToFrame.InputContext.AbilityTemplateName).CameraPriority;
+		FollowCamera.bLockFloorZ = bLockFloorZ;
 		`CAMERASTACK.AddCamera(FollowCamera);
 
 		// wait for it to get to the lookat point on screen
-		while( FollowCamera != None && !FollowCamera.HasArrived )
+		while( FollowCamera != None && !FollowCamera.HasArrived && FollowCamera.IsLookAtValid() )
 		{
 			Sleep(0.0);
 		}

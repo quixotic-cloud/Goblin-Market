@@ -116,4 +116,5 @@ DefaultProperties
 {	
 	PostProcessName = "ReflexAction"
 	RevealFOWRadius = 384.0; //4 tiles
+	bCauseTimeDilationWhenInterrupting = true
 }

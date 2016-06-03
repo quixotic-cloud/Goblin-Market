@@ -16,7 +16,9 @@ class UIDebugMap extends UIScreen dependson(XComParcelManager, XComPlotCoverParc
 enum EMapDebugMode
 {
 	EMapDebugMode_WorldData,
-	EMapDebugMode_CachedVisibility
+	EMapDebugMode_CachedVisibility,
+	EMapDebugMode_DebugAnalytics,
+	EMapDebugMode_ChallengeMode,
 };
 
 enum EProcessClickType
@@ -53,6 +55,7 @@ var XComWorldData               WorldData;
 //Game state objects
 var XComGameStateHistory        History;
 var XComGameState_BattleData    BattleDataState;
+var XComGameState_ChallengeData	ChallengeModeData;
 
 //Variables to draw the parcel / plot data to the canvas
 var int CanvasDrawScale;
@@ -106,12 +109,38 @@ var UIDropdown	m_kDropdownDebugFOWViewer;
 var UIButton	m_kButtonToggleDebugVoxelData;
 var UICheckbox  m_kCheckbox_DebugGameplayData;
 
+// Debug Analytics
+var UIList		m_kAnalyticsList;
+
+//Challenge Mode Configuration Display
+var UIText		m_kSquadSizeLabel;
+var UIText		m_kSquadSizeConfig;
+var UIText		m_kSoldierClassLabel;
+var UIText		m_kSoldierClassConfig;
+var UIText		m_kAlienTypeLabel;
+var UIText		m_kAlienTypeConfig;
+var UIText		m_kSoldierRankLabel;
+var UIText		m_kSoldierRankConfig;
+var UIText		m_kSoldierArmorLabel;
+var UIText		m_kSoldierArmorConfig;
+var UIText		m_kPrimaryWeaponsLabel;
+var UIText		m_kPrimaryWeaponsConfig;
+var UIText		m_kSecondaryWeaponsLabel;
+var UIText		m_kSecondaryWeaponsConfig;
+var UIText		m_kUtilityItemsLabel;
+var UIText		m_kUtilityItemsConfig;
+var UIText		m_kForceLevelLabel;
+var UIText		m_kForceLevelConfig;
+var UIText		m_kEnemyForcesLabel;
+var UIText		m_kEnemyForcesConfig;
+var array<UIPanel> AllChallengeControls;
+
 //----------------------------------------------------------------------------
 // MEMBERS
 
 simulated function InitScreen(XComPlayerController InitController, UIMovie InitMovie, optional name InitName)
-{	
-	super.InitScreen(InitController, InitMovie, InitName);
+{
+	super.InitScreen( InitController, InitMovie, InitName );
 
 	m_kAllContainer         = Spawn(class'UIPanel', self);
 	m_kMouseHitBG           = Spawn(class'UIBGBox', m_kAllContainer);	
@@ -167,7 +196,8 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 
 	m_kMapDebugModeDropDown.InitDropdown('mapDebugModeDropdown', "Debug World Data", SelectMapDebugMode);
 	m_kMapDebugModeDropDown.AddItem("Debug World Data");	
-	m_kMapDebugModeDropDown.AddItem("Debug Cached Visibility");	
+	m_kMapDebugModeDropDown.AddItem("Debug Cached Visibility");
+	m_kMapDebugModeDropDown.AddItem("Debug Analytics");
 	m_kMapDebugModeDropDown.SetSelected(0);
 	m_kMapDebugModeDropDown.SetX(30);
 	m_kMapDebugModeDropDown.SetY(575);
@@ -184,6 +214,8 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	InitializeDebugWorldDataControls();
 
 	InitializeDebugCachedVisibilityControls();
+
+	InitializeDebugAnalyticsControls();
 
 	SelectMapDebugMode(m_kMapDebugModeDropDown);
 
@@ -205,6 +237,12 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 
 	//Store off the battle data object in the start state. It will be filled out with the results of the generation process
 	BattleDataState = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
+	ChallengeModeData = XComGameState_ChallengeData( History.GetSingleGameStateObjectForClass( class'XComGameState_ChallengeData', true ) );
+	if (ChallengeModeData != none)
+	{
+		m_kMapDebugModeDropDown.AddItem( "Challenge Mode Config" );
+		InitializeChallengeModeDataDisplay( );
+	}
 
 	bStoredFOWState =  `XWORLD.bEnableFOW;
 	if( bStoredFOWState )
@@ -418,6 +456,164 @@ function InitializeDebugCachedVisibilityControls()
 
 }
 
+simulated function InitializeDebugAnalyticsControls( )
+{
+	m_kAnalyticsList = Spawn( class'UIList', FrameInfoContainer );
+	m_kAnalyticsList.InitList( '', 10, 10, 460, 520 );
+	AllDebugModeControls.AddItem( m_kAnalyticsList );
+}
+
+simulated function InitializeChallengeModeDataDisplay( )
+{
+	local int PositionY;
+	local int Spacing;
+	local int LabelX, ConfigX;
+	local UIPanel Control;
+
+	PositionY = 80;
+	Spacing = 30;
+
+	LabelX = 30;
+	ConfigX = 200;
+
+	m_kSquadSizeLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kSquadSizeConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kSoldierClassLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kSoldierClassConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kAlienTypeLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kAlienTypeConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kSoldierRankLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kSoldierRankConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kSoldierArmorLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kSoldierArmorConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kPrimaryWeaponsLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kPrimaryWeaponsConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kSecondaryWeaponsLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kSecondaryWeaponsConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kUtilityItemsLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kUtilityItemsConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kForceLevelLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kForceLevelConfig = Spawn(class'UIText', FrameInfoContainer);
+	m_kEnemyForcesLabel = Spawn(class'UIText', FrameInfoContainer);
+	m_kEnemyForcesConfig = Spawn(class'UIText', FrameInfoContainer);
+
+	m_kSquadSizeLabel.InitText( 'SquadSizeLabel', "Squad Size:" );
+	m_kSquadSizeLabel.SetX( LabelX );
+	m_kSquadSizeLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSquadSizeLabel );
+	m_kSquadSizeConfig.InitText( 'SquadSizeConfig', string(ChallengeModeData.SquadSizeSelectorName) );
+	m_kSquadSizeConfig.SetX( ConfigX );
+	m_kSquadSizeConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSquadSizeConfig );
+
+	PositionY += Spacing;
+
+	m_kSoldierClassLabel.InitText( 'SoldierClassLabel', "Soldier Class:" );
+	m_kSoldierClassLabel.SetX( LabelX );
+	m_kSoldierClassLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSoldierClassLabel );
+	m_kSoldierClassConfig.InitText( 'SoldierClassConfig', string(ChallengeModeData.ClassSelectorName) );
+	m_kSoldierClassConfig.SetX( ConfigX );
+	m_kSoldierClassConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSoldierClassConfig );
+
+	PositionY += Spacing;
+
+	m_kAlienTypeLabel.InitText( 'AlienTypeLabel', "Alien Type:" );
+	m_kAlienTypeLabel.SetX( LabelX );
+	m_kAlienTypeLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kAlienTypeLabel );
+	m_kAlienTypeConfig.InitText( 'AlienTypeConfig', string(ChallengeModeData.AlienSelectorName) );
+	m_kAlienTypeConfig.SetX( ConfigX );
+	m_kAlienTypeConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kAlienTypeConfig );
+
+	PositionY += Spacing;
+
+	m_kSoldierRankLabel.InitText( 'SoldierRankLabel', "Soldier Rank:" );
+	m_kSoldierRankLabel.SetX( LabelX );
+	m_kSoldierRankLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSoldierRankLabel );
+	m_kSoldierRankConfig.InitText( 'SoldierRankConfig', string(ChallengeModeData.RankSelectorName) );
+	m_kSoldierRankConfig.SetX( ConfigX );
+	m_kSoldierRankConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSoldierRankConfig );
+
+	PositionY += Spacing;
+
+	m_kSoldierArmorLabel.InitText( 'SoldierArmorLabel', "Soldier Armor:" );
+	m_kSoldierArmorLabel.SetX( LabelX );
+	m_kSoldierArmorLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSoldierArmorLabel );
+	m_kSoldierArmorConfig.InitText( 'SoldierArmorConfig', string(ChallengeModeData.ArmorSelectorName) );
+	m_kSoldierArmorConfig.SetX( ConfigX );
+	m_kSoldierArmorConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSoldierArmorConfig );
+
+	PositionY += Spacing;
+
+	m_kPrimaryWeaponsLabel.InitText( 'PrimaryWeaponsLabel', "Primary Weapons:" );
+	m_kPrimaryWeaponsLabel.SetX( LabelX );
+	m_kPrimaryWeaponsLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kPrimaryWeaponsLabel );
+	m_kPrimaryWeaponsConfig.InitText( 'PrimaryWeaponsConfig', string(ChallengeModeData.PrimaryWeaponSelectorName) );
+	m_kPrimaryWeaponsConfig.SetX( ConfigX );
+	m_kPrimaryWeaponsConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kPrimaryWeaponsConfig );
+
+	PositionY += Spacing;
+
+	m_kSecondaryWeaponsLabel.InitText( 'SecondaryWeaponsLabel', "Secondary Weapons:" );
+	m_kSecondaryWeaponsLabel.SetX( LabelX );
+	m_kSecondaryWeaponsLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSecondaryWeaponsLabel );
+	m_kSecondaryWeaponsConfig.InitText( 'SecondaryWeaponsConfig', string(ChallengeModeData.SecondaryWeaponSelectorName) );
+	m_kSecondaryWeaponsConfig.SetX( ConfigX );
+	m_kSecondaryWeaponsConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kSecondaryWeaponsConfig );
+
+	PositionY += Spacing;
+
+	m_kUtilityItemsLabel.InitText( 'UtilityItemsLabel', "Utility Items:" );
+	m_kUtilityItemsLabel.SetX( LabelX );
+	m_kUtilityItemsLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kUtilityItemsLabel );
+	m_kUtilityItemsConfig.InitText( 'UtilityItemsConfig', string(ChallengeModeData.UtilityItemSelectorName) );
+	m_kUtilityItemsConfig.SetX( ConfigX );
+	m_kUtilityItemsConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kUtilityItemsConfig );
+
+	PositionY += Spacing;
+
+	m_kForceLevelLabel.InitText( 'ForceLevelLabel', "Alert & Force Level:" );
+	m_kForceLevelLabel.SetX( LabelX );
+	m_kForceLevelLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kForceLevelLabel );
+	m_kForceLevelConfig.InitText( 'ForceLevelConfig', string(ChallengeModeData.AlertForceLevelSelectorName) );
+	m_kForceLevelConfig.SetX( ConfigX );
+	m_kForceLevelConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kForceLevelConfig );
+
+	PositionY += Spacing;
+
+	m_kEnemyForcesLabel.InitText( 'EnemyForcesLabel', "Enemy Forces:" );
+	m_kEnemyForcesLabel.SetX( LabelX );
+	m_kEnemyForcesLabel.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kEnemyForcesLabel );
+	m_kEnemyForcesConfig.InitText( 'EnemyForcesConfig', string( ChallengeModeData.EnemyForcesSelectorName ) );
+	m_kEnemyForcesConfig.SetX( ConfigX );
+	m_kEnemyForcesConfig.SetY( PositionY );
+	AllChallengeControls.AddItem( m_kEnemyForcesConfig );
+
+	PositionY += Spacing;
+
+	foreach AllChallengeControls( Control )
+	{
+		Control.Hide();
+		AllDebugModeControls.AddItem( Control );
+	}
+}
+
 simulated function bool OnUnrealCommand(int cmd, int arg)
 {
 	if ( !CheckInputIsReleaseOrDirectionRepeat(cmd, arg) )
@@ -495,12 +691,25 @@ simulated function SelectMapDebugMode(UIDropdown dropdown)
 		m_kCheckbox_COVER_DebugWorld.Show();
 		m_kCheckbox_COVER_DebugOccupancy.Show();
 		m_kCheckbox_COVER_DebugClimb.Show();
+		m_kToggleMapButton.Show();
 		break;
 	case EMapDebugMode_CachedVisibility:
 		UpdateFOWViewerDropdown();
 		m_kDropdownDebugFOWViewer.Show();
 		m_kButtonToggleDebugVoxelData.Show();
 		m_kCheckbox_DebugGameplayData.Show();
+		m_kToggleMapButton.Show();
+		break;
+	case EMapDebugMode_DebugAnalytics:
+		UpdateAnalyticsDataList( );
+		m_kAnalyticsList.Show();
+		m_kToggleMapButton.Hide();
+		break;
+	case EMapDebugMode_ChallengeMode:
+		for (Index = 0; Index < AllChallengeControls.Length; ++Index)
+		{
+			AllChallengeControls[Index].Show();
+		}
 		break;
 	}
 }
@@ -527,6 +736,71 @@ function UpdateFOWViewerDropdown()
 
 	}
 	m_kDropdownDebugFOWViewer.SetSelected(0);
+}
+
+function UpdateAnalyticsDataList( )
+{
+	local XComGameState_Analytics Analytics;
+	local bool IncludeGlobal, IncludeTactical, IncludeUnits;
+	local AnalyticEntry Entry;
+	local UIListItemString ListItem;
+	local float Diff;
+	local string DiffString;
+
+	IncludeGlobal = true;
+	IncludeTactical = false;
+	IncludeUnits = false;
+
+	m_kAnalyticsList.ClearItems( );
+
+	Analytics = XComGameState_Analytics( `XCOMHISTORY.GetSingleGameStateObjectForClass( class'XComGameState_Analytics', true ) );
+	if (Analytics != none)
+	{
+		if (`XANALYTICS.PrevDebugAnalytics == none)
+		{
+			`XANALYTICS.PrevDebugAnalytics = Analytics; // make there always be a valid reference
+		}
+
+		if (IncludeGlobal)
+		{
+			foreach Analytics.IterateGlobalAnalytics( Entry, IncludeUnits )
+			{
+				Diff = Entry.Value - `XANALYTICS.PrevDebugAnalytics.GetFloatValue( Entry.Key );
+				if (Diff == 0)
+				{
+					DiffString = "";
+				}
+				else
+				{
+					DiffString = "(" $ (Diff > 0 ? "+" : "") $ Diff $ ")";
+				}
+
+				ListItem = Spawn( class'UIListItemString', m_kAnalyticsList.itemContainer );
+				ListItem.InitListItem( "Campaign: "$Entry.Key$": "$Entry.Value$DiffString );
+			}
+		}
+
+		if (IncludeTactical)
+		{
+			foreach Analytics.IterateTacticalAnalytics( Entry, IncludeUnits )
+			{
+				Diff = Entry.Value - `XANALYTICS.PrevDebugAnalytics.GetTacticalFloatValue( Entry.Key );
+				if (Diff == 0)
+				{
+					DiffString = "";
+				}
+				else
+				{
+					DiffString = "(" $( Diff > 0 ? "+" : "" ) $ Diff $ ")";
+				}
+
+				ListItem = Spawn( class'UIListItemString', m_kAnalyticsList.itemContainer );
+				ListItem.InitListItem( "Tactical: "$Entry.Key$": "$Entry.Value$DiffString );
+			}
+		}
+
+		`XANALYTICS.PrevDebugAnalytics = Analytics; // make there always be a valid reference
+	}
 }
 
 function ToggleGameplayDataCheckbox(UICheckbox checkboxControl)

@@ -50,7 +50,6 @@ static function X2AbilityTemplate CreateGestationStage1Ability()
 	Template.AbilityToHitCalc = default.DeadEye;
 	Template.AbilityTargetStyle = default.SelfTarget;
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
 
 	// This ability fires when the ParthenogenicPoisonCocoonSpawnedName event occurs
 	EventListener = new class'X2AbilityTrigger_EventListener';
@@ -85,6 +84,7 @@ static function X2AbilityTemplate CreateGestationStage1Ability()
 	DamageImmunity.ImmuneTypes.AddItem(class'X2Item_DefaultDamageTypes'.default.KnockbackDamageType);
 	DamageImmunity.ImmuneTypes.AddItem('Poison');
 	DamageImmunity.ImmuneTypes.AddItem(class'X2Item_DefaultDamageTypes'.default.ParthenogenicPoisonType);
+	DamageImmunity.ImmuneTypes.AddItem('stun');
 	DamageImmunity.EffectName = 'ChryssalidCocoonImmunity';
 	Template.AddTargetEffect(DamageImmunity);	
 
@@ -227,7 +227,6 @@ static function X2AbilityTemplate CreateGestationStage2Ability()
 	Template.AbilityToHitCalc = default.DeadEye;
 	Template.AbilityTargetStyle = default.SelfTarget;
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
 
 	// This ability fires when the event GestationTriggerName fires on this unit
 	EventListener = new class'X2AbilityTrigger_EventListener';
@@ -270,7 +269,6 @@ static function X2AbilityTemplate CreateGestationStage3Ability()
 
 	Template.AbilityToHitCalc = default.DeadEye;
 	Template.AbilityTargetStyle = default.SelfTarget;
-	Template.AddShooterEffectExclusions();
 
 	ExcludeEffects = new class'X2Condition_UnitEffects';
 	ExcludeEffects.AddExcludeEffect(class'X2Effect_ChryssalidCocoonGestationStage3'.default.EffectName, 'AA_UnitIsDead');
@@ -340,6 +338,7 @@ static function X2AbilityTemplate CreateSpawnChryssalidAbility()
 	local X2Condition_UnblockedNeighborTile UnblockedNeighborTileCondition;
 	local X2Effect_RemoveEffects RemoveEffects;
 	local X2Effect_Persistent GestationEffect_Stage2;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'SpawnChryssalid');
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_cocoon"; // TODO: Change this icon
@@ -360,7 +359,11 @@ static function X2AbilityTemplate CreateSpawnChryssalidAbility()
 	Template.AbilityTargetStyle = default.SelfTarget;
 
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
+	
+	// May spawn a pup if the unit is burning or disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	GestationEffectComplete = new class'X2Condition_UnitEffects';
 	GestationEffectComplete.AddExcludeEffect(default.GestationEffectName, 'AA_UnitGestationComplete');

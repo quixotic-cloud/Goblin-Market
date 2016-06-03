@@ -36,7 +36,7 @@ Begin:
 	if( !bNewUnitSelected )
 	{
 		// pause on the frame action before starting it
-		Sleep(DelayAfterArrival);
+		Sleep(DelayAfterArrival * GetDelayModifier());
 	}
 
 	CompleteAction();

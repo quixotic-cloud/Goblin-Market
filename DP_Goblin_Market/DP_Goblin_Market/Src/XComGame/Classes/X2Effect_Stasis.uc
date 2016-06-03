@@ -12,6 +12,8 @@ simulated protected function OnEffectAdded(const out EffectAppliedData ApplyEffe
 	TargetUnit.bInStasis = true;
 	TargetUnit.ActionPoints.Length = 0;
 	TargetUnit.ReserveActionPoints.Length = 0;
+
+	`XEVENTMGR.TriggerEvent('AffectedByStasis', kNewTargetState, kNewTargetState);
 }
 
 simulated function OnEffectRemoved(const out EffectAppliedData ApplyEffectParameters, XComGameState NewGameState, bool bCleansed, XComGameState_Effect RemovedEffectState)
@@ -47,31 +49,36 @@ function bool CanAbilityHitUnit(name AbilityName)
 
 simulated function AddX2ActionsForVisualization(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, name EffectApplyResult)
 {
+	// Empty because we will be adding all this at the end with ModifyTracksVisualization
+}
+
+simulated function ModifyTracksVisualization(XComGameState VisualizeGameState, out VisualizationTrack ModifyTrack, const name EffectApplyResult)
+{
 	local X2Action_PlaySoundAndFlyOver SoundAndFlyOver;
 	local X2Action_PlayAnimation PlayAnimation;
 
-	if (EffectApplyResult == 'AA_Success' && BuildTrack.StateObject_NewState.IsA('XComGameState_Unit'))
+	if (EffectApplyResult == 'AA_Success' && ModifyTrack.StateObject_NewState.IsA('XComGameState_Unit'))
 	{
 		if (!bSkipFlyover)
 		{
-			SoundAndFlyOver = X2Action_PlaySoundAndFlyOver(class'X2Action_PlaySoundAndFlyOver'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext()));
+			SoundAndFlyOver = X2Action_PlaySoundAndFlyOver(class'X2Action_PlaySoundAndFlyOver'.static.AddToVisualizationTrack(ModifyTrack, VisualizeGameState.GetContext()));
 			SoundAndFlyOver.SetSoundAndFlyOverParameters(None, default.StasisFlyover, '', eColor_Bad, class'UIUtilities_Image'.const.UnitStatus_Stunned, 1.0, true);
 		}
 
-		if( XComGameState_Unit(BuildTrack.StateObject_NewState).IsTurret() )
+		if( XComGameState_Unit(ModifyTrack.StateObject_NewState).IsTurret() )
 		{
-			class'X2Action_UpdateTurretAnim'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext());
+			class'X2Action_UpdateTurretAnim'.static.AddToVisualizationTrack(ModifyTrack, VisualizeGameState.GetContext());
 		}
 		else
 		{
 			// Not a turret
 			// Play the start stun animation
-			PlayAnimation = X2Action_PlayAnimation(class'X2Action_PlayAnimation'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext()));
+			PlayAnimation = X2Action_PlayAnimation(class'X2Action_PlayAnimation'.static.AddToVisualizationTrack(ModifyTrack, VisualizeGameState.GetContext()));
 			PlayAnimation.Params.AnimName = StunStartAnim;
 		}
-		class'X2StatusEffects'.static.UpdateUnitFlag(BuildTrack, VisualizeGameState.GetContext());
+		class'X2StatusEffects'.static.UpdateUnitFlag(ModifyTrack, VisualizeGameState.GetContext());
 
-		super.AddX2ActionsForVisualization(VisualizeGameState, BuildTrack, EffectApplyResult);
+		super.AddX2ActionsForVisualization(VisualizeGameState, ModifyTrack, EffectApplyResult);
 	}
 }
 
@@ -103,4 +110,6 @@ DefaultProperties
 	DuplicateResponse = eDupe_Refresh
 	CustomIdleOverrideAnim="HL_StunnedIdle"
 	StunStartAnim="HL_StunnedStart"
+	ModifyTracksFn=ModifyTracksVisualization
+	EffectHierarchyValue=950
 }

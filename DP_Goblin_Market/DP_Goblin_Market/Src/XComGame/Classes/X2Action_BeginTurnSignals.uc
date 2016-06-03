@@ -24,11 +24,18 @@ static function AddBeginTurnSignalsToBlock(XComGameStateContext_TacticalGameRule
 	local XGUnit GroupLeaderVisualizer;
 	local GameRulesCache_VisibilityInfo OutVisibilityInfo;
 	local X2Action_BeginTurnSignals Action;
+	local X2Action_CameraLookAt LookAtAction;
 	local array<StateObjectReference> OutFriendsSeeingTarget;
 	local XComGameState_Unit ClosestTarget;
 	local int ScanFriends;
 	local XComGameState_Unit FriendUnit;
 	local int HistoryIndexForContext;
+
+	// skip signals in zip mode
+	if( `XPROFILESETTINGS.Data.bEnableZipMode )
+	{
+		return;
+	}
 
 	History = `XCOMHISTORY;
 
@@ -73,6 +80,12 @@ static function AddBeginTurnSignalsToBlock(XComGameStateContext_TacticalGameRule
 											BuildTrack.StateObject_OldState = GroupLeader;
 											BuildTrack.StateObject_NewState = GroupLeader;
 											BuildTrack.TrackActor = GroupLeaderVisualizer;
+
+											LookAtAction = X2Action_CameraLookAt(class'X2Action_CameraLookAt'.static.AddToVisualizationTrack(BuildTrack, Context));
+											LookAtAction.LookAtObject = GroupLeader;
+											LookAtAction.UseTether = false;
+											LookAtAction.BlockUntilActorOnScreen = true;
+
 											Action = X2Action_BeginTurnSignals(class'X2Action_BeginTurnSignals'.static.AddToVisualizationTrack(BuildTrack, Context));
 											Action.Target = XGUnit(ClosestTarget.GetVisualizer());
 											VisualizationTracks.AddItem(BuildTrack);

@@ -14,6 +14,17 @@ class XComGameState_ChallengeData extends XComGameState_BaseObject
 var FullSeedData SeedData;
 var string LeaderBoardName;
 
+var name SquadSizeSelectorName;
+var name ClassSelectorName;
+var name AlienSelectorName;
+var name RankSelectorName;
+var name ArmorSelectorName;
+var name PrimaryWeaponSelectorName;
+var name SecondaryWeaponSelectorName;
+var name UtilityItemSelectorName;
+var name AlertForceLevelSelectorName;
+var name EnemyForcesSelectorName;
+
 cpptext
 {
 	virtual void Serialize(FArchive& Ar);

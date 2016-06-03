@@ -6,6 +6,8 @@ var config float BIND_RANGE;
 var config int BIND_FRAGILE_AMOUNT;
 var config float GET_OVER_HERE_MIN_RANGE;
 var config float GET_OVER_HERE_MAX_RANGE;
+var config array<name> BIND_ABILITY_ALIASES;
+var config array<name> GET_OVER_HERE_ABILITY_ALIASES;
 
 var name BindSustainedEffectName;
 var name GetOverHereAbilityName;
@@ -89,7 +91,7 @@ static function X2AbilityTemplate CreatePoisonSpitAbility()
 	return Template;
 }
 
-static function X2AbilityTemplate CreateBindAbility(bool Interruptible, name AbilityName)
+static function X2AbilityTemplate CreateBindAbility(bool Interruptible, name AbilityName, name SustainedAbilityName='BindSustained')
 {
 	local X2AbilityTemplate                 Template;
 	local X2AbilityCost_ActionPoints        ActionPointCost;
@@ -174,13 +176,14 @@ static function X2AbilityTemplate CreateBindAbility(bool Interruptible, name Abi
 
 	// Add to the target the sustained bind effect
 	SustainedEffect = new class'X2Effect_ViperBindSustained';
-	SustainedEffect.SustainedAbilityName = 'BindSustained';
+	SustainedEffect.SustainedAbilityName = SustainedAbilityName;
 	SustainedEffect.FragileAmount = default.BIND_FRAGILE_AMOUNT;
 	SustainedEffect.EffectName = default.BindSustainedEffectName;
 	SustainedEffect.bRemoveWhenTargetDies = true;
 	SustainedEffect.EffectRemovedSourceVisualizationFn = BindEndSource_BuildVisualization;
 	SustainedEffect.EffectRemovedVisualizationFn = BindEndTarget_BuildVisualization;
 	SustainedEffect.BuildPersistentEffect(1, true, true, false, eGameRule_PlayerTurnBegin);
+	SustainedEffect.RegisterAdditionalEventsLikeImpair.AddItem('AffectedByStasis');
 	SustainedEffect.bBringRemoveVisualizationForward = true;
 
 	// Since this will also be a sustained ability, only put the bound status on the target
@@ -220,6 +223,7 @@ static function X2AbilityTemplate CreateBindAbility(bool Interruptible, name Abi
 	EnvironmentDamageEffect.PlusNumZTiles = 1;
 	EnvironmentDamageEffect.bApplyToWorldOnMiss = false;
 	EnvironmentDamageEffect.bHitSourceTile = true;
+	EnvironmentDamageEffect.bAllowDestructionOfDamageCauseCover=true;
 	Template.AddTargetEffect(EnvironmentDamageEffect);
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
@@ -231,62 +235,11 @@ static function X2AbilityTemplate CreateBindAbility(bool Interruptible, name Abi
 	if (Interruptible)
 	{
 		Template.Hostility = eHostility_Offensive;
-		Template.BuildInterruptGameStateFn = Bind_BuildInterruptGameState;
+		Template.BuildInterruptGameStateFn = TypicalAbility_BuildInterruptGameState;
 	}
 
 	return Template;
 }
-
-function XComGameState Bind_BuildInterruptGameState(XComGameStateContext Context, int InterruptStep, EInterruptionStatus InterruptionStatus)
-{
-	local XComGameState NewGameState;
-	local XComGameStateContext_Ability AbilityContext;
-	local XComGameState_Ability AbilityState;
-	local XComGameStateHistory History;
-	local XComGameStateContext_Ability InterruptingAbilityContext;
-	local int i;
-
-	History = `XCOMHISTORY;
-
-	AbilityContext = XComGameStateContext_Ability(Context);
-	if (AbilityContext != none)
-	{
-		if (InterruptionStatus == eInterruptionStatus_Resume)
-		{
-			//If we're resuming from an interruption, check if that interruption was an attack against this Viper.
-			//If the Viper was attacked, in interrupt, by its target, force the bind to fail.
-			//(Motivating use case: Bind->Bladestorm visualization looking horrible.)
-			for (i = AbilityContext.EventChainStartIndex; i < History.GetCurrentHistoryIndex(); i++)
-			{
-				InterruptingAbilityContext = XComGameStateContext_Ability(History.GetGameStateFromHistory(i).GetContext());
-				if (InterruptingAbilityContext != None)
-				{
-					if (InterruptingAbilityContext.InputContext.PrimaryTarget == AbilityContext.InputContext.SourceObject && 
-						InterruptingAbilityContext.InputContext.SourceObject == AbilityContext.InputContext.PrimaryTarget)
-					{
-						AbilityContext.ResultContext.HitResult = eHit_Miss;
-						break;
-					}
-				}
-			}
-
-			AbilityState = XComGameState_Ability(`XCOMHISTORY.GetGameStateForObjectID(AbilityContext.InputContext.AbilityRef.ObjectID));
-			NewGameState = AbilityState.GetMyTemplate().BuildNewGameStateFn(Context);
-			AbilityContext = XComGameStateContext_Ability(NewGameState.GetContext());
-			AbilityContext.SetInterruptionStatus(InterruptionStatus);
-			AbilityContext.ResultContext.InterruptionStep = InterruptStep;
-		}
-		else if (InterruptStep == 0)
-		{
-			NewGameState = `XCOMHISTORY.CreateNewGameState(true, Context);
-			AbilityContext = XComGameStateContext_Ability(NewGameState.GetContext());
-			AbilityContext.SetInterruptionStatus(InterruptionStatus);
-			AbilityContext.ResultContext.InterruptionStep = InterruptStep;
-		}
-	}
-	return NewGameState;
-}
-
 
 simulated function Bind_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
 {
@@ -315,10 +268,20 @@ simulated function Bind_BuildVisualization(XComGameState VisualizeGameState, out
 	Context = XComGameStateContext_Ability(VisualizeGameState.GetContext());
 	AbilityTemplate = class'XComGameState_Ability'.static.GetMyTemplateManager().FindAbilityTemplate(Context.InputContext.AbilityTemplateName);
 
-	bIsContextHit = Context.IsResultContextHit();
+	if( Context.InterruptionStatus == eInterruptionStatus_Interrupt )
+	{
+		// Only visualize InterruptionStatus eInterruptionStatus_None or eInterruptionStatus_Resume,
+		// if eInterruptionStatus_Interrupt then the Viper was killed (or removed)
+		return;
+	}
 
-	bDisplayAnimations = Context.IsResultContextHit();  // If this missed, there is no need to display animations
-	if( bDisplayAnimations )
+	bIsContextHit = Context.IsResultContextHit();   // If this missed, there is no need to display animations
+
+	bDisplayAnimations = Context.IsResultContextHit();
+
+	// If this missed, there is no need to display animations
+	if( bDisplayAnimations &&
+		Context.InterruptionStatus == eInterruptionStatus_None )
 	{
 		// Look backwards for a turn begin, Bind, or GetOverHere
 		for( SearchHistoryIndex = VisualizeGameState.HistoryIndex - 1; SearchHistoryIndex >= 0; --SearchHistoryIndex )
@@ -335,14 +298,14 @@ simulated function Bind_BuildVisualization(XComGameState VisualizeGameState, out
 			bGetOverHereWasHit = GetOverHereAbilityContext != none && class'XComGameStateContext_Ability'.static.IsHitResultHit(GetOverHereAbilityContext.ResultContext.HitResult);
 
 			if( bGetOverHereWasHit &&
-				GetOverHereAbilityContext.InputContext.AbilityTemplateName == default.BindAbilityName &&
+				default.BIND_ABILITY_ALIASES.Find(GetOverHereAbilityContext.InputContext.AbilityTemplateName) != INDEX_NONE &&
 				GetOverHereAbilityContext.InputContext.SourceObject.ObjectID == Context.InputContext.SourceObject.ObjectID )
 			{
 				// A Bind with the same source was found, so this can't be a Bind due to GetOverHere
 				break;
 			}
 			else if( bGetOverHereWasHit &&
-					 GetOverHereAbilityContext.InputContext.AbilityTemplateName == default.GetOverHereAbilityName &&
+					 default.GET_OVER_HERE_ABILITY_ALIASES.Find(GetOverHereAbilityContext.InputContext.AbilityTemplateName) != INDEX_NONE &&
 					 GetOverHereAbilityContext.InputContext.SourceObject.ObjectID == Context.InputContext.SourceObject.ObjectID )
 			{
 				// An associated GetOverHere Ability was found, so we won't need to show the animations
@@ -414,7 +377,7 @@ simulated function Bind_BuildVisualization(XComGameState VisualizeGameState, out
 	}
 }
 
-simulated function BindSourceAnimationVisualization(out VisualizationTrack BuildTrack, XComGameStateContext Context, bool bSyncAction = false)
+static simulated function BindSourceAnimationVisualization(out VisualizationTrack BuildTrack, XComGameStateContext Context, bool bSyncAction = false)
 {
 	local X2Action_PersistentEffect		PersistentEffectAction;
 
@@ -424,7 +387,7 @@ simulated function BindSourceAnimationVisualization(out VisualizationTrack Build
 	PersistentEffectAction.IdleAnimName = 'NO_BindLoop';
 }
 
-simulated function BindTargetAnimationVisualization(out VisualizationTrack BuildTrack, XComGameStateContext Context)
+static simulated function BindTargetAnimationVisualization(out VisualizationTrack BuildTrack, XComGameStateContext Context)
 {
 	local X2Action_PersistentEffect		PersistentEffectAction;
 	local X2Action_WaitForAbilityEffect WaitAction;
@@ -436,7 +399,7 @@ simulated function BindTargetAnimationVisualization(out VisualizationTrack Build
 	PersistentEffectAction.IdleAnimName = 'NO_BindLoop';
 }
 
-simulated function BindEnvironmentDamageVisualization(XComGameStateContext Context, XComGameStateContext_Ability BindContext, X2AbilityTemplate AbilityTemplate, 
+static simulated function BindEnvironmentDamageVisualization(XComGameStateContext Context, XComGameStateContext_Ability BindContext, X2AbilityTemplate AbilityTemplate, 
 													  out array<VisualizationTrack> OutVisualizationTracks)
 {
 	local XComGameState_EnvironmentDamage EnvironmentDamageEvent;
@@ -465,7 +428,7 @@ simulated function BindEnvironmentDamageVisualization(XComGameStateContext Conte
 	}
 }
 
-static function X2AbilityTemplate CreateBindSustainedAbility()
+static function X2AbilityTemplate CreateBindSustainedAbility(name AbilityName='BindSustained')
 {
 	local X2AbilityTemplate                 Template;
 	local X2AbilityCost_ActionPoints        ActionPointCost;
@@ -475,7 +438,7 @@ static function X2AbilityTemplate CreateBindSustainedAbility()
 	local X2Effect_GrantActionPoints        ActionPointsEffect;
 	local X2Effect_ApplyWeaponDamage        PhysicalDamageEffect;
 
-	`CREATE_X2ABILITY_TEMPLATE(Template, 'BindSustained');
+	`CREATE_X2ABILITY_TEMPLATE(Template, AbilityName);
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_viper_bind";
 
 	Template.bDontDisplayInAbilitySummary = true;
@@ -674,6 +637,7 @@ simulated function BindEndTarget_BuildVisualization(XComGameState VisualizeGameS
 	local XComGameState_Unit            OldUnitState;
 	local X2Action_ViperBindEnd         BindEnd;
 	local XComGameStateContext			Context;
+	local X2Action_WaitForAbilityEffect WaitAction;
 
 	if(BuildTrack.TrackActor != None)
 	{
@@ -692,7 +656,8 @@ simulated function BindEndTarget_BuildVisualization(XComGameState VisualizeGameS
 		}
 		else
 		{
-			class'X2Action_WaitForAbilityEffect'.static.AddToVisualizationTrack(BuildTrack, Context);
+			WaitAction = X2Action_WaitForAbilityEffect(class'X2Action_WaitForAbilityEffect'.static.AddToVisualizationTrack(BuildTrack, Context));
+			WaitAction.bWaitingForActionMessage = true;
 		}
 	}
 }
@@ -843,7 +808,7 @@ static function X2AbilityTemplate CreateGetOverHereAbility()
 	return Template;
 }
 
-simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+static simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
 {
 	local XComGameStateHistory			History;
 	local XComGameStateContext_Ability  Context;
@@ -852,6 +817,7 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 	local X2Action_ViperGetOverHere		GetOverHereAction;
 	local X2Action_PlaySoundAndFlyOver	SoundAndFlyover;
 	local X2VisualizerInterface			Visualizer;
+	local XComGameState_Unit            TargetUnit;
 
 	local VisualizationTrack        EmptyTrack;
 	local VisualizationTrack        BuildTrack;
@@ -864,6 +830,7 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 	local XComGameStateContext_Ability	BindAbilityContext;
 	local bool							bGrabWasHit;
 	local bool							bBindWasHit;
+	local bool                          bDoBindVisuals;
 
 	History = `XCOMHISTORY;
 
@@ -875,6 +842,7 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 	//If we hit the target, then there should be a game state where we apply our free bind attack to the target. Collect visualization track actions
 	//for this bind attack so we can sequence them into the grab + pull visualization
 	bBindWasHit = false;
+	bDoBindVisuals = false;
 	if( bGrabWasHit )
 	{	
 		//Search forward in the history for the bind that we are going to apply to the target
@@ -884,11 +852,12 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 			BindAbilityContext = XComGameStateContext_Ability(ApplyBindState.GetContext());
 			bBindWasHit = BindAbilityContext != none &&
 						  class'XComGameStateContext_Ability'.static.IsHitResultHit(BindAbilityContext.ResultContext.HitResult) &&
-						  BindAbilityContext.InputContext.AbilityTemplateName == default.BindAbilityName &&
+						  default.BIND_ABILITY_ALIASES.Find(BindAbilityContext.InputContext.AbilityTemplateName) != INDEX_NONE &&
 						  BindAbilityContext.InputContext.SourceObject.ObjectID == Context.InputContext.SourceObject.ObjectID;
 				
 			if( bBindWasHit )
 			{
+				bDoBindVisuals = BindAbilityContext.InterruptionStatus == eInterruptionStatus_None;
 				BindAbilityTemplate = class'XComGameState_Ability'.static.GetMyTemplateManager().FindAbilityTemplate(BindAbilityContext.InputContext.AbilityTemplateName);
 				break;
 			}
@@ -907,8 +876,8 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 	GetOverHereAction = X2Action_ViperGetOverHere(class'X2Action_ViperGetOverHere'.static.AddToVisualizationTrack(BuildTrack, Context));
 	GetOverHereAction.SetFireParameters(Context.IsResultContextHit());
 
-	//Add any actions that we get from our free bind attack if we hit
-	if( bBindWasHit )
+	//Add any actions that we get from our free bind attack if we hit and the Bind was not interrupted
+	if( bDoBindVisuals )
 	{
 		BindSourceAnimationVisualization(BuildTrack, BindAbilityContext);
 	}
@@ -936,6 +905,12 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 	BuildTrack.StateObject_NewState = VisualizeGameState.GetGameStateForObjectID(InteractingUnitRef.ObjectID);
 	BuildTrack.TrackActor = History.GetVisualizer(InteractingUnitRef.ObjectID);
 
+	TargetUnit = XComGameState_Unit(BuildTrack.StateObject_OldState);
+	if( (TargetUnit != none) && (TargetUnit.IsUnitApplyingEffectName('Suppression')))
+	{
+		class'X2Action_StopSuppression'.static.AddToVisualizationTrack(BuildTrack, Context);
+	}
+
 	class'X2Action_WaitForAbilityEffect'.static.AddToVisualizationTrack(BuildTrack, Context);
 
 	for (EffectIndex = 0; EffectIndex < AbilityTemplate.AbilityTargetEffects.Length; ++EffectIndex)
@@ -949,8 +924,8 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 		SoundAndFlyOver.SetSoundAndFlyOverParameters(None, AbilityTemplate.LocMissMessage, '', eColor_Bad);
 	}
 
-	//Add any actions that we get from our free bind attack if we hit
-	if( bBindWasHit )
+	//Add any actions that we get from our free bind attack if we hit and the Bind was not interrupted
+	if( bDoBindVisuals )
 	{
 		BindTargetAnimationVisualization(BuildTrack, BindAbilityContext);
 	}
@@ -960,14 +935,14 @@ simulated function GetOverhere_BuildVisualization(XComGameState VisualizeGameSta
 
 	//Configure the visualization tracks for the environment
 	//****************************************************************************************
-	if( bBindWasHit )
+	if( bDoBindVisuals )
 	{
 		BindEnvironmentDamageVisualization(Context, BindAbilityContext, BindAbilityTemplate, OutVisualizationTracks);
 	}
 	//****************************************************************************************
 }
 
-simulated function BindUnit_BuildAffectedVisualization(name EffectName, XComGameState VisualizeGameState, out VisualizationTrack BuildTrack )
+static simulated function BindUnit_BuildAffectedVisualization(name EffectName, XComGameState VisualizeGameState, out VisualizationTrack BuildTrack )
 {
 	local XComGameState_Unit NewGameState;
 	local XComGameState_Effect BindEffectState;

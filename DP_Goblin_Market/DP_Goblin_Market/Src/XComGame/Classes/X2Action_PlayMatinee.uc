@@ -42,6 +42,10 @@ var protected Actor MatineeBase;
 // socket in the base actor to use, if any
 var protected name MatineeBaseSocket;
 
+// location and rotation to move the matinee base to
+var private Vector MatineeBaseLocation;
+var private Rotator MatineeBaseRotation;
+
 // In tactical missions, we use the camera stack matinee camera to actually control the camera during playback,
 // instead of the build in unreal camera takeover. This allows us to manipulate all of the other gameplay things
 // that need to happen, such as cinematic mode and fow disabling, for free.
@@ -80,11 +84,8 @@ function AddUnitToMatinee(name GroupName, XComGameState_Unit GameStateUnit)
 
 function SetMatineeLocation(Vector NewLocation, optional Rotator NewRotation)
 {
-	if( MatineeBase != None )
-	{
-		MatineeBase.SetLocation(NewLocation);
-		MatineeBase.SetRotation(NewRotation);
-	}
+	MatineeBaseLocation = NewLocation;
+	MatineeBaseRotation = NewRotation;
 }
 
 function SetMatineeBase(name MatineeBaseActorTag, optional name MatineeBaseSocketName = '')
@@ -208,6 +209,13 @@ protected function PlayMatinee()
 		return;
 	}
 
+	// move the matinee base to the correct location
+	if( MatineeBase != None && MatineeBaseLocation != vect(0,0,0))
+	{
+		MatineeBase.SetLocation(MatineeBaseLocation);
+		MatineeBase.SetRotation(MatineeBaseRotation);
+	}
+
 	// update the timeout so that we can see the entire matinee
 	MatineeInfo = new class'X2MatineeInfo';
 	MatineeInfo.InitFromMatinee(Matinee);
@@ -231,14 +239,13 @@ protected function PlayMatinee()
 	XComTacticalController(GetALocalPlayerController()).SetCinematicMode(true, true, true, true, true, true);
 
 	// create a camera on the camera stack to do the actual camera logic
-	if( !bNewUnitSelected )
+	if( !bNewUnitSelected && MatineeBase != none )
 	{
 		MatineeCamera = new class'X2Camera_Matinee';
 		MatineeCamera.SetMatinee(Matinee, MatineeBase);
 		MatineeCamera.PopWhenFinished = false;
 		`CAMERASTACK.AddCamera(MatineeCamera);
 	}
-
 
 	// fixes bug where skipped matinee won't replay (because it thinks it's still playing).  mdomowicz 2015_11_13
 	Matinee.Stop();
@@ -256,6 +263,39 @@ simulated protected function EndMatinee()
 		`XWORLD.bDisableVisibilityUpdates = false;
 
 		MatineeCamera = none;
+	}
+}
+
+simulated function SelectMatineeByTag(string TagPrefix)
+{
+	local array<SequenceObject> FoundMatinees;
+	local Sequence GameSeq;
+	local SeqAct_Interp FoundMatinee;
+	local int TotalValid;
+	local int Index;
+
+	GameSeq = class'WorldInfo'.static.GetWorldInfo().GetGameSequence();
+	GameSeq.FindSeqObjectsByClass(class'SeqAct_Interp', true, FoundMatinees);
+	FoundMatinees.RandomizeOrder();
+
+	Matinee = none;
+	for (Index = 0; Index < FoundMatinees.length; Index++)
+	{
+		FoundMatinee = SeqAct_Interp(FoundMatinees[Index]);
+		if(Instr(FoundMatinee.ObjComment, TagPrefix, , true) == 0)
+		{
+			// this math works out such that there is an equal change of any matching matinee being chosen
+			TotalValid++;
+			if(Matinee == none || `SYNC_RAND(TotalValid) == 0)
+			{
+				Matinee = FoundMatinee;
+			}
+		}
+	}
+
+	if(Matinee == none)
+	{
+		`Redscreen("X2Action_PlayMatinee::SelectMatineeByTag(): Could not find Matinee for tag " $ TagPrefix);
 	}
 }
 

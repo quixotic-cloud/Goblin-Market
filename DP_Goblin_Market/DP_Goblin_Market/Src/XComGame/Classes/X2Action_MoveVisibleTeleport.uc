@@ -31,20 +31,27 @@ Begin:
 
 	// Play the teleport start animation
 	Params.AnimName = 'HL_TeleportStart';
+	Params.PlayRate = GetMoveAnimationSpeed();
 	FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
 
 	// Move the pawn to the end position
-	Destination.Z = `XWORLD.GetFloorZForPosition(Destination, true) + UnitPawn.CollisionHeight + class'XComWorldData'.const.Cover_BufferDistance;	
+	Destination.Z = UnitPawn.GetDesiredZForLocation(Destination, true) + UnitPawn.GetAnimTreeController().ComputeAnimationRMADistance('HL_TeleportStop');	
 	UnitPawn.SetLocation(Destination);		
 	Unit.ProcessNewPosition( );
 
 	// Play the teleport stop animation
 	Params.AnimName = 'HL_TeleportStop';
+	Params.BlendTime = 0;
+	Params.HasDesiredEndingAtom = true;
+	Params.DesiredEndingAtom.Translation = UnitPawn.Location;
+	Params.DesiredEndingAtom.Translation.Z = UnitPawn.GetDesiredZForLocation(UnitPawn.Location);
+	Params.DesiredEndingAtom.Rotation = QuatFromRotator(UnitPawn.Rotation);
+	Params.DesiredEndingAtom.Scale = 1.0f;
+
 	FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
 
 	UnitPawn.EnableRMA(false, false);
 	UnitPawn.EnableRMAInteractPhysics(false);
-	UnitPawn.SnapToGround();
 
 	UnitPawn.Acceleration = Vect(0, 0, 0);
 	UnitPawn.vMoveDirection = Vect(0, 0, 0);

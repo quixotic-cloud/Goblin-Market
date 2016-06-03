@@ -60,6 +60,13 @@ simulated function SpawnSoldierPawn()
 	SoldierPawn.CreateVisualInventoryAttachments(PawnMgr, XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(SoldierRef.ObjectID)));
 	GremlinPawn = PawnMgr.GetCosmeticPawn(eInvSlot_SecondaryWeapon, SoldierRef.ObjectID);
 
+	//Keep dangly bits from wigging out when the character is teleported into the matinee
+	if(XComHumanPawn(SoldierPawn) != none)
+	{
+		XComHumanPawn(SoldierPawn).FreezePhysics();
+		SetTimer(1.0f, false, 'WakePhysics', XComHumanPawn(SoldierPawn));
+	}
+
 	SetTimer(0.035, false, 'SetSoldierMatineeVariable');
 }
 
@@ -190,10 +197,19 @@ event OnRemoteEvent(name RemoteEventName)
 
 simulated function DismissScreen()
 {
+	local bool GermanVOIsTooLong;
+
 	WorldInfo.RemoteEventListeners.RemoveItem(self);
 	PawnMgr.ReleasePawn(self, SoldierRef.ObjectID);
 
-	`HQPRES.m_kNarrativeUIMgr.EndCurrentConversation();
+	// last minute fix for the Rage Suit German localization. They recorded audio that was too long,
+	// so don't cut it off. Everything else can be cut off - dburchanowski
+	GermanVOIsTooLong = (GetLanguage() == "DEU" || GetLanguage() == "ITA" || GetLanguage() == "ESN")
+		&& (StartEventBase == "CIN_ArmorIntro_RageSuit" || StartEventBase == "CIN_ArmorIntro_IcarusSuit");
+	if(!GermanVOIsTooLong)
+	{
+		`HQPRES.m_kNarrativeUIMgr.EndCurrentConversation();
+	}
 		
 	ShowExistingPawn();
 	RestoreAfterAction();

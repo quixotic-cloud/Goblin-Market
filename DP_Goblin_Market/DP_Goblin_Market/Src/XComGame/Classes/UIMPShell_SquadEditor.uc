@@ -364,6 +364,7 @@ simulated function UpdateData(optional bool bFillSquad)
 		bFoundUnit = false;
 
 		UnitInfos[i].SetEditable(m_bAllowEditing && m_kSquadLoadout != none && !m_kLocalPlayerInfo.GetPlayerReady());
+		UnitInfos[i].SetLoadout(m_kSquadLoadout);
 		for(j = 0; j < Squad.Length; ++j)
 		{
 			Unit = Squad[j];
@@ -522,13 +523,55 @@ function SaveLoadout()
 
 function SaveAsNewLoadout(string strLoadoutName)
 {
+	local XComGameState kNewLoadout;
+	local int i, j;
+	local XComGameState_Unit Unit, UpdatedUnit;
+
 	if(!m_bSavingLoadout)
 	{
 		m_bSavingLoadout = true;
-		XComGameStateContext_SquadSelect(m_kSquadLoadout.GetContext()).strLoadoutName = strLoadoutName;
-		m_kMPShellManager.AddLoadoutToList(m_kSquadLoadout);
+		kNewLoadout = m_kMPShellManager.CloneSquadLoadoutGameState(m_kSquadLoadout, true);
+		XComGameStateContext_SquadSelect(kNewLoadout.GetContext()).strLoadoutName = strLoadoutName;
+		m_kMPShellManager.AddLoadoutToList(kNewLoadout);
+		
 		m_kMPShellManager.WriteSquadLoadouts();
 		m_kMPShellManager.SaveProfileSettings();
+
+		m_kSquadLoadout = kNewLoadout;
+		m_kOriginalSquadLoadout = m_kSquadLoadout;
+
+		Squad.Length = 0;
+
+		foreach m_kSquadLoadout.IterateByClassType(class'XComGameState_Unit', Unit)
+		{
+			Squad.AddItem(Unit);
+		}
+
+		m_kPawnMgr.CheckGameState = m_kSquadLoadout;
+		for(i = 0; i < eMPNumUnitsPerSquad_MAX; ++i)
+		{
+			UnitInfos[i].SetLoadout(none);
+			for(j = 0; j < Squad.Length; ++j)
+			{
+				Unit = Squad[j];
+				if( (Unit.MPSquadLoadoutIndex == i || Unit.MPSquadLoadoutIndex == INDEX_NONE))
+				{
+					if(UnitInfos[i].GetUnit() != none)
+					{
+						ClearPawn(i);
+						UpdatedUnit = XComGameState_Unit(m_kSquadLoadout.CreateStateObject(class'XComGameState_Unit', Unit.ObjectID));
+						UpdatedUnit.MPSquadLoadoutIndex = i;
+						UnitInfos[i].SetUnit(UpdatedUnit);
+						UnitInfos[i].SetLoadout(m_kSquadLoadout);
+						UnitInfos[i].UpdateData(i);
+				
+						m_kSquadLoadout.AddStateObject(UpdatedUnit);
+						UnitPawns[i] = CreatePawn(UpdatedUnit, i);
+						break;
+					}
+				}
+			}
+		}
 	}
 }
 

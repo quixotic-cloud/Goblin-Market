@@ -7,12 +7,13 @@ var StateObjectReference                    PartnerUnitRef;
 
 //Cached info for performing the action
 //*************************************
-var private CustomAnimParams				Params;//, PartnerParams;
+var private CustomAnimParams				Params;
 var private XComGameState_Unit				UnitState, PartnerUnitState;
 var private Vector							DesiredLocation;
-var private Actor				            PartnerVisualizer;
+var private XGUnit				            PartnerVisualizer;
 var private XComUnitPawn		            PartnerUnitPawn;
-var private bool                            bUnitIsAlive, bPartnerIsAlive;
+var private bool                            bUnitIsAliveAndConcious, bPartnerIsAliveAndConcious;
+var private bool                            bUnitIsAlive, bPartnerIsAlive; // deprecated
 var private AnimNodeSequence	            UnitAnimSeq, PartnerAnimSeq;
 //*************************************
 
@@ -24,16 +25,16 @@ function Init(const out VisualizationTrack InTrack)
 
 	History = `XCOMHISTORY;
 
-	UnitState = XComGameState_Unit(History.GetGameStateForObjectID(Unit.ObjectID));
+	UnitState = Unit.GetVisualizedGameState(CurrentHistoryIndex);
 
 	`assert(PartnerUnitRef.ObjectID != 0);
 
-	PartnerUnitState = XComGameState_Unit(History.GetGameStateForObjectID(PartnerUnitRef.ObjectID));
-	PartnerVisualizer = PartnerUnitState.GetVisualizer();
-	PartnerUnitPawn = XGUnit(PartnerVisualizer).GetPawn();
+	PartnerVisualizer = XGUnit(History.GetVisualizer(PartnerUnitRef.ObjectID));
+	PartnerUnitPawn = PartnerVisualizer.GetPawn();
+	PartnerUnitState = PartnerVisualizer.GetVisualizedGameState(CurrentHistoryIndex);
 
-	bUnitIsAlive = UnitState.IsAlive();
-	bPartnerIsAlive = PartnerUnitState.IsAlive();
+	bUnitIsAliveAndConcious = UnitState.IsAlive() && !UnitState.IsUnconscious() && !UnitState.IsBleedingOut();
+	bPartnerIsAliveAndConcious = PartnerUnitState.IsAlive() && !PartnerUnitState.IsUnconscious() && !PartnerUnitState.IsBleedingOut();
 }
 
 simulated state Executing
@@ -60,14 +61,14 @@ simulated state Executing
 
 Begin:
 
-	if( bUnitIsAlive )
+	if( bUnitIsAliveAndConcious )
 	{
 		UnitAnimSeq = EndBind(UnitState, Unit, UnitPawn);
 	}
 
-	if( bPartnerIsAlive )
+	if( bPartnerIsAliveAndConcious )
 	{
-		PartnerAnimSeq = EndBind(PartnerUnitState, XGUnit(PartnerVisualizer), PartnerUnitPawn);
+		PartnerAnimSeq = EndBind(PartnerUnitState, PartnerVisualizer, PartnerUnitPawn);
 	}
 
 	FinishAnim(UnitAnimSeq);
@@ -82,4 +83,9 @@ Begin:
 	}
 
 	CompleteAction();
+}
+
+event bool BlocksAbilityActivation()
+{
+	return true;
 }

@@ -51,8 +51,10 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	super.InitScreen(InitController, InitMovie, InitName);
 
 	ButtonGroup = Spawn(class'UIPanel', self);
-	ButtonGroup.bAnimateOnInit = false; 
+	ButtonGroup.bAnimateOnInit = false;
+	ButtonGroup.bIsNavigable = true;
 	ButtonGroup.InitPanel('ButtonGroup', '');
+	ButtonGroup.bCascadeFocus = false;
 
 	Button0 = Spawn(class'UIButton', ButtonGroup);
 	Button0.bAnimateOnInit = false;
@@ -68,6 +70,12 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	Button2.bAnimateOnInit = false; 
 	Button2.SetResizeToText(false);
 	Button2.InitButton('Button2', m_sExitToMain, RequestExit);
+
+	Navigator.SetSelected(ButtonGroup);
+	ButtonGroup.Navigator.SetSelected(Button0);
+
+	//We're hijacking the pause menu override of the input methods here, to allow the Steam controller to switch the input mode in Tactical to use the menu mode. 
+	`BATTLE.m_bInPauseMenu = true;
 }
 
 //----------------------------------------------------------------------------
@@ -103,8 +111,6 @@ simulated function bool OnUnrealCommand(int cmd, int arg)
 	if(!CheckInputIsReleaseOrDirectionRepeat(cmd, arg))
 		return true;
 
-	// TODO: Need a custom implementation for keyboard / gamepad (track selected index and set button's focus state manually)
-
 	return super.OnUnrealCommand(cmd, arg);
 }
 
@@ -137,6 +143,7 @@ simulated public function ExitGameDialogueCallback(eUIAction eAction)
 {
 	if (eAction == eUIAction_Accept)
 	{
+		`BATTLE.m_bInPauseMenu = false;
 		Movie.Pres.UIEndGame();
 		`XCOMHISTORY.ResetHistory();
 		ConsoleCommand("disconnect");
@@ -151,6 +158,9 @@ simulated protected function AS_SetDisplay( string title, string body, string im
 {
 	Movie.ActionScriptVoid(screen.MCPath$".SetDisplay");
 }
+
+
+
 	
 DefaultProperties
 {

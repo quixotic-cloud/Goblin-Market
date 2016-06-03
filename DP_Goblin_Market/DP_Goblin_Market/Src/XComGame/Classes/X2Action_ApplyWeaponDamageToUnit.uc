@@ -811,6 +811,7 @@ Begin:
 
 				if( AnimParams.AnimName != '' )
 				{
+					AnimParams.PlayRate = GetMoveAnimationSpeed();
 					PlayingSequence = UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams);
 				}
 			}
@@ -825,7 +826,14 @@ Begin:
 
 			if( !bGoingToDie && !bSkipWaitForAnim)
 			{
-				FinishAnim(PlayingSequence);
+				if( Track.TrackActor.CustomTimeDilation < 1.0 )
+				{
+					Sleep(PlayingSequence.AnimSeq.SequenceLength * PlayingSequence.Rate * Track.TrackActor.CustomTimeDilation);
+				}
+				else
+				{
+					FinishAnim(PlayingSequence);
+				}
 				bShouldContinueAnim = false;
 			}
 
@@ -903,7 +911,14 @@ Begin:
 
 			if( !bGoingToDie )
 			{
-				FinishAnim(PlayingSequence);
+				if( Track.TrackActor.CustomTimeDilation < 1.0 )
+				{
+					Sleep(PlayingSequence.AnimSeq.SequenceLength * PlayingSequence.Rate * Track.TrackActor.CustomTimeDilation);
+				}
+				else
+				{
+					FinishAnim(PlayingSequence);
+				}
 				bShouldContinueAnim = false;
 			}
 
@@ -936,7 +951,7 @@ Begin:
 				//Only play the hit react if there is more than one projectile volley
 				if( !SingleProjectileVolley() )
 				{
-					Sleep(HitReactDelayTimeToDeath); // Let the hit react play for a little bit before we CompleteAction to go to death
+					Sleep(HitReactDelayTimeToDeath * GetDelayModifier()); // Let the hit react play for a little bit before we CompleteAction to go to death
 				}
 			}
 		}
@@ -950,4 +965,5 @@ DefaultProperties
 	TimeoutSeconds = 8.0f
 	bDoOverrideAnim=false
 	bPlayDamageAnim = true
+	bCauseTimeDilationWhenInterrupting = true
 }

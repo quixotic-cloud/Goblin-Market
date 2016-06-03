@@ -12,6 +12,8 @@ var config int AREA_MELEE_ENVIRONMENT_DAMAGE;
 var config float CIVILIAN_MORPH_RANGE_METERS;
 var config int CHANGE_FORM_PERCENT_CHANCE;
 
+var config int REGENERATION_HEALMP_VALUE;
+
 var privatewrite name ChangeFormTriggerEventName;
 var private name ChangeFormCheckEffectName;
 
@@ -24,6 +26,11 @@ static function array<X2DataTemplate> CreateTemplates()
 	Templates.AddItem(CreateScythingClawsAbility());
 	Templates.AddItem(CreateChangeFormAbility());
 	Templates.AddItem(CreateChangeFormSawEnemyAbility());
+
+	// MP Versions of Abilities
+	Templates.AddItem(CreateFacelessInitMPAbility());
+	Templates.AddItem(PurePassive('FacelessRegenerationMP', "img:///UILibrary_PerkIcons.UIPerk_rapidregeneration"));
+	Templates.AddItem(CreateScythingClawsMPAbility());
 
 	return Templates;
 }
@@ -71,6 +78,7 @@ static function X2AbilityTemplate CreateScythingClawsAbility()
 	local X2AbilityTarget_Cursor CursorTarget;
 	local X2AbilityMultiTarget_Cone ConeMultiTarget;
 	local X2Effect_ApplyWeaponDamage PhysicalDamageEffect;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'ScythingClaws');
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_chryssalid_chargeandslash";
@@ -103,7 +111,11 @@ static function X2AbilityTemplate CreateScythingClawsAbility()
 	Template.AbilityMultiTargetStyle = ConeMultiTarget;
 
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
+	
+	// May attack if the unit is burning or disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	// Primary Target
 	Template.AbilityTargetConditions.AddItem(default.GameplayVisibilityCondition);
@@ -148,6 +160,7 @@ static function X2AbilityTemplate CreateChangeFormAbility()
 	local X2Condition_UnitProperty UnitPropertyCondition;
 	local X2Effect_RemoveEffects RemoveEffects;
 	local X2Condition_UnitValue NotAlreadyChangedFormCondition;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'ChangeForm');
 
@@ -172,7 +185,11 @@ static function X2AbilityTemplate CreateChangeFormAbility()
 	Template.AbilityTargetStyle = default.SelfTarget;
 
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
+	
+	// May change form if the unit is burning or disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	//If two of the following triggers occur simultaneously, the ability may try to trigger twice before the civilian unit is removed.
 	//This conditional will catch and prevent this from happening.
@@ -331,6 +348,127 @@ static function X2AbilityTemplate CreateChangeFormSawEnemyAbility()
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
 	
+	return Template;
+}
+
+// #######################################################################################
+// -------------------- MP Abilities -----------------------------------------------------
+// #######################################################################################
+
+static function X2AbilityTemplate CreateFacelessInitMPAbility()
+{
+	local X2AbilityTemplate Template;
+	local X2Effect_Regeneration RegenerationEffect;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'FacelessInitMP');
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_hunter"; // TODO: This needs to be changed
+	Template.MP_PerkOverride = 'FacelessInit';
+	Template.bCausesCheckFirstSightingOfEnemyGroup = true;  // Check when this unit first spawns
+
+	Template.bDontDisplayInAbilitySummary = true;
+
+	Template.AdditionalAbilities.AddItem('FacelessRegenerationMP');
+
+	Template.AbilitySourceName = 'eAbilitySource_Perk';
+	Template.eAbilityIconBehaviorHUD = EAbilityIconBehavior_NeverShow;
+	Template.Hostility = eHostility_Neutral;
+
+	Template.AbilityToHitCalc = default.DeadEye;
+	Template.AbilityTargetStyle = default.SelfTarget;
+
+	Template.AbilityTriggers.AddItem(default.UnitPostBeginPlayTrigger);
+
+	// Build the regeneration effect
+	RegenerationEffect = new class'X2Effect_Regeneration';
+	RegenerationEffect.BuildPersistentEffect(1, true, true, false, eGameRule_PlayerTurnBegin);
+	//	RegenerationEffect.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.GetMyLongDescription(), Template.IconImage,,,Template.AbilitySourceName);
+	RegenerationEffect.HealAmount = default.REGENERATION_HEALMP_VALUE;
+	Template.AddTargetEffect(RegenerationEffect);
+
+	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
+
+	return Template;
+}
+
+static function X2AbilityTemplate CreateScythingClawsMPAbility()
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityCost_ActionPoints ActionPointCost;
+	local X2AbilityToHitCalc_StandardMelee MeleeHitCalc;
+	local X2Condition_UnitProperty UnitPropertyCondition;
+	local X2AbilityTarget_Cursor CursorTarget;
+	local X2AbilityMultiTarget_Cone ConeMultiTarget;
+	local X2Effect_ApplyWeaponDamage PhysicalDamageEffect;
+	local array<name> SkipExclusions;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'ScythingClawsMP');
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_chryssalid_chargeandslash";
+	Template.MP_PerkOverride = 'ScythingClaws';
+
+	Template.Hostility = eHostility_Offensive;
+	Template.AbilitySourceName = 'eAbilitySource_Standard';
+
+	ActionPointCost = new class'X2AbilityCost_ActionPoints';
+	ActionPointCost.iNumPoints = 1;
+	ActionPointCost.bConsumeAllPoints = true;
+	Template.AbilityCosts.AddItem(ActionPointCost);
+
+	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
+
+	MeleeHitCalc = new class'X2AbilityToHitCalc_StandardMelee';
+	Template.AbilityToHitCalc = MeleeHitCalc;
+
+	Template.TargetingMethod = class'X2TargetingMethod_Cone';
+
+	CursorTarget = new class'X2AbilityTarget_Cursor';
+	CursorTarget.bRestrictToWeaponRange = false;
+	CursorTarget.FixedAbilityRange = default.SCYTHING_CLAWS_LENGTH_TILES * class'XComWorldData'.const.WORLD_StepSize;
+	Template.AbilityTargetStyle = CursorTarget;
+
+	ConeMultiTarget = new class'X2AbilityMultiTarget_Cone';
+	ConeMultiTarget.ConeEndDiameter = default.SCYTHING_CLAWS_END_DIAMETER_TILES * class'XComWorldData'.const.WORLD_StepSize;
+	ConeMultiTarget.ConeLength = default.SCYTHING_CLAWS_LENGTH_TILES * class'XComWorldData'.const.WORLD_StepSize;
+	ConeMultiTarget.fTargetRadius = Sqrt(Square(ConeMultiTarget.ConeEndDiameter / 2) + Square(ConeMultiTarget.ConeLength)) * class'XComWorldData'.const.WORLD_UNITS_TO_METERS_MULTIPLIER;
+	ConeMultiTarget.bExcludeSelfAsTargetIfWithinRadius = true;
+	Template.AbilityMultiTargetStyle = ConeMultiTarget;
+
+	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
+	
+	// May attack if the unit is burning or disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
+
+	// Primary Target
+	Template.AbilityTargetConditions.AddItem(default.GameplayVisibilityCondition);
+
+	UnitPropertyCondition = new class'X2Condition_UnitProperty';
+	UnitPropertyCondition.ExcludeDead = true;
+	UnitPropertyCondition.ExcludeFriendlyToSource = true;
+	UnitPropertyCondition.ExcludeCosmetic = true;
+	Template.AbilityTargetConditions.AddItem(UnitPropertyCondition);
+
+	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
+	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.FACELESSMP_MELEEAOE_BASEDAMAGE;
+	PhysicalDamageEffect.EffectDamageValue.DamageType = 'Melee';
+	PhysicalDamageEffect.EnvironmentalDamageAmount = default.AREA_MELEE_ENVIRONMENT_DAMAGE;
+	Template.AddTargetEffect(PhysicalDamageEffect);
+
+	// Multi Targets
+	UnitPropertyCondition = new class'X2Condition_UnitProperty';
+	UnitPropertyCondition.ExcludeDead = true;
+	UnitPropertyCondition.ExcludeFriendlyToSource = false;
+	UnitPropertyCondition.RequireWithinRange = true;
+	Template.AbilityMultiTargetConditions.AddItem(UnitPropertyCondition);
+
+	Template.AddMultiTargetEffect(PhysicalDamageEffect);
+
+	Template.CustomFireAnim = 'NO_ScythingClawsSlash';
+	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
+	Template.BuildInterruptGameStateFn = TypicalAbility_BuildInterruptGameState;
+	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.CinescriptCameraType = "Faceless_ScythingClaws";
+
 	return Template;
 }
 

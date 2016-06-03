@@ -185,7 +185,7 @@ Begin:
 	FinishAnim(PlayingAnim);
 
 	// keep the camera looking this way for a few moments
-	Sleep(1.0);
+	Sleep(1.0 * GetDelayModifier());
 
 	if( MatineeCamera != None )
 	{

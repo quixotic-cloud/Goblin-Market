@@ -51,6 +51,8 @@ var protectedwrite bool             bTimerEnded;
 var bool							bStopTime;				// Should the timer stop running
 var float							TotalPauseTime;			// The total time in seconds the timer has been paused.
 
+var bool							bIsChallengeModeTimer;
+
 
 //=======================================================================================
 //
@@ -230,4 +232,5 @@ function SetPauseTime(byte PauseTime)
 
 defaultproperties
 {
+	bIsChallengeModeTimer = false
 }

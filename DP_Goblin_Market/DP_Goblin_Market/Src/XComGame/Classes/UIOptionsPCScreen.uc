@@ -19,6 +19,18 @@ struct native TUIOptionsInitVideoSettings
 	var bool bFRSmoothing;
 };
 
+struct native PartPackPreset
+{
+	var name PartPackName;
+	var float ChanceToSelect; //0.0f no chance to select, 1.0f same chance to select as any other part with 1.0f
+};
+
+struct native PartPackPresetSliderMapping
+{
+	var UISlider Slider;
+	var int PresetIndex;
+};
+
 enum EFXSFXAAType
 {
 	FXSAA_Off<DisplayName = Off>,
@@ -109,6 +121,8 @@ var array<string> m_kGameResolutionStrings;
 var array<int> m_kGameResolutionWidths;
 var array<int> m_kGameResolutionHeights;
 var int m_kCurrentSupportedResolutionIndex;
+
+var array<PartPackPresetSliderMapping> SliderMapping;
 
 enum EUI_PCOptions_Graphics
 {
@@ -252,6 +266,7 @@ var localized string m_strGameplayLabel_AutosaveToggle;
 var localized string m_strGameplayLabel_AutosaveOnReturnFromTactical;
 var localized string m_strGameplayLabel_ShowEnemyHealth;
 var localized string m_strGameplayLabel_UnitMoveSpeed;
+var localized string m_strGameplayLabel_EnableZipMode;
 
 var localized string m_strInterfaceLabel_DefaultCameraZoom;
 var localized string m_strInterfaceLabel_ShowHealthBars;
@@ -309,6 +324,7 @@ var localized string m_strGameplayLabel_AutosaveToggle_Desc;
 var localized string m_strGameplayLabel_AutosaveOnReturnFromTactical_Desc;
 var localized string m_strGameplayLabel_ShowEnemyHealth_Desc;
 var localized string m_strGameplayLabel_UnitMoveSpeed_Desc;
+var localized string m_strGameplayLabel_EnableZipMode_Desc;
 
 var localized string m_strInterfaceLabel_DefaultCameraZoom_Desc;
 var localized string m_strInterfaceLabel_ShowHealthBars_Desc;
@@ -351,7 +367,7 @@ enum EUI_PCOptions_Tabs
 	ePCTab_Video,
 	ePCTab_Graphics,
 	ePCTab_Gameplay,
-	ePCTab_Interface
+	ePCTab_Interface,
 };
 
 enum EUI_PCOptions_Video
@@ -384,7 +400,8 @@ enum EUI_PCOptions_Gameplay
 	ePCTabGameplay_AutosaveMaster,
 //  ePCTabGameplay_AutosaveOnReturnFromTactical,
 	ePCTabGameplay_ShowEnemyHealth,
-	ePCTabGameplay_UnitMoveSpeed,
+//	ePCTabGameplay_UnitMoveSpeed,
+	ePCTabGameplay_EnableZipMode,
 };
 enum EUI_PCOptions_Interface
 {
@@ -394,6 +411,9 @@ enum EUI_PCOptions_Interface
 	ePCTabInterface_Subtitles,
 	ePCTabInterface_EdgeScroll,
 };
+
+var config array<int> MaxVisibleCrewConfig;
+var private int InitialMaxVisibleCrew;
 
 simulated function TUIGraphicsOptionSettingConfig GetPresetConfig()
 {
@@ -467,7 +487,7 @@ simulated function TUIGraphicsOptionSettingConfig GetAntiAliasingConfig()
 	Config.Presets.AddItem(0);
 	Config.Presets.AddItem(1);
 	Config.Presets.AddItem(1);
-	Config.Presets.AddItem(4);
+	Config.Presets.AddItem(1);
 
 	Config.Labels.AddItem(m_strGraphicsSetting_Disabled);
 	Config.Labels.AddItem(m_str_AASetting_FXAA);
@@ -764,7 +784,7 @@ simulated function TUIGraphicsOptionSettingConfig GetMaxDrawDistanceConfig()
 }
 
 simulated native function bool GetIsBorderlessWindow();
-simulated native function SetSupportedResolutionsNative(bool bBorderlessWindow);
+simulated native function SetSupportedResolutionsNative(bool bFullscreen, bool bBorderlessWindow);
 simulated native function UpdateViewportNative(INT ScreenWidth, INT ScreenHeight, BOOL Fullscreen, INT BorderlessWindow);
 simulated native function bool GetCurrentVSync();
 simulated native function UpdateVSyncNative(bool bUseVSync);
@@ -883,6 +903,7 @@ simulated function OnInit()
 
 	m_kProfileSettings = `XPROFILESETTINGS;
 
+	InitialMaxVisibleCrew = m_kProfileSettings.Data.MaxVisibleCrew;
 	// Save profile settings so they can be restored if the user cancels
 	SavePreviousProfileSettingsToBuffer();
 
@@ -1104,7 +1125,7 @@ function SetVideoTabSelected()
 	m_arrMechaItems[ePCTabVideo_MouseLock].BG.SetTooltipText(m_strVideolabel_MouseLock_Desc, , , 10, , , , 0.0f);
 
 	// Resolution: --------------------------------------------
-	SetSupportedResolutionsNative(ModeSpinnerVal == 1);
+	SetSupportedResolutionsNative(ModeSpinnerVal == 0, ModeSpinnerVal == 1);
 
 	m_arrMechaItems[ePCTabVideo_Resolution].UpdateDataDropdown(m_strVideoLabel_Resolution, m_kGameResolutionStrings, m_kCurrentSupportedResolutionIndex, UpdateResolution);
 	m_arrMechaItems[ePCTabVideo_Resolution].BG.SetTooltipText(m_strVideoLabel_Resolution_Desc, , , 10, , , , 0.0f);
@@ -1301,8 +1322,17 @@ function SetAudioTabSelected()
 
 function SetGameplayTabSelected()
 {
-	local int numOptions;
-	
+	local int Index;	
+	local int MechaItemIndex;
+	local int PartPackPresetIndex;
+	local array<name> PartPackNames; //Names of installed part packs	
+	local PartPackPreset PartPackData;
+	local PartPackPresetSliderMapping Mapping;
+	local X2BodyPartTemplateManager PartTemplateManager;
+	local string Label;
+	local string Tooltip;
+	local array<X2DownloadableContentInfo> DLCInfos;
+	local int DLCInfoIndex;
 	ResetMechaListItems();
 
 	// Glam Cam: --------------------------------------------
@@ -1315,18 +1345,48 @@ function SetGameplayTabSelected()
 	// Show enemy health: --------------------------------------------
 	m_arrMechaItems[ePCTabGameplay_ShowEnemyHealth].UpdateDataCheckbox(m_strGameplayLabel_ShowEnemyHealth, "", m_kProfileSettings.Data.m_bShowEnemyHealth, UpdateShowEnemyHealth);
 
-	if(class'X2Action_MoveDirect'.default.bUseRunRateOption)
-	{
-		numOptions = ePCTabGameplay_Max;
-		// Adjust how fast units move around
-		m_arrMechaItems[ePCTabGameplay_UnitMoveSpeed].UpdateDataSlider(m_strGameplayLabel_UnitMoveSpeed, "", m_kProfileSettings.Data.UnitMovementSpeed * 100.0f, , UpdateMovementSpeed);
-	}
-	else
-	{
-		numOptions = ePCTabGameplay_Max -1;
+	// Adjust how fast units move around
+	m_arrMechaItems[ePCTabGameplay_EnableZipMode].UpdateDataCheckbox(m_strGameplayLabel_EnableZipMode, "", m_kProfileSettings.Data.bEnableZipMode, UpdateMovementSpeed);
+	m_arrMechaItems[ePCTabGameplay_EnableZipMode].BG.SetTooltipText(m_strGameplayLabel_EnableZipMode_Desc, , , 10, , , , 0.0f);
+
+	DLCInfos = `ONLINEEVENTMGR.GetDLCInfos(false);	
+
+	SliderMapping.Length = 0;
+	PartTemplateManager = class'X2BodyPartTemplateManager'.static.GetBodyPartTemplateManager();
+	PartPackNames = PartTemplateManager.GetPartPackNames();
+	for(Index = 1; Index < PartPackNames.Length; ++Index) //There will always be a NULL entry at the beginning of the list
+	{		
+		PartPackPresetIndex = m_kProfileSettings.Data.PartPackPresets.Find('PartPackName', PartPackNames[Index]);
+		if(PartPackPresetIndex == INDEX_NONE)
+		{
+			PartPackPresetIndex = m_kProfileSettings.Data.PartPackPresets.Length;
+			PartPackData.ChanceToSelect = 0.15f;
+			PartPackData.PartPackName = PartPackNames[Index];
+			m_kProfileSettings.Data.PartPackPresets.AddItem(PartPackData);
+		}
+
+		//Retrieve the localized string for this menu option from the DLC info object. Default to just using the DLC identifier if it did not provide nice strings
+		Label = string(PartPackNames[Index]);
+		Tooltip = "";
+		for(DLCInfoIndex = 0; DLCInfoIndex < DLCInfos.Length; ++DLCInfoIndex)
+		{
+			if(name(DLCInfos[DLCInfoIndex].DLCIdentifier) == PartPackNames[Index])
+			{
+				Label = DLCInfos[DLCInfoIndex].PartContentLabel;
+				Tooltip = DLCInfos[DLCInfoIndex].PartContentSummary;
+			}
+		}
+
+		MechaItemIndex = ePCTabGameplay_EnableZipMode + Index;
+		m_arrMechaItems[MechaItemIndex].UpdateDataSlider(Label, "", int(m_kProfileSettings.Data.PartPackPresets[PartPackPresetIndex].ChanceToSelect * 100.0f), , UpdatePartChance);
+		m_arrMechaItems[MechaItemIndex].BG.SetTooltipText(Tooltip, , , 10, , , , 0.0f);
+
+		Mapping.Slider = m_arrMechaItems[MechaItemIndex].Slider;
+		Mapping.PresetIndex = PartPackPresetIndex;
+		SliderMapping.AddItem(Mapping);
 	}
 
-	RenableMechaListItems(numOptions);
+	RenableMechaListItems(ePCTabGameplay_Max + PartPackNames.Length - 1);
 }
 
 function SetInterfaceTabSelected()
@@ -1642,9 +1702,27 @@ public function UpdateShowEnemyHealth(UICheckbox CheckboxControl)
 	m_bAnyValueChanged = true;
 }
 
-public function UpdateMovementSpeed(UISlider SliderControl)
+public function UpdateMovementSpeed(UICheckbox CheckboxControl)
 {
-	m_kProfileSettings.Data.UnitMovementSpeed = SliderControl.percent / 100.0f;
+	m_kProfileSettings.Data.bEnableZipMode = CheckboxControl.bChecked;
+	Movie.Pres.PlayUISound(eSUISound_MenuSelect);
+	m_bAnyValueChanged = true;
+}
+
+public function UpdatePartChance(UISlider SliderControl)
+{
+	local int Index;
+
+	//Use the slider control to find the correct pack preset index and set it
+	for(Index = 0; Index < SliderMapping.Length; ++Index)
+	{
+		if(SliderControl == SliderMapping[Index].Slider)
+		{
+			m_kProfileSettings.Data.PartPackPresets[SliderMapping[Index].PresetIndex].ChanceToSelect = SliderControl.percent / 100.0f;
+			break;
+		}
+	}
+	
 	Movie.Pres.PlayUISound(eSUISound_MenuSelect);
 	m_bAnyValueChanged = true;
 }
@@ -1655,7 +1733,10 @@ public function UpdateMovementSpeed(UISlider SliderControl)
 
 public function OpenKeyBindingsScreen(UIButton ButtonSource)
 {
-	Movie.Pres.UIKeybindingsPCScreen();
+	if( `XENGINE.m_SteamControllerManager.IsSteamControllerActive() )
+		`XENGINE.m_SteamControllerManager.ShowSteamControllerBindings();
+	else 
+		Movie.Pres.UIKeybindingsPCScreen();
 }
 
 public function UpdateSubtitles(UICheckbox CheckboxControl)
@@ -1746,7 +1827,7 @@ simulated function SetResolutionDropdown()
 
 simulated function SetSupportedResolutions()
 {
-	SetSupportedResolutionsNative(ModeSpinnerVal == 1);
+	SetSupportedResolutionsNative(ModeSpinnerVal == 0, ModeSpinnerVal == 1);
 
 	SetResolutionDropdown();
 }
@@ -1981,6 +2062,11 @@ simulated function ApplyPresetState(bool bCustom)
 		}
 	}
 
+	// apply additional presets here
+
+	// apply Max Visible Crew preset
+	m_kProfileSettings.Data.MaxVisibleCrew = MaxVisibleCrewConfig[PresetIndex];
+
 	m_bApplyingPreset = false;
 }
 
@@ -2085,7 +2171,7 @@ simulated public function GPUAutoDetectFinished()
 	SetGraphicsValsFromCurrentSettings();
 	ApplyPresetState(true);
 	SetPresetState();
-	m_bAnyValueChanged = false;
+	m_bAnyValueChanged = true;
 	Show();
 }
 
@@ -2133,6 +2219,11 @@ simulated public function SaveAndExitFinal()
 	if( m_bGammaChanged )
 	{
 		SaveGamma();
+	}
+
+	if( InitialMaxVisibleCrew != m_kProfileSettings.Data.MaxVisibleCrew )
+	{
+		`GAME.GetGeoscape().m_kBase.m_kCrewMgr.RepopulateBaseRoomsWithCrew();
 	}
 	
 	XComHUD(WorldInfo.GetALocalPlayerController().myHUD).SetGammaLogoDrawing(false);
@@ -2218,6 +2309,8 @@ simulated function SetSelectedTab( int iSelect )
 		XComHUD(WorldInfo.GetALocalPlayerController().myHUD).SetGammaLogoDrawing(true);
 	}
 	*/
+	//Clear the tooltips when switching tabs, else the previous tab tooltips may leak as cached data over on to the new tooltips. 
+	Movie.Pres.m_kTooltipMgr.RemoveTooltipByTarget(string(MCPath), true);
 
 	GPUAutoDetectButton.Hide();
 	switch(m_iCurrentTab)

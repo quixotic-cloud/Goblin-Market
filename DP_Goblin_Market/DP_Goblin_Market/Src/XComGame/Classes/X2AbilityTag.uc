@@ -37,6 +37,18 @@ event ExpandHandler(string InString, out string OutString)
 
 	switch (Type)
 	{
+		case 'CANNOTBEDODGED':
+			OutString = "";
+			AbilityState = XComGameState_Ability(ParseObj);
+			if (AbilityState != none)
+			{
+				ItemState = AbilityState.GetSourceWeapon();
+				if (ItemState != none && !ItemState.CanWeaponBeDodged())
+				{
+					OutString = class'XLocalizedData'.default.CannotBeDodged;
+				}
+			}
+			return;         //  not break, as it is valid for OutString to be blank in this case, and we don't want to redscreen.
 		case 'SELFAMMOCOST':
 			OutString = "0";
 			AbilityTemplate = X2AbilityTemplate(ParseObj);
@@ -141,6 +153,10 @@ event ExpandHandler(string InString, out string OutString)
 
 		case 'FACELESSREGEN':
 			OutString = string(class'X2Ability_Faceless'.default.REGENERATION_HEAL_VALUE);
+			break;
+
+		case 'FACELESSREGENMP':
+			OutString = string(class'X2Ability_Faceless'.default.REGENERATION_HEALMP_VALUE);
 			break;
 
 		case 'BERSERKERMELEERESISTANCE':
@@ -295,6 +311,20 @@ event ExpandHandler(string InString, out string OutString)
 			if( EffectState != None )
 			{
 				OutString = string(EffectState.iTurnsRemaining);
+			}
+			break;
+
+		case 'STUNNEDACTIONPOINTS':
+			TargetUnitState = XComGameState_Unit(ParseObj);
+			if( TargetUnitState.StunnedActionPoints + TargetUnitState.StunnedThisTurn > 0 )
+			{
+				OutString = string(TargetUnitState.StunnedActionPoints + TargetUnitState.StunnedThisTurn);
+			}
+			else
+			{
+				// possible we were stunned, but it was immediately removed. Show the action points the stun consumed
+				OutString = string(XComGameState_Unit(History.GetPreviousGameStateForObject(TargetUnitState)).ActionPoints.Length 
+								   - TargetUnitState.ActionPoints.Length);
 			}
 			break;
 
@@ -464,6 +494,31 @@ event ExpandHandler(string InString, out string OutString)
 			{
 				// Use the GameState check here because in Multiplayer games there is no History
 				OutString = TargetUnitState.GetItemInSlot(eInvSlot_PrimaryWeapon, GameState).GetMyTemplate().GetItemAbilityDescName();
+			}
+			break;
+
+		case 'SECONDARYWEAPONNAME':
+			if (StrategyParseObj != none)
+				TargetUnitState = XComGameState_Unit(StrategyParseObj);
+			else
+			{
+				AbilityState = XComGameState_Ability(ParseObj);
+				EffectState = XComGameState_Effect(ParseObj);
+				if (AbilityState != none)
+					TargetUnitState = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(AbilityState.OwnerStateObject.ObjectID));
+				else if (EffectState != none)
+					TargetUnitState = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(EffectState.ApplyEffectParameters.TargetStateObjectRef.ObjectID));
+				else
+				{
+					// If everything else fails, use a generic secondary weapon string
+					AbilityTemplate = X2AbilityTemplate(ParseObj);
+					OutString = AbilityTemplate.LocDefaultSecondaryWeapon;
+				}
+			}
+			if (TargetUnitState != none)
+			{
+				// Use the GameState check here because in Multiplayer games there is no History
+				OutString = TargetUnitState.GetItemInSlot(eInvSlot_SecondaryWeapon, GameState).GetMyTemplate().GetItemAbilityDescName();
 			}
 			break;
 	}

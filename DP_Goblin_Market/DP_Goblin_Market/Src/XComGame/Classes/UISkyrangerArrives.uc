@@ -95,7 +95,7 @@ simulated function BuildScreen()
 	BuildSkyrangerPanel();
 	BuildOptionsPanel();
 
-	if (!class'XComGameState_HeadquartersXCom'.static.IsObjectiveCompleted('T0_M7_WelcomeToGeoscape'))
+	if (!class'XComGameState_HeadquartersXCom'.static.IsObjectiveCompleted('T0_M7_WelcomeToGeoscape') || GetMission().GetMissionSource().DataName == 'MissionSource_Broadcast')
 	{
 		Button2.Hide();
 	}
@@ -134,7 +134,7 @@ simulated function OnLaunchClicked(UIButton button)
 }
 simulated function OnCancelClicked(UIButton button)
 {
-	if (class'XComGameState_HeadquartersXCom'.static.IsObjectiveCompleted('T0_M7_WelcomeToGeoscape'))
+	if (class'XComGameState_HeadquartersXCom'.static.IsObjectiveCompleted('T0_M7_WelcomeToGeoscape') && GetMission().GetMissionSource().DataName != 'MissionSource_Broadcast')
 	{
 		`HQPRES.UINarrative(XComNarrativeMoment'X2NarrativeMoments.Strategy.Avenger_Skyranger_Recalled');
 		GetMission().CancelMission();

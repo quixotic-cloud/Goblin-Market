@@ -224,20 +224,10 @@ function XComGameState ContextBuildGameState()
 	return NewGameState;
 }
 
-function OnSubmittedToReplay(XComGameState SubmittedGameState)
+function FillEffectsForReplay()
 {
-	local XComTacticalController TacticalController;
-	local XComGameState_Unit UnitState;
-	local XComGameState_Ability AbilityState;
-	local XComGameStateHistory History;
 	local X2AbilityTemplate AbilityTemplate;
 	local int x, y;
-
-	History = `XCOMHISTORY;
-
-	// Concealment must be updated on ability use
-	TacticalController = XComTacticalController(class'WorldInfo'.static.GetWorldInfo().GetALocalPlayerController());
-	TacticalController.m_kPathingPawn.MarkAllConcealmentCachesDirty();
 
 	// these effect references are not maintained across the save/load boundry.  Regular save/load doesn't really need them but replay really does
 	AbilityTemplate = class'XComGameState_Ability'.static.GetMyTemplateManager( ).FindAbilityTemplate( InputContext.AbilityTemplateName );
@@ -264,6 +254,22 @@ function OnSubmittedToReplay(XComGameState SubmittedGameState)
 			}
 		}
 	}
+}
+
+function OnSubmittedToReplay(XComGameState SubmittedGameState)
+{
+	local XComTacticalController TacticalController;
+	local XComGameState_Unit UnitState;
+	local XComGameState_Ability AbilityState;
+	local XComGameStateHistory History;
+
+	History = `XCOMHISTORY;
+
+	// Concealment must be updated on ability use
+	TacticalController = XComTacticalController(class'WorldInfo'.static.GetWorldInfo().GetALocalPlayerController());
+	TacticalController.m_kPathingPawn.MarkAllConcealmentCachesDirty();
+
+	FillEffectsForReplay();
 
 	foreach SubmittedGameState.IterateByClassType( class'XComGameState_Unit', UnitState )
 	{
@@ -423,6 +429,51 @@ private function InsertCinescriptCamera(out array<VisualizationTrack> Visualizat
 	}
 }
 
+private function ModifyTracks(XComGameState VisualizeState, out array<VisualizationTrack> VisualizationTracks)
+{
+	local int Index;
+	local int TrackIndex;
+	local VisualizationTrack ModifyTrack;
+
+	for( TrackIndex = 0; TrackIndex < VisualizationTracks.Length; ++TrackIndex )
+	{
+		ModifyTrack = VisualizationTracks[TrackIndex];
+		if( VisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == InputContext.PrimaryTarget.ObjectID )
+		{
+			EffectsModifyTracks(VisualizeState, ResultContext.TargetEffectResults, ModifyTrack);
+		}
+
+		if( VisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == InputContext.SourceObject.ObjectID )
+		{
+			EffectsModifyTracks(VisualizeState, ResultContext.ShooterEffectResults, ModifyTrack);
+		}
+
+		for( Index = 0; Index < InputContext.MultiTargets.Length; ++Index )
+		{
+			if( VisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == InputContext.MultiTargets[Index].ObjectID )
+			{
+				EffectsModifyTracks(VisualizeState, ResultContext.MultiTargetEffectResults[Index], ModifyTrack);
+			}
+		}
+
+		VisualizationTracks[TrackIndex] = ModifyTrack;
+	}
+}
+
+private function EffectsModifyTracks(XComGameState VisualizeState, EffectResults ResultEffects, out VisualizationTrack ModifyTrack)
+{
+	local int Index;
+	local X2Effect_Persistent PersistentEffect;
+
+	for( Index = 0; Index < ResultEffects.Effects.Length; ++Index )
+	{
+		PersistentEffect = X2Effect_Persistent(ResultEffects.Effects[Index]);
+		if( PersistentEffect != None )
+		{
+			PersistentEffect.ModifyTracksFn(VisualizeState, ModifyTrack, ResultEffects.ApplyResults[Index]);
+		}
+	}
+}
 
 /// <summary>
 /// Adds a track to play an artist defined Cinescript camera during the ability, if one exists.
@@ -732,6 +783,7 @@ protected function ContextBuildVisualization(out array<VisualizationTrack> Visua
 	local VisualizationTrack EmptyTrack;
 	local VisualizationTrack BuildTrack;
 	local XComGameState VisualizeState;	
+	local XComGameStateContext_Ability VisualizeAbilityContext;
 
 	AbilityTemplateManager = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager();
 	AbilityTemplate = AbilityTemplateManager.FindAbilityTemplate(InputContext.AbilityTemplateName);
@@ -754,6 +806,13 @@ protected function ContextBuildVisualization(out array<VisualizationTrack> Visua
 				VisualizeState = AssociatedState;
 			}
 
+			// we may have changed the visualization state that will be used to construct the visualization, so we have to update the context as well
+			VisualizeAbilityContext = XComGameStateContext_Ability(VisualizeState.GetContext());
+			if( VisualizeAbilityContext == None )
+			{
+				VisualizeAbilityContext = self;
+			}
+
 			AbilityTemplate.BuildVisualizationFn(VisualizeState, VisualizationTracks);
 
 			//Find the track representing the source of this ability. The source is automatically set to want time dilation. If other tracks should be dilated, it should
@@ -768,10 +827,12 @@ protected function ContextBuildVisualization(out array<VisualizationTrack> Visua
 			
 			AddVisualizationFromFutureGameStates(VisualizeState, VisualizationTracks, VisTrackInsertedInfoArray);
 
-			InsertAbilityPerkEvents(AbilityTemplate, VisualizationTracks);
-			InsertAbilityFOWRevealArea(AbilityTemplate, VisualizationTracks);
-			InsertCinescriptCamera(VisualizationTracks);
-			InsertSourceUnitLookAtAction(VisualizationTracks, AbilityTemplate);
+			ModifyTracks(VisualizeState, VisualizationTracks);
+
+			VisualizeAbilityContext.InsertAbilityPerkEvents(AbilityTemplate, VisualizationTracks);
+			VisualizeAbilityContext.InsertAbilityFOWRevealArea(AbilityTemplate, VisualizationTracks);
+			VisualizeAbilityContext.InsertCinescriptCamera(VisualizationTracks);
+			VisualizeAbilityContext.InsertSourceUnitLookAtAction(VisualizationTracks, AbilityTemplate);
 		}		
 	}
 	else

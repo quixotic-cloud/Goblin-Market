@@ -259,6 +259,8 @@ simulated function OnMouseEvent(int cmd, array<string> args)
 
 	// send a clicked callback
 	if( cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_UP )
+	   bHandled = Click();
+	else if( cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_UP_DELAYED && `XENGINE.m_SteamControllerManager.IsSteamControllerActive() )
 		bHandled = Click();
 	else if( cmd == class'UIUtilities_Input'.const.FXS_L_MOUSE_DOUBLE_UP )
 		bHandled = DoubleClick();

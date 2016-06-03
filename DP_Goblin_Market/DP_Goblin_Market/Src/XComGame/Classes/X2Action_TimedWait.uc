@@ -26,7 +26,7 @@ function bool IsTimedOut()
 simulated state Executing
 {
 Begin:
-	sleep(DelayTimeSec);
+	sleep(DelayTimeSec * GetDelayModifier());
 
 	CompleteAction();
 }

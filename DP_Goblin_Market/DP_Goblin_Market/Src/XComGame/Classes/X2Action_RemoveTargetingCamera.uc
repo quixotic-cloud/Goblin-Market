@@ -49,7 +49,7 @@ Begin:
 	{
 		// Give it a moment to settle back to the default camera (or whichever camera has priority). Otherwise the next action
 		// will begin mid-camera transition
-		Sleep(1.0);
+		Sleep(1.0 * GetDelayModifier());
 	}
 	bCameraRemovedCompleted = true;
 

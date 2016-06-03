@@ -23,9 +23,9 @@ native function GetBlastExtents(out TTile Min, out TTile Max);
 native function NativePreActivate();
 native function GetUnitsInBlastRadius(out array<XComGameState_Unit> Units);
 
-event PreActivate( )
+event PreActivateResponse( )
 {
-	super.PreActivate();
+	super.PreActivateResponse();
 
 	NativePreActivate();
 }

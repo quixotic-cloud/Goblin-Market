@@ -23,6 +23,7 @@ var config float WheelRotationMultiplier;
 simulated function SetActorPawn(Actor NewPawn, optional Rotator NewRotation)
 {
 	local Rotator ZeroRotation;
+	local XComHumanPawn HumanPawn;
 
 	ActorPawn = NewPawn;
 	if(ActorPawn != none)
@@ -34,6 +35,13 @@ simulated function SetActorPawn(Actor NewPawn, optional Rotator NewRotation)
 		ActorRotation = NewRotation;
 	else if(ActorRotation == ZeroRotation && ActorPawn != none)
 		ActorRotation = ActorPawn.Rotation;
+
+	HumanPawn = XComHumanPawn(ActorPawn);
+	if( HumanPawn != None )
+	{
+		HumanPawn.CustomizationRotation = ActorRotation;
+		HumanPawn.CustomizationRotationSet = true;
+	}
 }
 
 simulated function OnUpdate()
@@ -44,24 +52,27 @@ simulated function OnUpdate()
 	local Quat ResultRotation;
 	local Rotator RotatorLerp;
 	local float RotatorDiff;
-
-	if(ActorPawn != none)
+	local XComHumanPawn HumanPawn;
+	
+	HumanPawn = XComHumanPawn(ActorPawn);
+	if( ActorPawn != none && HumanPawn != None )
 	{
 		if(bRotatingPawn)
 		{
 			MouseDelta = Movie.Pres.m_kUIMouseCursor.m_v2MouseFrameDelta;
 			ActorRotation.Yaw += -1 * MouseDelta.X * DragRotationMultiplier;
 		}
-
+	
 		RotatorDiff = RDiff(ActorPawn.Rotation, ActorRotation);
 		if(Abs(RotatorDiff) > 1)
 		{
 			StartRotation = QuatFromRotator(ActorPawn.Rotation);
 			GoalRotation = QuatFromRotator(ActorRotation);
-
+	
 			ResultRotation = QuatSlerp(StartRotation, GoalRotation, 0.1f, true);
 			RotatorLerp = QuatToRotator(ResultRotation);
-			ActorPawn.SetRotation(RotatorLerp);
+			HumanPawn.CustomizationRotation = RotatorLerp;
+			HumanPawn.CustomizationRotationSet = true;
 		}
 	}
 }
@@ -114,16 +125,31 @@ simulated function bool OnUnrealCommand(int cmd, int arg)
 
 simulated function RotateInPlace(int Dir)
 {
+	local XComHumanPawn HumanPawn;
 	ActorRotation.Yaw += 45.0f * class'Object'.const.DegToUnrRot * WheelRotationMultiplier * Dir;
+	
+	HumanPawn = XComHumanPawn(ActorPawn);
+	if( HumanPawn != None )
+	{
+		HumanPawn.CustomizationRotationSet = false;
+	}
 }
 
 simulated function OnReceiveFocus()
 {
+	local XComHumanPawn HumanPawn;
+
 	super.OnReceiveFocus();
 	if(ActorPawn != none)
 	{
 		ActorRotation = ActorPawn.Rotation;
 		SetTimer(0.01f, true, nameof(OnUpdate));
+
+		HumanPawn = XComHumanPawn(ActorPawn);
+		if( HumanPawn != None )
+		{
+			HumanPawn.CustomizationRotationSet = false;
+		}
 	}
 }
 

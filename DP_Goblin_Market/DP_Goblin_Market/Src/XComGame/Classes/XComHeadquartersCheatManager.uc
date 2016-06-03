@@ -2277,8 +2277,14 @@ exec function TestItemCard()
 exec function DebugAnims( optional bool bEnable = true, optional bool bEnableDisplay = false, optional Name pawnName = '' )
 {
 	bDebugAnims = bEnable;              // Enables animation logging to internal memory buffer.
+	bDebugAnimsPawn = bEnable;
 
 	bDisplayAnims = bEnableDisplay;      // Displays logged animations to screen.
+
+	if( pawnName == 'all' )
+	{
+		pawnName = '';
+	}
 
 	m_DebugAnims_TargetName = pawnName;   // Debugs ONE unit only. Will write to screen && std-out.
 }

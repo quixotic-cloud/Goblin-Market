@@ -205,7 +205,7 @@ static function X2AbilityTemplate HackRewardShutdownRobotOrTurret( bool bTurret,
 
 	Template.AbilityTargetStyle = default.SimpleSingleTarget;
 
-	StunEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, 100);
+	StunEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, 100, false);
 	StunEffect.SetDisplayInfo(ePerkBuff_Penalty, class'X2StatusEffects'.default.RoboticStunnedFriendlyName, class'X2StatusEffects'.default.RoboticStunnedFriendlyDesc, "img:///UILibrary_PerkIcons.UIPerk_stun");
 	if( bTurret )
 	{
@@ -692,7 +692,7 @@ static function X2AbilityTemplate BuildDisorientAbility(Name TemplateName, Effec
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, TemplateName);
 
-	SelectedEffects.AddItem(class'X2StatusEffects'.static.CreateDisorientedStatusEffect());
+	SelectedEffects.AddItem(class'X2StatusEffects'.static.CreateDisorientedStatusEffect(, , false));
 
 	ApplyEffectsToTemplate(Template, TargetType, 0, SelectedEffects);
 

@@ -206,7 +206,7 @@ simulated function bool OnUnrealCommand(int ucmd, int arg)
 				bHandled = false;
 			break;
 
-		case (class'UIUtilities_Input'.const.FXS_DPAD_LEFT):
+		//case (class'UIUtilities_Input'.const.FXS_DPAD_LEFT):
 		case (class'UIUtilities_Input'.const.FXS_ARROW_LEFT):
 			if( UITacticalHUD(Owner).IsMenuRaised() )
 				CycleAbilitySelection(-1);
@@ -214,7 +214,7 @@ simulated function bool OnUnrealCommand(int ucmd, int arg)
 				bHandled = false;
 			break;
 
-		case (class'UIUtilities_Input'.const.FXS_DPAD_RIGHT):	
+		//case (class'UIUtilities_Input'.const.FXS_DPAD_RIGHT):	
 		case (class'UIUtilities_Input'.const.FXS_ARROW_RIGHT):
 			if( UITacticalHUD(Owner).IsMenuRaised() )
 				CycleAbilitySelection(1);	
@@ -376,28 +376,33 @@ simulated public function bool ConfirmAbility( optional AvailableAction Availabl
 	if(AvailableActionInfo.AbilityObjectRef.ObjectID <= 0)
 		return false;
 
-	TargetIndex = TargetingMethod.GetTargetIndex();
+	if( TargetingMethod != none ) 
+		TargetIndex = TargetingMethod.GetTargetIndex();
+
 	//overwrite Targeting Method which does not exist for cases such as opening of doors
 	if(AvailableActionInfo.AvailableTargetCurrIndex > 0)
 	{
 		TargetIndex = AvailableActionInfo.AvailableTargetCurrIndex;
 	}
-
-	TargetingMethod.GetTargetLocations(TargetLocations);
-	if(TargetingMethod.GetAdditionalTargets(AdditionalTarget))
+	if( TargetingMethod != none )
 	{
-		AvailableActionInfo.AvailableTargets.AddItem(AdditionalTarget);
-	}
+		TargetingMethod.GetTargetLocations(TargetLocations);
+		if( TargetingMethod.GetAdditionalTargets(AdditionalTarget) )
+		{
+			AvailableActionInfo.AvailableTargets.AddItem(AdditionalTarget);
+		}
 
-	if (AvailableActionInfo.AvailableCode == 'AA_Success')
-	{
-		AvailableActionInfo.AvailableCode = TargetingMethod.ValidateTargetLocations(TargetLocations);
+		if (AvailableActionInfo.AvailableCode == 'AA_Success')
+		{
+			AvailableActionInfo.AvailableCode = TargetingMethod.ValidateTargetLocations(TargetLocations);
+		}
 	}
 	
 	// Cann't activate the ability, so bail out
 	if(AvailableActionInfo.AvailableCode != 'AA_Success')
 	{
 		Movie.Pres.PlayUISound(eSUISound_MenuClickNegative);
+		m_iCurrentIndex = -1;
 		return false;
 	}
 
@@ -435,10 +440,10 @@ simulated public function bool ConfirmAbility( optional AvailableAction Availabl
 
 		PC.SetInputState('ActiveUnit_Moving');
 
-		m_iCurrentIndex = -1;
-
 		`Pres.m_kUIMouseCursor.HideMouseCursor();
 	}
+
+	m_iCurrentIndex = -1;
 
 	return bSubmitSuccess;
 }
@@ -878,25 +883,22 @@ simulated function CycleAbilitySelectionRow(int step)
 simulated function bool GetDefaultTargetingAbility(int TargetObjectID, out AvailableAction DefaultAction, optional bool SelectReloadLast = false)
 {
 	local int i, j;
-	local string AbilityName;
+	local name AbilityName;
 	local AvailableAction AbilityAction;
+	local AvailableAction ReloadAction;
+	local X2AbilityTemplate AbilityTemplate;
+	local X2AbilityCost AbilityCost;
 
 	for(i = 0; i < m_arrAbilities.Length; i++)
 	{
 		AbilityAction = m_arrAbilities[i];
-		AbilityName = class'XGAIBehavior'.static.GetAbilityName(AbilityAction);
+		AbilityName = name(class'XGAIBehavior'.static.GetAbilityName(AbilityAction));
 
-		// If player has enough ammo for standard shot, select that, otherwise select reload ability
-		if(AbilityName == "Reload" && AbilityAction.ShotHUDPriority == class'UIUtilities_Tactical'.const.MUST_RELOAD_PRIORITY)
+		// We'll want to default to the reload action if the user doesn't have enough ammo for the default ability
+		if(AbilityName == 'Reload' && AbilityAction.ShotHUDPriority == class'UIUtilities_Tactical'.const.MUST_RELOAD_PRIORITY)
 		{
+			ReloadAction = AbilityAction;
 			DefaultAction = AbilityAction;
-
-			if( SelectReloadLast )
-			{
-				continue;
-			}
-
-			return true;
 		}
 
 		// Find the first available ability that includes the enemy as a target
@@ -906,6 +908,23 @@ simulated function bool GetDefaultTargetingAbility(int TargetObjectID, out Avail
 			{
 				if(AbilityAction.AvailableTargets[j].PrimaryTarget.ObjectID == TargetObjectID)
 				{
+					// if this action requires ammo, and we need to reload, select the reload action instead
+					if(!SelectReloadLast && ReloadAction.AbilityObjectRef.ObjectID > 0)
+					{
+						AbilityTemplate = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager().FindAbilityTemplate(AbilityName);
+						`assert(AbilityTemplate != none);
+
+						foreach AbilityTemplate.AbilityCosts(AbilityCost)
+						{
+							if(X2AbilityCost_Ammo(AbilityCost) != none)
+							{
+								DefaultAction = ReloadAction;
+								return true;
+							}
+						}
+					}
+				
+					// don't need to reload, so use this ability
 					DefaultAction = AbilityAction;
 					return true;
 				}
@@ -1139,6 +1158,7 @@ simulated function bool SetAbilityByIndex( int AbilityIndex, optional bool Activ
 	local GameRulesCache_Unit	UnitInfoCache;
 	local int                   PreviousIndex;
 	local int                   DefaultTargetIndex;
+	local name					PreviousInptuState;
 
 	if(AbilityIndex == m_iCurrentIndex)
 		return false; // we are already using this ability
@@ -1203,6 +1223,7 @@ simulated function bool SetAbilityByIndex( int AbilityIndex, optional bool Activ
 	}
 
 	// make sure our input is in the right mode
+	PreviousInptuState = XComTacticalInput(PC.PlayerInput).GetStateName();
 	XComTacticalInput(PC.PlayerInput).GotoState('UsingTargetingMethod');
 
 	if(AvailableActionInfo.AvailableTargets.Length > 0 || AvailableActionInfo.bFreeAim)
@@ -1215,7 +1236,9 @@ simulated function bool SetAbilityByIndex( int AbilityIndex, optional bool Activ
 
 	if (AbilityState.GetMyTemplate().bNoConfirmationWithHotKey && ActivatedViaHotKey)
 	{
-		OnAccept();
+		// if the OnAccept fails, because unavailable or other similar reasons, we need to put the input state back. 
+		if( !OnAccept() )
+			XComTacticalInput(PC.PlayerInput).GotoState(PreviousInptuState);
 		return true;
 	}
 

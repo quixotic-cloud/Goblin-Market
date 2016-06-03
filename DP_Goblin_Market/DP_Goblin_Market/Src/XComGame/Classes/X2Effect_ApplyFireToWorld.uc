@@ -59,6 +59,9 @@ static simulated event AddLDEffectToTiles( name EffectName, XComGameState NewGam
 	local int Index, SmokeIndex;
 	local array<TileIsland> TileIslands;
 	local array<TileParticleInfo> FireTileParticleInfos;
+	local XComWorldData WorldData;
+
+	WorldData = `XWORLD;
 
 	FireTileUpdate = XComGameState_WorldEffectTileData( NewGameState.CreateStateObject( class'XComGameState_WorldEffectTileData' ) );
 	FireTileUpdate.WorldEffectClassName = EffectName;
@@ -86,7 +89,8 @@ static simulated event AddLDEffectToTiles( name EffectName, XComGameState NewGam
 		SmokeTile = Tiles[ Index ];
 		// Create tile data smoke flags for some/all of the tiles in the fire's column.
 		// The higher up we go the shorter it lasts (matching up with the effect).
-		for (SmokeIndex = 0; SmokeIndex < 11; ++SmokeIndex)
+		// And we should extend past the top of the level
+		for (SmokeIndex = 0; (SmokeIndex < 11) && (SmokeTile.Tile.Z < WorldData.NumZ); ++SmokeIndex)
 		{
 			if ((SmokeIndex == 3) || (SmokeIndex == 4) || (SmokeIndex == 8))
 			{
@@ -127,6 +131,9 @@ static simulated function SharedApplyFireToTiles( Name EffectName, X2Effect_Appl
 	local array<TileIsland> TileIslands;
 	local array<TileParticleInfo> FireTileParticleInfos;
 	local float FireChanceTotal, FireLevelRand;
+	local XComWorldData WorldData;
+
+	WorldData = `XWORLD;
 
 	FireChanceTotal = FireEffect.FireChance_Level1 + FireEffect.FireChance_Level2 + FireEffect.FireChance_Level3;
 
@@ -197,7 +204,8 @@ static simulated function SharedApplyFireToTiles( Name EffectName, X2Effect_Appl
 
 		// Create tile data smoke flags for some/all of the tiles in the fire's column.
 		// The higher up we go the shorter it lasts (matching up with the effect).
-		for (SmokeIndex = 0; SmokeIndex < 11; ++SmokeIndex)
+		// And we should extend past the top of the level
+		for (SmokeIndex = 0; (SmokeIndex < 11) && (SmokeTile.Tile.Z < WorldData.NumZ); ++SmokeIndex)
 		{
 			if ((SmokeIndex == 3) || (SmokeIndex == 4) || (SmokeIndex == 8))
 			{
@@ -423,6 +431,8 @@ event AddWorldEffectTickEvents( XComGameState NewGameState, XComGameState_WorldE
 	if (DestroyedTiles.Length > 0)
 	{
 		DamageEvent = XComGameState_EnvironmentDamage( NewGameState.CreateStateObject(class'XComGameState_EnvironmentDamage') );
+
+		DamageEvent.DEBUG_SourceCodeLocation = "UC: X2Effect_ApplyFireToWorld:AddWorldEffectTickEvents()";
 
 		DamageEvent.DamageTypeTemplateName = 'Fire';
 		DamageEvent.bRadialDamage = false;

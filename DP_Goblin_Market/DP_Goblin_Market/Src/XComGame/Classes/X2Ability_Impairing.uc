@@ -22,6 +22,7 @@ static function X2DataTemplate CreateApplyImpairingEffectAbility()
 	local X2Effect_Persistent               DisorientedEffect;
 	local X2Effect_Stunned				    StunnedEffect;
 	local X2Effect_Persistent               UnconsciousEffect;
+	local X2Condition_UnitProperty          UnitPropertyCondition;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, default.ImpairingAbilityName);
 
@@ -37,7 +38,15 @@ static function X2DataTemplate CreateApplyImpairingEffectAbility()
 
 	// Target Conditions
 	//
-	Template.AbilityTargetConditions.AddItem(default.LivingTargetUnitOnlyProperty);
+	UnitPropertyCondition = new class'X2Condition_UnitProperty';
+	UnitPropertyCondition.ExcludeImpaired = true;
+	UnitPropertyCondition.ExcludeAlive = false;
+	UnitPropertyCondition.ExcludeDead = true;
+	UnitPropertyCondition.ExcludeFriendlyToSource = false;
+	UnitPropertyCondition.ExcludeHostileToSource = false;
+	UnitPropertyCondition.FailOnNonUnits = true;
+
+	Template.AbilityTargetConditions.AddItem(UnitPropertyCondition);
 	Template.AbilityTargetConditions.AddItem(default.GameplayVisibilityCondition);
 
 	// Shooter Conditions
@@ -53,21 +62,21 @@ static function X2DataTemplate CreateApplyImpairingEffectAbility()
 
 	// On hit effects
 	//  Stunned effect for 1 or 2 unblocked hit
-	DisorientedEffect = class'X2StatusEffects'.static.CreateDisorientedStatusEffect();
+	DisorientedEffect = class'X2StatusEffects'.static.CreateDisorientedStatusEffect(, , false);
 	DisorientedEffect.MinStatContestResult = 1;
 	DisorientedEffect.MaxStatContestResult = 2;
 	DisorientedEffect.bRemoveWhenSourceDies = false;
 	Template.AddTargetEffect(DisorientedEffect);
 
 	//  Stunned effect for 3 or 4 unblocked hit
-	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(1, 100);
+	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, 100, false);
 	StunnedEffect.MinStatContestResult = 3;
 	StunnedEffect.MaxStatContestResult = 4;
 	StunnedEffect.bRemoveWhenSourceDies = false;
 	Template.AddTargetEffect(StunnedEffect);
 
 	//  Unconscious effect for 5 unblocked hits
-	UnconsciousEffect = class'X2StatusEffects'.static.CreateUnconsciousStatusEffect(true);
+	UnconsciousEffect = class'X2StatusEffects'.static.CreateUnconsciousStatusEffect();
 	UnconsciousEffect.MinStatContestResult = 5;
 	UnconsciousEffect.MaxStatContestResult = 0;
 	UnconsciousEffect.bRemoveWhenSourceDies = false;
@@ -89,6 +98,7 @@ static function ImpairingAbilityEffectTriggeredVisualization(XComGameState Visua
 	local bool bAbilityWasSuccess;
 	local X2AbilityTemplate AbilityTemplate;
 	local X2VisualizerInterface TargetVisualizerInterface;
+	local XComGameStateVisualizationMgr VisualizationMgr;
 
 	if( (EffectApplyResult != 'AA_Success') || (XComGameState_Unit(BuildTrack.StateObject_NewState) == none) )
 	{
@@ -101,6 +111,7 @@ static function ImpairingAbilityEffectTriggeredVisualization(XComGameState Visua
 	if( AbilityContext.EventChainStartIndex != 0 )
 	{
 		History = `XCOMHISTORY;
+		VisualizationMgr = `XCOMVISUALIZATIONMGR;
 
 		// This GameState is part of a chain, which means there may be a stun to the target
 		for( i = AbilityContext.EventChainStartIndex; !Context.bLastEventInChain; ++i )
@@ -110,10 +121,22 @@ static function ImpairingAbilityEffectTriggeredVisualization(XComGameState Visua
 			TestAbilityContext = XComGameStateContext_Ability(Context);
 			bAbilityWasSuccess = (TestAbilityContext != none) && class'XComGameStateContext_Ability'.static.IsHitResultHit(TestAbilityContext.ResultContext.HitResult);
 
+			// Continue if
+			// The TestAbilityContext exists and was successful
+			// AND
+			// The TestAbility is the Impairing Ability
+			// AND
+			// The TestAbility and Original Ability have the same source
+			// AND
+			// The TestAbility's primary target and BuildTrack's unit are the same
+			// AND
+			// The primary targets are the same OR the Impairing Ability's target is in the Original Ability's MultiTargets
 			if( bAbilityWasSuccess &&
 				TestAbilityContext.InputContext.AbilityTemplateName == default.ImpairingAbilityName &&
 				TestAbilityContext.InputContext.SourceObject.ObjectID == AbilityContext.InputContext.SourceObject.ObjectID &&
-				TestAbilityContext.InputContext.PrimaryTarget.ObjectID == AbilityContext.InputContext.PrimaryTarget.ObjectID )
+				TestAbilityContext.InputContext.PrimaryTarget.ObjectID == BuildTrack.StateObject_NewState.ObjectID &&
+				(TestAbilityContext.InputContext.PrimaryTarget.ObjectID == AbilityContext.InputContext.PrimaryTarget.ObjectID ||
+				 AbilityContext.InputContext.MultiTargets.Find('ObjectID', TestAbilityContext.InputContext.PrimaryTarget.ObjectID) != INDEX_NONE) )
 			{
 				// The Melee Impairing Ability has been found with the same source and target
 				// Move that ability's visualization forward to this track
@@ -131,7 +154,7 @@ static function ImpairingAbilityEffectTriggeredVisualization(XComGameState Visua
 				}
 
 				//Notify the visualization mgr that the Impairing Ability visualization has occured
-				`XCOMVISUALIZATIONMGR.SkipVisualization(TestAbilityContext.AssociatedState.HistoryIndex);
+				VisualizationMgr.SkipVisualization(TestAbilityContext.AssociatedState.HistoryIndex);
 			}
 		}
 	}

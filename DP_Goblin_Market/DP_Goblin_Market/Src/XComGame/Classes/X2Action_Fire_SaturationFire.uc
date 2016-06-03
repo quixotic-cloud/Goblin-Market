@@ -310,7 +310,7 @@ Begin:
 		XGUnit(PrimaryTarget).GetPawn().UpdatePawnVisibility();
 
 		// Sleep long enough for the fog to be revealed
-		Sleep(1.0f);
+		Sleep(1.0f * GetDelayModifier());
 	}
 
 	Unit.CurrentFireAction = self;

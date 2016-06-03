@@ -26,7 +26,8 @@ var localized string m_strRookiePromoteTooltip;
 var localized string m_strNoImplantsTooltip;
 var localized string m_strNoGTSTooltip;
 var localized string m_strNoModularWeaponsTooltip;
-var localized string m_strNoWeaponUprgadesTooltip;
+var localized string m_strCannotUpgradeWeaponTooltip;
+var localized string m_strNoWeaponUpgradesTooltip;
 var localized string m_strInsufficientRankForImplantsTooltip;
 var localized string m_strCombatSimsSlotsFull;
 
@@ -111,12 +112,14 @@ simulated function PopulateData()
 
 	if( !WeaponUpgradeAvailabilityData.bHasModularWeapons )
 		WeaponUpgradeTooltip = m_strNoModularWeaponsTooltip;
+	else if( !WeaponUpgradeAvailabilityData.bCanWeaponBeUpgraded )
+		WeaponUpgradeTooltip = m_strCannotUpgradeWeaponTooltip;
 	else if( !WeaponUpgradeAvailabilityData.bHasWeaponUpgrades )
-		WeaponUpgradeTooltip = m_strNoWeaponUprgadesTooltip;
+		WeaponUpgradeTooltip = m_strNoWeaponUpgradesTooltip;
 	
 	WeaponsOption = m_strCustomizeWeapon;
 
-	bEnableWeaponUpgradeOption = WeaponUpgradeAvailabilityData.bHasModularWeapons && !bInTutorialPromote;
+	bEnableWeaponUpgradeOption = WeaponUpgradeAvailabilityData.bHasModularWeapons && WeaponUpgradeAvailabilityData.bCanWeaponBeUpgraded && !bInTutorialPromote;
 	ListItem = Spawn(class'UIListItemString', List.ItemContainer).InitListItem(WeaponsOption).SetDisabled(!bEnableWeaponUpgradeOption, WeaponUpgradeTooltip);
 	
 	if( WeaponUpgradeAvailabilityData.bHasWeaponUpgrades && WeaponUpgradeAvailabilityData.bHasWeaponUpgradeSlotsAvailable && WeaponUpgradeAvailabilityData.bHasModularWeapons)

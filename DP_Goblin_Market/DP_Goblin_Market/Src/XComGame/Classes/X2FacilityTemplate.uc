@@ -74,6 +74,7 @@ var (Display) Delegate<CalculateStaffingRequirement> CalculateStaffingRequiremen
 var (Display) Delegate<IsFacilityProjectActive> IsFacilityProjectActiveFn; // Is this facility running a timed project
 var (Display) Delegate<GetQueueMessage> GetQueueMessageFn; // What is the current status of the facility
 var (Display) Delegate<NeedsAttentionDelegate> NeedsAttentionFn;
+var (Display) Delegate<UpdateFacilityPropsDelegate> UpdateFacilityPropsFn;
 
 delegate SelectFacilityDelegate(StateObjectReference FacilityRef, optional bool bForceInstant = false);
 delegate OnFacilityBuiltDelegate(StateObjectReference FacilityRef);
@@ -85,6 +86,7 @@ delegate LeaveFacilityInterruptDelegate(StateObjectReference FacilityRef);
 delegate bool IsFacilityProjectActive(StateObjectReference FacilityRef);
 delegate string GetQueueMessage(StateObjectReference FacilityRef);
 delegate bool NeedsAttentionDelegate(StateObjectReference FacilityRef);
+delegate UpdateFacilityPropsDelegate(StateObjectReference FacilityRef, XGBase Base);
 
 
 //---------------------------------------------------------------------------------------

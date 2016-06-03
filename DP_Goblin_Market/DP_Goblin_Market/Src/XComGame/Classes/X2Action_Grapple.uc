@@ -88,6 +88,15 @@ Begin:
 	CompleteAction();
 }
 
+function CompleteAction()
+{
+	super.CompleteAction();
+
+	// since we step out of and step into cover from different tiles, 
+	// need to set the enter cover restore to the destination location
+	Unit.RestoreLocation = DesiredLocation;
+}
+
 defaultproperties
 {
 	ProjectileHit = false;

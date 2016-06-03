@@ -239,10 +239,10 @@ private static function XComGameState_Unit CreateDebugUnit(XComGameStateHistory 
 	NewGameState = History.CreateNewGameState(true, NewGameStateContext);
 
 	// generate a debug unit
-	CharacterGenerator = `XCOMGRI.Spawn(class'XGCharacterGenerator');
-
 	CharTemplate = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager().FindCharacterTemplate('Soldier');
 	`assert(CharTemplate != none);
+	CharacterGenerator = `XCOMGRI.Spawn(CharTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	Unit = CharTemplate.CreateInstanceFromTemplate(NewGameState);
 	

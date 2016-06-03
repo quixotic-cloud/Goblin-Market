@@ -75,7 +75,7 @@ private:
 native function ShowIcons(const bool bShow);
 native function UpdateInteractIcons();
 
-native function UpdateCursorLocation(optional const bool bForceRefresh=false);
+native function UpdateCursorLocation(optional const bool bForceRefresh=false, optional const bool bNonPathing=false);
 
 native function ClearCoverIcons();
 native function ClearLadderIcons();

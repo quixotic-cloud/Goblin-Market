@@ -180,6 +180,7 @@ static function array<X2DataTemplate> CreateTemplates()
 
 	Objectives.AddItem(CreateS0_RevealAvatarProjectTemplate());
 	Objectives.AddItem(CreateS1_ShortenFirstPOITemplate());
+	Objectives.AddItem(CreateS2_SpawnFirstPOITemplate());
 
 	/////////////////////////////////////////////////
 
@@ -1356,7 +1357,7 @@ function TutorialKickToBridge()
 	local XComGameState NewGameState;
 
 	HQPres = `HQPRES;
-	HQPres.ScreenStack.PopUntilClass(class'UIFacility_Armory');
+	HQPres.ScreenStack.PopUntilFirstInstanceOfClass(class'UIFacility_Armory');
 	CurrentScreen = UIFacility_Armory(HQPres.ScreenStack.GetCurrentScreen());
 	CurrentScreen.LeaveArmory();
 
@@ -1961,8 +1962,10 @@ static function X2DataTemplate CreateT0_M11_S1_WaitForRadioRelaysTemplate()
 function UnlockNormalRegion()
 {
 	local XComGameStateHistory History;
+	local XComGameState NewGameState;
 	local XComGameState_WorldRegion RegionState;
 	local XComGameState_MissionSite MissionState;
+	local bool bRegionFound;
 
 	History = `XCOMHISTORY;
 	
@@ -1974,13 +1977,24 @@ function UnlockNormalRegion()
 			{
 				if (RegionState.bUnlockedPopup && RegionState.GetReference() != MissionState.Region)
 				{
+					bRegionFound = true;
 					break;
 				}
 			}
 		}
 	}
 
-	RegionState.UnlockPopup();
+	// If a non-Blacksite region is not found to unlock, trigger the unlock event so the tutorial sequence can continue
+	if (!bRegionFound)
+	{
+		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Region Unlocked");
+		`XEVENTMGR.TriggerEvent('RegionUnlocked', , , NewGameState);
+		`GAMERULES.SubmitGameState(NewGameState);
+	}
+	else
+	{
+		RegionState.UnlockPopup();
+	}
 }
 
 function UnlockBlacksiteRegion()
@@ -2059,6 +2073,7 @@ static function X2DataTemplate CreateT1_M0_FirstMissionTemplate()
 	Template.NextObjectives.AddItem('T2_M0_L0_BlacksiteReveal');
 	Template.NextObjectives.AddItem('N_InDropPosition');
 	Template.NextObjectives.AddItem('S1_ShortenFirstPOI');
+	Template.NextObjectives.AddItem('S2_SpawnFirstPOI');
 	Template.NextObjectives.AddItem('N_CentralObjectiveAdded');
 	Template.NextObjectives.AddItem('T1_M1_AlienBiotech');
 
@@ -3964,6 +3979,22 @@ static function X2DataTemplate CreateS1_ShortenFirstPOITemplate()
 
 	// No triggers, only used to shorten the length of the first POI
 
+	return Template;
+}
+
+static function X2DataTemplate CreateS2_SpawnFirstPOITemplate()
+{
+	local X2ObjectiveTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2ObjectiveTemplate', Template, 'S2_SpawnFirstPOI');
+	Template.bMainObjective = true;
+	Template.bNeverShowObjective = true;
+	
+	// The SpawnFirst POI event should only trigger in games where Beginner VO is turned off
+	Template.CompletionEvent = 'SpawnFirstPOI';
+
+	Template.AddNarrativeTrigger("", NAW_OnAssignment, 'SpawnFirstPOI', '', ELD_OnStateSubmitted, NPC_Once, '', SpawnFirstPOI);
+	
 	return Template;
 }
 

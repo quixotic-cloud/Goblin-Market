@@ -273,7 +273,7 @@ simulated function OnMenuButtonClicked(UIButton button)
 	switch( button.MCName )
 	{
 	case 'Tactical': 
-		`XCOMHISTORY.ResetHistory();
+		`XCOMHISTORY.ResetHistory( , false);
 		ConsoleCommand("open TacticalQuickLaunch");
 		break;
 	case 'Strategy':
@@ -414,6 +414,8 @@ simulated function OnReceiveFocus()
 		Movie.DeactivateMouse();
 
 	XComShellPresentationLayer(Movie.Pres).Get3DMovie().ShowDisplay('UIShellBlueprint');
+	//Use the panel version 
+	super(UIPanel).AnimateIn();
 }
 
 

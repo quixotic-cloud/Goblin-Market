@@ -16,9 +16,9 @@ var EDecoratorType m_eDecType;
 var int RandValue, RolledValue;
 var delegate<BTDecoratorDelegate> m_dDecoratorFn;
 
+const MAX_REPEAT_DECORATOR_ITERATIONS = 128; // Abort RepeatUntilFail decorator after this many repeats.
 
 var string DebugDetailText; // For debug only
-
 delegate bt_status BTDecoratorDelegate();       
 
 static event EDecoratorType GetDecTypeFromName( name strType )
@@ -159,7 +159,7 @@ function bt_status RepeatUntilFail()
 {
 	local bt_status ChildStatus;
 	local int iMaxIterations, iIterations;
-	iMaxIterations = 50;
+	iMaxIterations = MAX_REPEAT_DECORATOR_ITERATIONS;
 	do
 	{
 		ChildStatus = m_Child.Run(m_kRef.ObjectID, m_iLastInit);
@@ -169,6 +169,7 @@ function bt_status RepeatUntilFail()
 	if (iIterations > iMaxIterations)
 	{
 		`Log("Error - exceeded max iterations!  Failed!  (this should not fail.)");
+		`RedScreen("AIBTDecorator RepeatUntilFail exceeded MaxIterations! ("$iMaxIterations$") - NodeName="@m_strName@" -ACHENG");
 		return BTS_FAILURE;
 	}
 	return BTS_SUCCESS;

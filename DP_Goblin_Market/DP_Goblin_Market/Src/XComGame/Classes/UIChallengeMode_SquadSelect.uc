@@ -45,11 +45,10 @@ class UIChallengeMode_SquadSelect extends UIScreen;
 var UIPanel							    m_kAllContainer;
 var UIX2PanelHeader						m_MissionHeader;
 var UIBGBox                             m_MissionHeaderBox;
-var UIX2PanelHeader						m_ObjectiveHeader;
-var UIBGBox                             m_ObjectiveHeaderBox;
-// var UIX2PanelHeader						m_TacticalOptionsHeader;
-// var UIBGBox                             m_TacticalOptionsHeaderBox;
-
+// var UIX2PanelHeader					m_TacticalOptionsHeader;
+// var UIBGBox                          m_TacticalOptionsHeaderBox;
+var UIX2PanelHeader                     m_ObjectiveHeader;		// DEPRECATED bsteiner 3/24/2016
+var UIBGBox                             m_ObjectiveHeaderBox;	// DEPRECATED bsteiner 3/24/2016
 
 //--------------------------------------------------------------------------------------- 
 // UI Objects
@@ -59,7 +58,6 @@ var UIBGBox                             m_ObjectiveHeaderBox;
 var UIButton							m_BackButton;
 var UIButton							m_ViewMedalsButton;
 var UIButton							m_AcceptChallengeButton;
-var array<UIChallengeMode_UnitSlot>     m_arrUnitSlots;
 var UIDropdown							m_IntervalDropdown;	        // List of all returned Intervals - TEMP
 
 
@@ -75,6 +73,11 @@ var localized string					m_strBoostActiveLabel;
 var localized string                    m_strBackButtonLabel;
 var localized string					m_strViewMedalsButtonLabel;
 var localized string					m_strAcceptChallengeButtonLabel;
+var localized string					m_strMostlyTag;	
+var array<UIChallengeMode_UnitSlot>     m_arrUnitSlots;	// DEPRECATED bsteiner 3/24/2016
+
+var localized string					m_strDifficultyLabel;
+var localized string					m_strLocationLabel;
 
 var UIText								m_ObjectiveText;
 
@@ -111,26 +114,33 @@ var X2TacticalChallengeModeManager    ChallengeModeManager;
 //==============================================================================
 simulated function CacheUpdate()
 {
+	local XComChallengeModeManager ChallengesManager;
+	local int ChallengeIdx, PlayerSeedId, DropdownIdx;
 	History = `XCOMHISTORY;
 	OnlineSub = Class'GameEngine'.static.GetOnlineSubsystem();
 	OnlineEventMgr = `ONLINEEVENTMGR;
 	ChallengeModeInterface = `CHALLENGEMODE_INTERFACE;
+	ChallengesManager = XComEngine(Class'GameEngine'.static.GetEngine()).ChallengeModeManager;
 
 	if (m_arrIntervals.Length > 0)
 	{
-		History.ReadHistoryFromChallengeModeManager(int(m_IntervalDropdown.GetSelectedItemData()));
-		m_BattleData = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
-		m_ChallengeData = XComGameState_ChallengeData(History.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData'));
-		m_ObjectivesList = XComGameState_ObjectivesList(History.GetSingleGameStateObjectForClass(class'XComGameState_ObjectivesList'));
+		DropdownIdx = int(m_IntervalDropdown.GetSelectedItemData());
+		PlayerSeedId = m_arrIntervals[DropdownIdx].IntervalSeedID.A;
+		ChallengeIdx = ChallengesManager.FindChallengeIndex(PlayerSeedId);
+		`log(`location @ `ShowVar(PlayerSeedId) @ `ShowVar(ChallengeIdx),,'FiraxisLive');
+		if( ChallengeIdx > -1 )
+		{
+			History.ReadHistoryFromChallengeModeManager(ChallengeIdx);
+			m_BattleData = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
+			m_ChallengeData = XComGameState_ChallengeData(History.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData'));
+			m_ObjectivesList = XComGameState_ObjectivesList(History.GetSingleGameStateObjectForClass(class'XComGameState_ObjectivesList'));
+		}
 	}
 }
 
 simulated function InitScreen( XComPlayerController InitController, UIMovie InitMovie, optional name InitName )
 {
-	local int ButtonWidth, FooterButtonYSpacing, UnitSlotWidth, UnitSlotHeight, UnitSlotXSpacing, HeaderYSpacing, NextX, NextY;
-	local int UnitSlotIdx;
-	UnitSlotXSpacing = 10;
-	HeaderYSpacing = 25;
+	local int ButtonWidth, FooterButtonYSpacing;
 	FooterButtonYSpacing = 25;
 	ButtonWidth = 150;
 
@@ -150,44 +160,7 @@ simulated function InitScreen( XComPlayerController InitController, UIMovie Init
 	// Create Header/Mission Section
 	//
 	m_MissionHeaderBox = Spawn(class'UIBGBox', m_kAllContainer).InitBG('', 0, 0, m_kAllContainer.width, 75).SetBGColor("gray");
-	NextY = m_MissionHeaderBox.Y + m_MissionHeaderBox.Height + HeaderYSpacing;
-
-	m_MissionHeader = Spawn(class'UIX2PanelHeader', m_kAllContainer);
-	m_MissionHeader.InitPanelHeader('', " ", " ");
-	m_MissionHeader.SetHeaderWidth(m_kAllContainer.width - 20);
-	m_MissionHeader.SetPosition(m_MissionHeaderBox.X + 10, m_MissionHeaderBox.Y + 10);
-
-
-	//
-	// Create Objectives Section
-	//
-	m_ObjectiveHeaderBox = Spawn(class'UIBGBox', m_kAllContainer).InitBG('', 0, NextY, m_kAllContainer.width, 225).SetBGColor("gray");
-	NextY = m_ObjectiveHeaderBox.Y + m_ObjectiveHeaderBox.Height + HeaderYSpacing;
-
-	m_ObjectiveHeader = Spawn(class'UIX2PanelHeader', m_kAllContainer);
-	m_ObjectiveHeader.InitPanelHeader('', m_strObjectiveTitle, "");
-	m_ObjectiveHeader.SetHeaderWidth(m_kAllContainer.width - 20);
-	m_ObjectiveHeader.SetPosition(m_ObjectiveHeaderBox.X + 10, m_ObjectiveHeaderBox.Y + 10);
-
-	m_ObjectiveText = Spawn(class'UIText', m_kAllContainer);
-	m_ObjectiveText.InitText('', "");
-	m_ObjectiveText.SetAnchor(class'UIUtilities'.const.ANCHOR_TOP_LEFT);
-	m_ObjectiveText.SetPosition(m_ObjectiveHeaderBox.X + 40, m_ObjectiveHeaderBox.Y + 60);
-
-	//
-	// Create Units Section
-	//
-	NextX = 0;
-	m_arrUnitSlots.Length = 0;
-	m_arrUnitSlots.Add(MAX_UNIT_SLOTS);
-	UnitSlotWidth = (m_kAllContainer.width - (UnitSlotXSpacing * (MAX_UNIT_SLOTS - 2))) / MAX_UNIT_SLOTS;
-	UnitSlotHeight = m_kAllContainer.height - NextY - 50;
-	for (UnitSlotIdx = 0; UnitSlotIdx < MAX_UNIT_SLOTS; ++UnitSlotIdx)
-	{
-		m_arrUnitSlots[UnitSlotIdx] = Spawn(class'UIChallengeMode_UnitSlot', m_kAllContainer);
-		m_arrUnitSlots[UnitSlotIdx].InitSlot(UnitSlotWidth, UnitSlotHeight).SetPosition(NextX, NextY);
-		NextX += m_arrUnitSlots[UnitSlotIdx].width + UnitSlotXSpacing;
-	}
+	
 
 	//
 	// Buttons
@@ -239,9 +212,17 @@ function UpdateObjectives()
 
 	foreach m_ObjectivesList.ObjectiveDisplayInfos(Info)
 	{
-		s $= Info.DisplayLabel $ "\n";
+		s $= Info.DisplayLabel $ ",";
 	}
-	m_ObjectiveText.SetText(s);
+	MC.BeginFunctionOp("setObjectiveData");
+	MC.QueueString(m_strObjectiveTitle);
+	MC.QueueString(s);
+	MC.QueueString("");//optional warning message send blank string if there is no message
+	MC.QueueString(m_strDifficultyLabel);//difficulty label "DIFFICULTY"
+	MC.QueueString("");//difficulty value EASY, HARD, IMPOSSIBLE
+	MC.QueueString(m_strLocationLabel);//location label "LOCATION"
+	MC.QueueString( m_BattleData.m_strLocation );//location value, location name
+	MC.EndOp();
 }
 
 function UpdateSoldiers()
@@ -250,14 +231,69 @@ function UpdateSoldiers()
 	local int Index;
 	foreach `XCOMHISTORY.IterateByClassType(class'XComGameState_Unit', Unit)
 	{
-		if (Unit.GetTeam() == eTeam_XCom)
+		if ((Unit.GetTeam() == eTeam_XCom) && (Unit.GetSoldierClassTemplate() != none))
 		{
 			if (Index < MAX_UNIT_SLOTS)
 			{
-				m_arrUnitSlots[Index++].SetTextFields(Unit);
+				AddSlot(Index++, Unit);
 			}
 		}
 	}
+}
+
+function AddSlot(int Index, XComGameState_Unit Unit)
+{
+	local SCATProgression SoldierProgression;
+	local int LeftCount, RightCount;
+	local X2SoldierClassTemplate ClassTemplate;
+	local string ClassSpecialization;
+
+	LeftCount = 0;
+	RightCount = 0;
+	foreach Unit.m_SoldierProgressionAbilties( SoldierProgression )
+	{
+		if (SoldierProgression.iRank > 0)
+		{
+			if (SoldierProgression.iBranch == 0)
+			{
+				++LeftCount;
+			}
+			else
+			{
+				++RightCount;
+			}
+		}
+	}
+
+	ClassTemplate = Unit.GetSoldierClassTemplate( );
+	if (LeftCount == 7)
+	{
+		ClassSpecialization = ClassTemplate.LeftAbilityTreeTitle;
+	}
+	else if (RightCount == 7)
+	{
+		ClassSpecialization = ClassTemplate.RightAbilityTreeTitle;
+	}
+	else if (LeftCount >= 4)
+	{
+		ClassSpecialization = m_strMostlyTag $ " " $ ClassTemplate.LeftAbilityTreeTitle;
+	}
+	else // RightCount must be >= 4
+	{
+		ClassSpecialization = m_strMostlyTag $ " " $ ClassTemplate.RightAbilityTreeTitle;
+	}
+
+	MC.BeginFunctionOp("addUnit");
+	MC.QueueNumber(Index);
+	MC.QueueString(Unit.GetName(eNameType_Rank));
+	MC.QueueString(Unit.GetName(eNameType_Last));
+	MC.QueueString(Unit.GetName(eNameType_Nick));
+	MC.QueueString(Unit.GetSoldierClassTemplate().IconImage);
+	MC.QueueString(class'UIUtilities_Image'.static.GetRankIcon(Unit.GetRank(), Unit.GetSoldierClassTemplateName()));
+	MC.QueueString(class'UIUtilities_Text'.static.CapsCheckForGermanScharfesS(Unit.GetSoldierClassTemplate().DisplayName));
+	MC.QueueString(class'UIUtilities_Text'.static.CapsCheckForGermanScharfesS(ClassSpecialization));
+	MC.QueueString("");// TODO we need head shot image
+	MC.EndOp();
 }
 
 function RequestServerDataUpdate()
@@ -303,7 +339,11 @@ function qword StringToQWord(string Text)
 
 function UpdateDisplay()
 {
-	m_MissionHeader.SetText(m_strChallengeModeTitle, m_BattleData.m_strOpName);
+	MC.BeginFunctionOp("setHeaderData");
+	MC.QueueString(m_strChallengeModeTitle);
+	MC.QueueString( m_BattleData.m_strOpName);
+	MC.EndOp();
+
 	UpdateObjectives();
 	UpdateSoldiers();
 }
@@ -322,7 +362,8 @@ function UpdateIntervalDropdown()
 	m_IntervalDropdown.Clear(); // empty dropdown
 	for( Index = 0; Index < m_arrIntervals.Length; ++Index )
 	{
-		DropdownEntryStr = QWordToString(m_arrIntervals[Index].IntervalSeedID);
+		//DropdownEntryStr = QWordToString(m_arrIntervals[Index].IntervalSeedID);
+		DropdownEntryStr = m_arrIntervals[Index].IntervalName;
 		DropdownEntryStr $= ": " $ `ShowEnum(EChallengeStateType, m_arrIntervals[Index].IntervalState, State);
 		m_IntervalDropdown.AddItem(DropdownEntryStr, string(Index));
 		if( m_arrIntervals[Index].IntervalSeedID == m_CurrentIntervalSeedID )
@@ -405,16 +446,18 @@ function IntervalDropdownSelectionChange(UIDropdown kDropdown)
 //==============================================================================
 //		DAILY CHALLENGE HANDLERS:
 //==============================================================================
-function OnReceivedChallengeModeIntervals(qword IntervalSeedID, int ExpirationDate, int TimeLength, EChallengeStateType IntervalState)
+function OnReceivedChallengeModeIntervals(qword IntervalSeedID, int ExpirationDate, int TimeLength, EChallengeStateType IntervalState, optional string IntervalName, optional array<byte> StartState)
 {
 	local int Idx;
-	`log(`location @ QWordToString(IntervalSeedID) @ `ShowVar(ExpirationDate) @ `ShowVar(TimeLength) @ `ShowEnum(EChallengeStateType, IntervalState, IntervalState),,'XCom_Online');
+	`log(`location @ QWordToString(IntervalSeedID) @ `ShowVar(ExpirationDate) @ `ShowVar(TimeLength) @ `ShowEnum(EChallengeStateType, IntervalState, IntervalState) @ `ShowVar(IntervalName),,'XCom_Online');
 	Idx = m_arrIntervals.Length;
 	m_arrIntervals.Add(1);
 	m_arrIntervals[Idx].IntervalSeedID = IntervalSeedID;
 	m_arrIntervals[Idx].DateEnd.B = ExpirationDate;
 	m_arrIntervals[Idx].TimeLimit = TimeLength;
 	m_arrIntervals[Idx].IntervalState = IntervalState;
+	m_arrIntervals[Idx].IntervalName = IntervalName;
+	m_arrIntervals[Idx].StartState = StartState;
 
 	UpdateIntervalDropdown();
 	if (m_arrIntervals.Length == 1)
@@ -525,4 +568,8 @@ simulated function Cleanup()
 
 defaultproperties
 {
+	Package   = "/ package/gfxDailyChallenge/DailyChallenge";
+	MCName      = "theScreen";
+
+	InputState= eInputState_Evaluate;
 }

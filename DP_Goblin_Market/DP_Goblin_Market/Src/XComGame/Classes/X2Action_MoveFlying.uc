@@ -27,6 +27,7 @@ simulated state Executing
 
 		AnimParams.AnimName = 'MV_RunFwd';
 		AnimParams.Looping = true;
+		AnimParams.PlayRate = GetMoveAnimationSpeed();
 		UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams);
 	}
 

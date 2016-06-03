@@ -88,9 +88,13 @@ var array<StateObjectReference> CapturedSoldiers; // soldiers that have been aba
 // For Preview Build
 var bool bPreviewBuild;
 
+// Store Lose Timer Time Remaining
+var float LoseTimerTimeRemaining;
+
 // Config vars
 var const config array<int> AlienHeadquarters_LoseModeDuration; // Hours
 var const config array<int> AlienHeadquarters_LoseModeDurationVariance; // Hours
+var const config array<int> AlienHeadquarters_MinLoseModeDuration; // Hours
 var const config int AlienHeadquarters_StartingForceLevel;
 var const config int AlienHeadquarters_MaxForceLevel;
 var const config array<int> AlienHeadquarters_ForceLevelInterval; // In Hours
@@ -2022,6 +2026,12 @@ function int GetLoseModeDuration()
 function int GetLoseModeVariance()
 {
 	return default.AlienHeadquarters_LoseModeDurationVariance[`DifficultySetting];
+}
+
+//---------------------------------------------------------------------------------------
+function int GetMinLoseModeDuration()
+{
+	return default.AlienHeadquarters_MinLoseModeDuration[`DifficultySetting];
 }
 
 //---------------------------------------------------------------------------------------

@@ -644,7 +644,7 @@ function SetFinalRagdoll(bool bSetting)
 function DelaySetRagdollLinearDriveToDestination()
 {
 	//Make sure all bones are set to no bone springs
-	Mesh.PhysicsAssetInstance.SetAllBoneSprings(false, false, 0.0f, 0.0f, 0.0f, 0.0f);
+	SetDesiredBoneSprings(false, false, 0.0f, 0.0f, 0.0f, 0.0f);
 
 	//Reset the values used to blend the physics weight
 	fPhysicsMotorForce = 3.0f;
@@ -744,7 +744,7 @@ simulated event StartRagDoll(optional bool bDoBoneSprings = true,
 	{
 		if(bAnimatedRagdoll)
 		{
-			Mesh.PhysicsAssetInstance.SetAllBoneSprings(true, true, fPhysicsMotorForce, fPhysicsMotorForce / 80, fPhysicsMotorForce, fPhysicsMotorForce / 80);
+			SetDesiredBoneSprings(true, true, fPhysicsMotorForce, fPhysicsMotorForce / 80, fPhysicsMotorForce, fPhysicsMotorForce / 80);
 			Mesh.bUpdateKinematicBonesFromAnimation = true;
 		}
 		else
@@ -829,6 +829,51 @@ simulated function EndRagDoll()
 
 	if (!IsInState(''))
 		GotoState('');
+
+	if( m_bHasFullAnimWeightBones )
+	{
+		Mesh.bEnableFullAnimWeightBodies = true;
+		Mesh.SetHasPhysicsAssetInstance(TRUE);
+		Mesh.bUpdateKinematicBonesFromAnimation = true;
+
+		Mesh.SetBlockRigidBody(true);
+		Mesh.SetRBChannel(RBCC_Pawn);
+		Mesh.SetRBCollidesWithChannel(RBCC_Default, TRUE);
+		Mesh.SetRBCollidesWithChannel(RBCC_Pawn, TRUE);
+		Mesh.SetRBCollidesWithChannel(RBCC_Vehicle, TRUE);
+
+		// Ragdoll detaches all bodies so set them fixed to animation
+		Mesh.PhysicsAssetInstance.SetAllBodiesFixed(true);
+
+		// Except for bodies that say they should never be controlled by animation
+		Mesh.PhysicsAssetInstance.SetFullAnimWeightBonesFixed(false, Mesh);
+
+		Mesh.WakeRigidBody();
+	}
+}
+
+simulated function UpdateAuxParameters(bool bDisableAuxMaterials)
+{
+	local XGUnitNativeBase kGameUnit;
+
+	UpdateAuxParameterState(bDisableAuxMaterials);
+
+	if (m_bAuxParametersDirty)
+	{
+		// if we have death handler we need to end it before reattaching our components otherwise particles will retrigger
+		if (m_deathHandler != none)
+		{
+			m_deathHandler.EndDeath(self);
+			m_deathHandler = none;
+		}
+
+		// If the pawn is dying or is dead and ticking for the last time, don't update the aux parameters, they've already been disabled
+		kGameUnit = GetGameUnit();
+		if (kGameUnit != none && kGameUnit.GetIsAliveInVisualizer())
+		{
+			SetAuxParameters(m_bAuxParamNeedsPrimary, m_bAuxParamNeedsSecondary, m_bAuxParamUse3POutline);
+		}
+	}
 }
 
 simulated event Tick(float DT)
@@ -840,7 +885,6 @@ simulated event Tick(float DT)
 	local XComTacticalCheatManager kTacticalCheatMgr;
 	local bool bDisableAuxMaterials;
 	local XComTacticalController kTacticalController;
-	local XGUnitNativeBase kGameUnit;
 	local PrimitiveComponent PreviousCollisionComponent;
 
 	kTacticalController = XComTacticalController(GetALocalPlayerController());
@@ -867,24 +911,7 @@ simulated event Tick(float DT)
 
 		CalculateVisibilityPercentage();
 
-		UpdateAuxParameterState(bDisableAuxMaterials);
-
-		if (m_bAuxParametersDirty)
-		{
-			// if we have death handler we need to end it before reattaching our components otherwise particles will retrigger
-			if( m_deathHandler != none )
-			{
-				m_deathHandler.EndDeath(self);
-				m_deathHandler = none;
-			}
-
-			// If the pawn is dying or is dead and ticking for the last time, don't update the aux parameters, they've already been disabled
-			kGameUnit = GetGameUnit();
-			if( kGameUnit != none && kGameUnit.GetIsAliveInVisualizer() )
-			{
-				SetAuxParameters(m_bAuxParamNeedsPrimary, m_bAuxParamNeedsSecondary, m_bAuxParamUse3POutline);
-			}
-		}
+		UpdateAuxParameters(bDisableAuxMaterials);
 	}
 
 	//Fallback to forcing the pawns visible if they are participating in a matinee, but only in tactical
@@ -1261,7 +1288,7 @@ simulated state RagDollBlend
 			if(bAnimatedRagdoll)
 			{
 				//Update all bones
-				Mesh.PhysicsAssetInstance.SetAllBoneSprings(fPhysicsMotorForce > 0.0f, fPhysicsMotorForce > 0.0f, fPhysicsMotorForce, fPhysicsMotorForce / 80, fPhysicsMotorForce, fPhysicsMotorForce / 80);
+				SetDesiredBoneSprings(fPhysicsMotorForce > 0.0f, fPhysicsMotorForce > 0.0f, fPhysicsMotorForce, fPhysicsMotorForce / 80, fPhysicsMotorForce, fPhysicsMotorForce / 80);
 			}
 			else
 			{
@@ -1414,59 +1441,104 @@ simulated event PostBeginPlay()
 function CreateDefaultAttachments()
 {
 	local int DefaultAttachmentIndex;
-	local XComBodyPartContent BodyPartContent;
-	local XComPawnPhysicsProp PhysicsProp;
-	local SkeletalMeshComponent SkelMeshComp;
 		
 	for(DefaultAttachmentIndex = 0; DefaultAttachmentIndex < DefaultAttachments.Length; ++DefaultAttachmentIndex)
 	{
-		BodyPartContent = DefaultAttachments[DefaultAttachmentIndex];
-		if(BodyPartContent.SocketName != '' && Mesh.GetSocketByName(BodyPartContent.SocketName) != none)
+		CreateBodyPartAttachment(DefaultAttachments[DefaultAttachmentIndex]);
+	}
+}
+
+function CreateBodyPartAttachment(XComBodyPartContent BodyPartContent)
+{
+	local SkeletalMeshComponent SkelMeshComp;
+	local XComPawnPhysicsProp PhysicsProp;
+
+	if( BodyPartContent.SocketName != '' && Mesh.GetSocketByName(BodyPartContent.SocketName) != none )
+	{
+		if( BodyPartContent.SkeletalMesh != none )
 		{
-			if(BodyPartContent.SkeletalMesh != none)
+			if( BodyPartContent.UsePhysicsAsset != none )
 			{
-				if(BodyPartContent.UsePhysicsAsset != none)
+				PhysicsProp = Spawn(class'XComPawnPhysicsProp', self);
+				PhysicsProp.CollisionComponent = PhysicsProp.SkeletalMeshComponent;
+				PhysicsProp.SetBase(self);
+				PhysicsProp.SkeletalMeshComponent.SetSkeletalMesh(BodyPartContent.SkeletalMesh);
+
+				Mesh.AttachComponentToSocket(PhysicsProp.SkeletalMeshComponent, BodyPartContent.SocketName, BodyPartContent.SocketName);
+
+				//Do NOT set bForceUpdateAttachmentsInTick because we need the cape to update in its selected tick group when attached to a ragdoll					
+				if( BodyPartContent.UsePhysicsAsset != none )
 				{
-					PhysicsProp = Spawn(class'XComPawnPhysicsProp', self);
-					PhysicsProp.CollisionComponent = PhysicsProp.SkeletalMeshComponent;
-					PhysicsProp.SetBase(self);					
-					PhysicsProp.SkeletalMeshComponent.SetSkeletalMesh(BodyPartContent.SkeletalMesh);
-
-					Mesh.AttachComponentToSocket(PhysicsProp.SkeletalMeshComponent, BodyPartContent.SocketName, BodyPartContent.SocketName);
-
-					//Do NOT set bForceUpdateAttachmentsInTick because we need the cape to update in its selected tick group when attached to a ragdoll					
-					if(BodyPartContent.UsePhysicsAsset != none)
-					{						
-						PhysicsProp.SkeletalMeshComponent.SetPhysicsAsset(BodyPartContent.UsePhysicsAsset, true);
-						PhysicsProp.SkeletalMeshComponent.SetHasPhysicsAssetInstance(true);
-						PhysicsProp.SkeletalMeshComponent.WakeRigidBody();
-						PhysicsProp.SkeletalMeshComponent.PhysicsWeight = 1.0f;		
-						PhysicsProp.SetTickGroup(TG_PostUpdateWork);						
-					}					
-
-					PhysicsProp.SkeletalMeshComponent.SetAcceptsDynamicDecals(FALSE); // Fix for blood puddles appearing on the hair.
-					PhysicsProp.SkeletalMeshComponent.SetAcceptsStaticDecals(FALSE);
-
-					m_aPhysicsProps.AddItem(PhysicsProp);
+					PhysicsProp.SkeletalMeshComponent.SetPhysicsAsset(BodyPartContent.UsePhysicsAsset, true);
+					PhysicsProp.SkeletalMeshComponent.SetHasPhysicsAssetInstance(true);
+					PhysicsProp.SkeletalMeshComponent.WakeRigidBody();
+					PhysicsProp.SkeletalMeshComponent.PhysicsWeight = 1.0f;
+					PhysicsProp.SetTickGroup(TG_PostUpdateWork);
 				}
-				else
+
+				PhysicsProp.SkeletalMeshComponent.SetAcceptsDynamicDecals(FALSE); // Fix for blood puddles appearing on the hair.
+				PhysicsProp.SkeletalMeshComponent.SetAcceptsStaticDecals(FALSE);
+
+				m_aPhysicsProps.AddItem(PhysicsProp);
+			}
+			else
+			{
+				SkelMeshComp = new(self) class'SkeletalMeshComponent';
+				SkelMeshComp.SetSkeletalMesh(BodyPartContent.SkeletalMesh);
+				Mesh.AttachComponentToSocket(SkelMeshComp, BodyPartContent.SocketName);
+			}
+		}
+	}
+	else if( BodyPartContent.SkeletalMesh != none )
+	{
+		SkelMeshComp = new(self) class'SkeletalMeshComponent';
+		SkelMeshComp.SetSkeletalMesh(BodyPartContent.SkeletalMesh);
+		SkelMeshComp.SetParentAnimComponent(Mesh);
+		Mesh.AppendSockets(SkelMeshComp.Sockets, true);
+		AttachComponent(SkelMeshComp);
+		AttachedMeshes.AddItem(SkelMeshComp);
+	}
+}
+
+function RemoveBodyPartAttachment(XComBodyPartContent BodyPartContent)
+{
+	local int AttachmentIndex;
+	local SkeletalMeshComponent AttachedMesh;
+
+	if( BodyPartContent.SkeletalMesh != None )
+	{
+		for( AttachmentIndex = 0; AttachmentIndex < Mesh.Attachments.Length; ++AttachmentIndex )
+		{
+			AttachedMesh = SkeletalMeshComponent(Mesh.Attachments[AttachmentIndex].Component);
+			if( AttachedMesh != None )
+			{
+				if( AttachedMesh.SkeletalMesh == BodyPartContent.SkeletalMesh )
 				{
-					SkelMeshComp = new(self) class'SkeletalMeshComponent';
-					SkelMeshComp.SetSkeletalMesh(BodyPartContent.SkeletalMesh);
-					Mesh.AttachComponentToSocket(SkelMeshComp, BodyPartContent.SocketName);
+					RemoveProp(AttachedMesh);
+					return;
 				}
 			}
 		}
-		else if(BodyPartContent.SkeletalMesh != none)
+	}
+}
+
+simulated function RemoveProp(MeshComponent PropComponent)
+{
+	local int PropIdx;
+
+	DetachComponent(PropComponent);
+	Mesh.DetachComponent(PropComponent);
+
+	for( PropIdx = 0; PropIdx < m_aPhysicsProps.Length; ++PropIdx )
+	{
+		if( m_aPhysicsProps[PropIdx] != none && m_aPhysicsProps[PropIdx].SkeletalMeshComponent == PropComponent )
 		{
-			SkelMeshComp = new(self) class'SkeletalMeshComponent';						
-			SkelMeshComp.SetSkeletalMesh(BodyPartContent.SkeletalMesh);
-			SkelMeshComp.SetParentAnimComponent(Mesh);			
-			Mesh.AppendSockets(SkelMeshComp.Sockets, true);
-			AttachComponent(SkelMeshComp);
-			AttachedMeshes.AddItem(SkelMeshComp);			
+			//m_aPhysicsProps[PropIdx].SetBase(none);
+			m_aPhysicsProps[PropIdx].Destroy();
+			m_aPhysicsProps.Remove(PropIdx, 1);
+			break;
 		}
-	}	
+	}
 }
 
 simulated function XComUpdateCylinderSize(bool bAlert)
@@ -1673,6 +1745,11 @@ simulated function CreateVisualInventoryAttachments(UIPawnMgr PawnMgr, XComGameS
 	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_HeavyWeapon, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
 	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_GrenadePocket, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
 	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_AmmoPocket, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
+	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_TertiaryWeapon, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
+	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_QuaternaryWeapon, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
+	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_QuinaryWeapon, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
+	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_SenaryWeapon, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
+	CreateVisualInventoryAttachment(PawnMgr, eInvSlot_SeptenaryWeapon, UnitState, CheckGameState, bSetAsVisualizer, OffsetCosmeticPawn);
 }
 
 simulated function SpawnCosmeticUnitPawn(UIPawnMgr PawnMgr, EInventorySlot InvSlot, string CosmeticUnitTemplate, XComGameState_Unit OwningUnit, bool OffsetForArmory)
@@ -1871,22 +1948,24 @@ simulated function CreateVisualInventoryAttachment(UIPawnMgr PawnMgr, EInventory
 		bRegularItem = EquipmentTemplate == none || EquipmentTemplate.CosmeticUnitTemplate == "";
 		if(bRegularItem)
 		{
-			class'XGItem'.static.CreateVisualizer(ItemState, bSetAsVisualizer, self);
-			kWeapon = XGWeapon(ItemState.GetVisualizer());
+			kWeapon = XGWeapon(class'XGItem'.static.CreateVisualizer(ItemState, bSetAsVisualizer, self));
 
-			if(kWeapon.m_kOwner != none)
+			if(kWeapon != none)
 			{
-				kWeapon.m_kOwner.GetInventory().PresRemoveItem(kWeapon);
-			}
+				if(kWeapon.m_kOwner != none)
+				{
+					kWeapon.m_kOwner.GetInventory().PresRemoveItem(kWeapon);
+				}
 
-			if(PawnMgr != none)
-			{
-				PawnMgr.AssociateWeaponPawn(InvSlot, ItemState.GetVisualizer(), UnitState.GetReference().ObjectID, self);
-			}
+				if(PawnMgr != none)
+				{
+					PawnMgr.AssociateWeaponPawn(InvSlot, ItemState.GetVisualizer(), UnitState.GetReference().ObjectID, self);
+				}
 
-			kWeapon.UnitPawn = self;
-			kWeapon.m_eSlot = X2WeaponTemplate(ItemState.GetMyTemplate()).StowedLocation; // right hand slot is for Primary weapons
-			EquipWeapon(kWeapon.GetEntity(), true, false);
+				kWeapon.UnitPawn = self;
+				kWeapon.m_eSlot = X2WeaponTemplate(ItemState.GetMyTemplate()).StowedLocation; // right hand slot is for Primary weapons
+				EquipWeapon(kWeapon.GetEntity(), true, false);
+			}
 		}
 		else
 		{
@@ -2154,12 +2233,30 @@ simulated function DetachFlamethrowerIndicator()
 	RangeIndicator.SetHidden(true);
 }
 
-simulated function AppendAbilityPerks( name PerkName, optional bool bUnique = false )
+simulated function AppendAbilityPerks( name AbilityName, optional bool bUnique = false, optional name PerkName = '' )
 {
+	local XComPerkContent kPawnPerk;
+
+	if (PerkName == '')
+		PerkName = AbilityName;
+
 	`CONTENT.AppendAbilityPerks( PerkName, self, bUnique );
+
+	// if the ability we're adding these perks for is not the same as the perks for (MP ability replacements)
+	// re-associate the perks to this ability so that they play appropriately.
+	if (AbilityName != PerkName)
+	{
+		foreach arrPawnPerkContent( kPawnPerk )
+		{
+			if (kPawnPerk.GetAbilityName( ) == PerkName)
+			{
+				kPawnPerk.ReassociateToAbility( AbilityName );
+			}
+		}
+	}
 }
 
-simulated function StartPersistentPawnPerkFX( optional name PerkName = 'none' )
+simulated function StartPersistentPawnPerkFX( optional name PerkName = '' )
 {
 	local XComPerkContent kPawnPerk;
 
@@ -2167,19 +2264,19 @@ simulated function StartPersistentPawnPerkFX( optional name PerkName = 'none' )
 	{
 		foreach arrPawnPerkContent(kPawnPerk)
 		{
-			if ((PerkName == 'none') || (kPawnPerk.GetAbilityName() == PerkName))
+			if ((PerkName == '') || (kPawnPerk.GetAbilityName() == PerkName))
 				kPawnPerk.StartPersistentFX(self);
 		}
 	}
 }
 
-simulated function StopPersistentPawnPerkFX( optional name PerkName = 'none' )
+simulated function StopPersistentPawnPerkFX( optional name PerkName = '' )
 {
 	local XComPerkContent kPawnPerk;
 
 	foreach arrPawnPerkContent(kPawnPerk)
 	{
-		if ((PerkName == 'none') || (kPawnPerk.GetAbilityName() == PerkName))
+		if ((PerkName == '') || (kPawnPerk.GetAbilityName() == PerkName))
 			kPawnPerk.StopPersistentFX();
 	}
 }
@@ -2791,7 +2888,7 @@ simulated event PostRenderFor(PlayerController kPC, Canvas kCanvas, vector vCame
 		DebugVis(kCanvas, kCheatManager);
 
 		bSingleUnitDebugging = kCheatManager.m_DebugAnims_TargetName == self.Name;
-		if (kCheatManager.bDebugAnims &&
+		if (kCheatManager.bDebugAnims && kCheatManager.bDebugAnimsPawn && 
 			((kCheatManager.m_DebugAnims_TargetName == '') || bSingleUnitDebugging))
 		{
 			vScreenPos = kCanvas.Project(Location);

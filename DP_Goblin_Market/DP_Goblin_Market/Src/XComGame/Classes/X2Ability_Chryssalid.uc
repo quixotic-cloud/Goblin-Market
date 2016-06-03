@@ -28,6 +28,9 @@ static function array<X2DataTemplate> CreateTemplates()
 	Templates.AddItem(PurePassive('ChyssalidPoison', "img:///UILibrary_PerkIcons.UIPerk_chryssalid_poisonousclaws"));
 	Templates.AddItem(CreateImmunitiesAbility());
 
+	// MP Versions of Abilities
+	Templates.AddItem(CreateSlashMPAbility());
+
 	return Templates;
 }
 
@@ -106,7 +109,6 @@ static function X2AbilityTemplate CreateBurrowAbility()
 	local X2AbilityTemplate Template;
 	local X2AbilityCost_ActionPoints ActionPointCost;
 	local X2Condition_UnitEffects ExcludeEffects;
-	local X2Effect_Burrowed BurrowedEffect;
 	local X2Condition_OnGroundTile GroundFloorCondition;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'ChryssalidBurrow');
@@ -139,10 +141,7 @@ static function X2AbilityTemplate CreateBurrowAbility()
 	Template.AddShooterEffectExclusions();
 	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
 
-	BurrowedEffect = new class'X2Effect_Burrowed';
-	BurrowedEffect.EffectName = class'X2AbilityTemplateManager'.default.BurrowedName;
-	BurrowedEffect.CustomIdleOverrideAnim = 'NO_BurrowLoop';
-	Template.AddTargetEffect(BurrowedEffect);
+	Template.AddTargetEffect(new class'X2Effect_Burrowed');
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
 	Template.BuildVisualizationFn = Burrow_BuildVisualization;
@@ -215,6 +214,9 @@ static function X2AbilityTemplate CreateUnburrowAbility()
 	local X2Effect_RemoveEffects RemoveEffects;
 	local X2Effect_GrantActionPoints AddActionPointsEffect;
 	local X2AbilityTrigger_EventListener Trigger;
+	local X2AbilityCooldown Cooldown;
+	local AdditionalCooldownInfo CooldownInfo;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'ChryssalidUnburrow');
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_chryssalid_burrow";
@@ -227,6 +229,15 @@ static function X2AbilityTemplate CreateUnburrowAbility()
 	ActionPointCost.AllowedTypes.Length = 0;        //  clear default allowances
 	ActionPointCost.AllowedTypes.AddItem(class'X2CharacterTemplateManager'.default.UnburrowActionPoint);
 	Template.AbilityCosts.AddItem(ActionPointCost);
+
+	Cooldown = new class'X2AbilityCooldown';
+	Cooldown.iNumTurns = 0;
+
+	CooldownInfo.AbilityName = 'ChryssalidBurrow';
+	CooldownInfo.NumTurns = 2;
+	Cooldown.AditionalAbilityCooldowns.AddItem(CooldownInfo);
+
+	Template.AbilityCooldown = Cooldown;
 
 	Template.AbilityToHitCalc = default.DeadEye;
 	Template.AbilityTargetStyle = default.SelfTarget;
@@ -244,7 +255,7 @@ static function X2AbilityTemplate CreateUnburrowAbility()
 	Trigger = new class'X2AbilityTrigger_EventListener';
 	Trigger.ListenerData.Deferral = ELD_OnStateSubmitted;
 	Trigger.ListenerData.EventID = default.UnburrowTriggerEventName;
-	Trigger.ListenerData.EventFn = class'XComGameState_Ability'.static.AbilityTriggerEventListener_Self;
+	Trigger.ListenerData.EventFn = class'XComGameState_Ability'.static.AbilityTriggerEventListener_Self_VisualizeInGameState;
 	Trigger.ListenerData.Filter = eFilter_Unit;
 	Template.AbilityTriggers.AddItem(Trigger);
 
@@ -253,7 +264,11 @@ static function X2AbilityTemplate CreateUnburrowAbility()
 
 	Template.AbilityShooterConditions.AddItem(RequiredEffects);
 	Template.AbilityShooterConditions.AddItem(new class'X2Condition_ValidUnburrowTile');
-	Template.AddShooterEffectExclusions();
+	
+	// Unburrow may trigger if the unit is burning or disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	RemoveEffects = new class'X2Effect_RemoveEffects';
 	RemoveEffects.EffectNamesToRemove.AddItem(class'X2AbilityTemplateManager'.default.BurrowedName);
@@ -305,8 +320,6 @@ simulated function Unburrow_BuildVisualization(XComGameState VisualizeGameState,
 	{
 		AbilityTemplate.AbilityTargetEffects[EffectIndex].AddX2ActionsForVisualization(VisualizeGameState, BuildTrack, Context.FindTargetEffectApplyResult(AbilityTemplate.AbilityTargetEffects[EffectIndex]));
 	}
-
-	class'X2Action_UnBurrow'.static.AddToVisualizationTrack(BuildTrack, Context);
 
 	UnitState = XComGameState_Unit(BuildTrack.StateObject_NewState);
 	if(UnitState != None && UnitState.IsDead())
@@ -481,6 +494,82 @@ static function X2AbilityTemplate CreateImmunitiesAbility()
 	Template.AddTargetEffect(DamageImmunity);
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
+
+	return Template;
+}
+
+// #######################################################################################
+// -------------------- MP Abilities -----------------------------------------------------
+// #######################################################################################
+
+static function X2AbilityTemplate CreateSlashMPAbility(optional Name AbilityName = 'ChryssalidSlashMP')
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityCost_ActionPoints ActionPointCost;
+	local X2AbilityToHitCalc_StandardMelee MeleeHitCalc;
+	local X2Condition_UnitProperty UnitPropertyCondition;
+	local X2Effect_ApplyWeaponDamage PhysicalDamageEffect;
+	local X2Effect_ParthenogenicPoison ParthenogenicPoisonEffect;
+	local X2AbilityTarget_MovingMelee MeleeTarget;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, AbilityName);
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_chryssalid_slash";
+	Template.Hostility = eHostility_Offensive;
+	Template.AbilitySourceName = 'eAbilitySource_Standard';
+	Template.MP_PerkOverride = 'ChryssalidSlash';
+
+	ActionPointCost = new class'X2AbilityCost_ActionPoints';
+	ActionPointCost.iNumPoints = 1;
+	ActionPointCost.bConsumeAllPoints = true;
+	Template.AbilityCosts.AddItem(ActionPointCost);
+
+	MeleeHitCalc = new class'X2AbilityToHitCalc_StandardMelee';
+	Template.AbilityToHitCalc = MeleeHitCalc;
+
+	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
+
+	UnitPropertyCondition = new class'X2Condition_UnitProperty';
+	UnitPropertyCondition.ExcludeDead = true;
+	UnitPropertyCondition.ExcludeFriendlyToSource = false; // Disable this to allow civilians to be attacked.
+	UnitPropertyCondition.ExcludeSquadmates = true;		   // Don't attack other AI units.
+	Template.AbilityTargetConditions.AddItem(UnitPropertyCondition);
+
+	Template.AbilityTargetConditions.AddItem(default.MeleeVisibilityCondition);
+
+	ParthenogenicPoisonEffect = new class'X2Effect_ParthenogenicPoison';
+	ParthenogenicPoisonEffect.UnitToSpawnName = 'ChryssalidCocoonMP';
+	ParthenogenicPoisonEffect.AltUnitToSpawnName = 'ChryssalidCocoonHumanMP';
+	ParthenogenicPoisonEffect.BuildPersistentEffect(default.POISON_DURATION, true, false, false, eGameRule_PlayerTurnEnd);
+	ParthenogenicPoisonEffect.SetDisplayInfo(ePerkBuff_Penalty, default.ParthenogenicPoisonFriendlyName, default.ParthenogenicPoisonFriendlyDesc, Template.IconImage, true);
+	ParthenogenicPoisonEffect.DuplicateResponse = eDupe_Ignore;
+	ParthenogenicPoisonEffect.SetPoisonDamageDamage();
+
+	UnitPropertyCondition = new class'X2Condition_UnitProperty';
+	UnitPropertyCondition.ExcludeRobotic = true;
+	UnitPropertyCondition.ExcludeAlive = false;
+	UnitPropertyCondition.ExcludeDead = false;
+	ParthenogenicPoisonEffect.TargetConditions.AddItem(UnitPropertyCondition);
+	Template.AddTargetEffect(ParthenogenicPoisonEffect);
+
+	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
+	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.CHRYSSALIDMP_MELEEATTACK_BASEDAMAGE;
+	PhysicalDamageEffect.EffectDamageValue.DamageType = 'Melee';
+	Template.AddTargetEffect(PhysicalDamageEffect);
+
+	MeleeTarget = new class'X2AbilityTarget_MovingMelee';
+	MeleeTarget.MovementRangeAdjustment = 0;
+	Template.AbilityTargetStyle = MeleeTarget;
+	Template.TargetingMethod = class'X2TargetingMethod_MeleePath';
+
+	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_PlayerInput');
+	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_EndOfMove');
+
+	Template.CustomFireAnim = 'FF_Melee';
+	Template.bSkipMoveStop = true;
+	Template.BuildNewGameStateFn = TypicalMoveEndAbility_BuildGameState;
+	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildInterruptGameStateFn = TypicalMoveEndAbility_BuildInterruptGameState;
+	Template.CinescriptCameraType = "Chryssalid_PoisonousClaws";
 
 	return Template;
 }

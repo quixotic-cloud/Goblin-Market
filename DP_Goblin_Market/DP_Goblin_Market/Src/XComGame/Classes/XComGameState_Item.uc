@@ -66,6 +66,26 @@ function Actor FindOrCreateVisualizer( optional XComGameState Gamestate = none )
 
 function SyncVisualizer(optional XComGameState GameState = none)
 {
+	local X2WeaponTemplate WeaponTemplate;
+	local XGWeapon WeaponVis;
+	local XComWeapon WeaponMeshVis;
+
+	if (Ammo == 0)
+	{
+		WeaponTemplate = X2WeaponTemplate(GetMyTemplate());
+		if (WeaponTemplate != None && WeaponTemplate.bHideWithNoAmmo)
+		{
+			WeaponVis = XGWeapon(GetVisualizer());
+			if (WeaponVis != None)
+			{
+				WeaponMeshVis = WeaponVis.GetEntity();
+				if (WeaponMeshVis != None)
+				{
+					WeaponMeshVis.Mesh.SetHidden(true);
+				}
+			}
+		}
+	}
 }
 
 function AppendAdditionalSyncActions( out VisualizationTrack BuildTrack )
@@ -93,6 +113,7 @@ simulated native function TTile GetTileLocation();
 event RequestResources(out array<string> ArchetypesToLoad)
 {
 	local X2EquipmentTemplate EquipmentTemplate;	
+	local int i;
 
 	super.RequestResources(ArchetypesToLoad);
 
@@ -113,6 +134,14 @@ event RequestResources(out array<string> ArchetypesToLoad)
 		if(EquipmentTemplate.CosmeticUnitTemplate != "")
 		{
 			ArchetypesToLoad.AddItem(EquipmentTemplate.CosmeticUnitTemplate);
+		}
+		
+		for (i = 0; i < EquipmentTemplate.AltGameArchetypeArray.Length; ++i)
+		{
+			if (EquipmentTemplate.AltGameArchetypeArray[i].ArchetypeString != "")
+			{
+				ArchetypesToLoad.AddItem(EquipmentTemplate.AltGameArchetypeArray[i].ArchetypeString);
+			}
 		}
 	}
 }
@@ -179,6 +208,7 @@ function OnBeginTacticalPlay()
 		EventManager.RegisterForEvent( ThisObj, 'UnitEvacuated', OnUnitEvacuated, ELD_OnStateSubmitted,,); //For gremlin, to evacuate with its owner
 		EventManager.RegisterForEvent( ThisObj, 'ItemRecalled', OnItemRecalled, ELD_OnStateSubmitted,,); //Return to owner when specifically requested 
 		EventManager.RegisterForEvent( ThisObj, 'ForceItemRecalled', OnForceItemRecalled, ELD_OnStateSubmitted,,); //Return to owner when specifically told
+		EventManager.RegisterForEvent(ThisObj, 'UnitIcarusJumped', OnUnitIcarusJumped, ELD_OnStateSubmitted, , ); //Return to owner when specifically told
 	}
 }
 
@@ -488,6 +518,71 @@ function ItemOwnerEvacVisualization(XComGameState VisualizeGameState, out array<
 	class'X2Action_RemoveUnit'.static.AddToVisualizationTrack(EvacTrack, VisualizeGameState.GetContext());
 
 	OutVisualizationTracks.AddItem(EvacTrack);
+}
+
+function EventListenerReturn OnUnitIcarusJumped(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
+{
+	local XComGameState_Item GremlinItem;
+	local XComGameStateContext_ChangeContainer ChangeContext;
+	local XComGameState NewGameState;
+	local XComGameState_Unit EventUnitState, AttachedUnitState;
+	local XComGameStateHistory History;
+
+	EventUnitState = XComGameState_Unit(EventData);
+
+	History = `XCOMHISTORY;
+	AttachedUnitState = XComGameState_Unit(History.GetGameStateForObjectID(AttachedUnitRef.ObjectID));
+
+	if (EventUnitState != none && AttachedUnitState == EventUnitState)
+	{
+		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Owner Unit Icarus Jumped");
+		ChangeContext = XComGameStateContext_ChangeContainer(NewGameState.GetContext());
+		ChangeContext.BuildVisualizationFn = ItemOwnerIcarusJumpVisualization;
+
+		// Visualize this context in the same visblock as the evacuating unit.
+		ChangeContext.SetDesiredVisualizationBlockIndex(GameState.HistoryIndex);
+
+		GremlinItem = XComGameState_Item(NewGameState.CreateStateObject(Class, ObjectID));
+		NewGameState.AddStateObject(GremlinItem);
+		`GAMERULES.SubmitGameState(NewGameState);
+	}
+
+	return ELR_NoInterrupt;
+}
+
+function ItemOwnerIcarusJumpVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+{
+	local VisualizationTrack IJTrack;
+	local XComGameState_Unit UnitState, AttachedUnitState;
+	local XComGameState_Item GremlinItemState;
+	local XComGameStateHistory History;
+	local X2Action_IcarusJumpGremlin IJGremlin;
+	local XGUnit GremlinUnit;
+
+	//  This game state should contain just the cosmetic unit state that's evacuating.
+	foreach VisualizeGameState.IterateByClassType(class'XComGameState_Item', GremlinItemState)
+	{
+		break;
+	}
+	
+	History = `XCOMHISTORY;
+
+	UnitState = XComGameState_Unit(History.GetGameStateForObjectID(GremlinItemState.CosmeticUnitRef.ObjectID));
+	GremlinUnit = XGUnit(UnitState.GetVisualizer());
+		
+	IJTrack.StateObject_OldState = History.GetGameStateForObjectID(UnitState.ObjectID, , VisualizeGameState.HistoryIndex - 1);
+	IJTrack.StateObject_NewState = UnitState;
+	IJTrack.TrackActor = GremlinUnit;
+
+	IJGremlin = X2Action_IcarusJumpGremlin(class'X2Action_IcarusJumpGremlin'.static.AddToVisualizationTrack(IJTrack, VisualizeGameState.GetContext()));
+	AttachedUnitState = XComGameState_Unit(History.GetGameStateForObjectID(AttachedUnitRef.ObjectID));
+	IJGremlin.MoveLocation = `XWORLD.GetPositionFromTileCoordinates(AttachedUnitState.TileLocation);
+
+	IJGremlin = X2Action_IcarusJumpGremlin(class'X2Action_IcarusJumpGremlin'.static.AddToVisualizationTrack(IJTrack, VisualizeGameState.GetContext()));
+	IJGremlin.bPlayInReverse = true;
+
+	OutVisualizationTracks.AddItem(IJTrack);
+
 }
 
 simulated function array<name> GetMyWeaponUpgradeTemplateNames()
@@ -830,6 +925,14 @@ simulated function bool SoundOriginatesFromOwnerLocation()
 	GetMyTemplate();
 	if (m_ItemTemplate.IsA('X2WeaponTemplate'))
 		return X2WeaponTemplate(m_ItemTemplate).bSoundOriginatesFromOwnerLocation;
+	return true;
+}
+
+simulated function bool CanWeaponBeDodged()
+{
+	GetMyTemplate();
+	if (m_ItemTemplate.IsA('X2WeaponTemplate'))
+		return X2WeaponTemplate(m_ItemTemplate).bCanBeDodged;
 	return true;
 }
 
@@ -1240,7 +1343,8 @@ simulated function array<UISummary_ItemStat> GetUISummary_DefaultStats()
 simulated function array<UISummary_ItemStat> GetUISummary_WeaponStats(optional X2WeaponUpgradeTemplate PreviewUpgradeStats)
 {
 	local array<UISummary_ItemStat> Stats; 
-	local UISummary_ItemStat		Item; 
+	local UISummary_ItemStat		Item;
+	local UIStatMarkup				StatMarkup;
 	local WeaponDamageValue         DamageValue;
 	local EUISummary_WeaponStats    UpgradeStats;
 	local X2WeaponTemplate WeaponTemplate;
@@ -1326,16 +1430,17 @@ simulated function array<UISummary_ItemStat> GetUISummary_WeaponStats(optional X
 	// Add any extra stats and benefits
 	for (Index = 0; Index < WeaponTemplate.UIStatMarkups.Length; ++Index)
 	{
-		ShouldStatDisplayFn = WeaponTemplate.UIStatMarkups[Index].ShouldStatDisplayFn;
+		StatMarkup = WeaponTemplate.UIStatMarkups[Index];
+		ShouldStatDisplayFn = StatMarkup.ShouldStatDisplayFn;
 		if (ShouldStatDisplayFn != None && !ShouldStatDisplayFn())
 		{
 			continue;
 		}
 
-		if (WeaponTemplate.UIStatMarkups[Index].StatModifier != 0 || WeaponTemplate.UIStatMarkups[Index].bForceShow)
+		if (StatMarkup.StatModifier != 0 || StatMarkup.bForceShow)
 		{
-			Item.Label = WeaponTemplate.UIStatMarkups[Index].StatLabel;
-			Item.Value = string(WeaponTemplate.UIStatMarkups[Index].StatModifier);
+			Item.Label = StatMarkup.StatLabel;
+			Item.Value = string(StatMarkup.StatModifier) $ StatMarkup.StatUnit;
 			Stats.AddItem(Item);
 		}
 	}

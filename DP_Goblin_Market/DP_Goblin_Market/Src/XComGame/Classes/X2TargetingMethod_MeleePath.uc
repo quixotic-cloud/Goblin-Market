@@ -13,7 +13,7 @@ var private X2MeleePathingPawn      PathingPawn;
 var private XComActionIconManager   IconManager;
 var private XComLevelBorderManager  LevelBorderManager;
 var private XCom3DCursor            Cursor;
-var private X2Camera_Midpoint       TargetingCamera;
+var private X2Camera_Midpoint		TargetingCamera; // deprecated
 var private XGUnit					TargetUnit;
 
 // the index of the last available target we were targeting
@@ -96,13 +96,16 @@ function Canceled()
 	PathingPawn.Destroy();
 	IconManager.ShowIcons(false);
 	LevelBorderManager.ShowBorder(false);
-
-	`CAMERASTACK.RemoveCamera(TargetingCamera);
 }
 
 function Committed()
 {
 	Canceled();
+}
+
+function bool AllowMouseConfirm()
+{
+	return true;
 }
 
 function Update(float DeltaTime)
@@ -122,6 +125,7 @@ function DirectSetTarget(int TargetIndex)
 	local UITacticalHUD TacticalHud;
 	local XComGameStateHistory History;
 	local XComGameState_BaseObject Target;
+	local X2Camera_LookAtActorTimed LookAtCamera;
 
 	// advance the target counter
 	LastTarget = TargetIndex % Action.AvailableTargets.Length;
@@ -139,19 +143,12 @@ function DirectSetTarget(int TargetIndex)
 	Target = History.GetGameStateForObjectID(Action.AvailableTargets[LastTarget].PrimaryTarget.ObjectID);
 	PathingPawn.UpdateMeleeTarget(Target);
 
-	// remove any previous camera
-	if(TargetingCamera != none)
-	{
-		`CAMERASTACK.RemoveCamera(TargetingCamera);
-	}
-
 	TargetUnit = XGUnit(Target.GetVisualizer());
-	
-	// create a midpoint targeting camera to frame the melee unit and his target
-	TargetingCamera = new class'X2Camera_Midpoint';
-	TargetingCamera.AddFocusActor(FiringUnit);
-	TargetingCamera.AddFocusActor(Target.GetVisualizer());
-	`CAMERASTACK.AddCamera(TargetingCamera);
+
+	LookAtCamera = new class'X2Camera_LookAtActorTimed';
+	LookAtCamera.LookAtDuration = 0.0f;
+	LookAtCamera.ActorToFollow = TargetUnit.GetPawn();
+	`CAMERASTACK.AddCamera(LookAtCamera);
 }
 
 function int GetTargetIndex()

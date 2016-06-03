@@ -260,6 +260,11 @@ function Deactivated()
 {
 	super.Deactivated();
 
+	if(MatineeInfo != none)
+	{
+		MatineeInfo.TriggerCompletionEvents();
+	}
+
 	if(ShouldHideUI)
 	{
 		if (`CHEATMGR != None && `CHEATMGR.bHideWorldMessagesInOTS)
@@ -286,6 +291,7 @@ protected function bool SelectClosestMatinee(X2Camera_OverTheShoulder PreviousOT
 	local TPOV OldCameraLocation;
 	local int SuffixIndex;
 	local string DesiredSuffix;
+	local int DesiredSuffixLength;
 
 	if(!GetCandidateMatinees(CandidateMatinees))
 	{
@@ -308,9 +314,10 @@ protected function bool SelectClosestMatinee(X2Camera_OverTheShoulder PreviousOT
 	if(SuffixIndex != INDEX_NONE)
 	{
 		DesiredSuffix = Mid(PreviousOTSCam.MatineeInfo.Matinee.ObjComment, SuffixIndex);
+		DesiredSuffixLength = Len(DesiredSuffix);
 		foreach CandidateMatinees(Matinee)
 		{
-			if(Instr(Matinee.ObjComment, DesiredSuffix) != INDEX_NONE)
+			if(Right(Matinee.ObjComment, DesiredSuffixLength) == DesiredSuffix)
 			{
 				ClosestMatinee = Matinee;
 				break;
@@ -565,9 +572,18 @@ protected function Vector GetUnitFacing()
 
 function UpdateCamera(float DeltaTime)
 {
+	local float SlomoRate;
+
 	super.UpdateCamera(DeltaTime);
 
 	CheckForTargetChange();
+
+	MatineeInfo.TriggerEvents(MatineeTime, DeltaTime);
+
+	if(MatineeInfo.SampleSlomoTrack(MatineeTime, SlomoRate))
+	{
+		class'WorldInfo'.static.GetWorldInfo().Game.SetGameSpeed(SlomoRate);
+	}
 
 	MatineeTime = fMin(MatineeTime + DeltaTime, MatineeInfo.GetMatineeDuration());
 	RetargetTransitionAlpha = fMin(RetargetTransitionAlpha + DeltaTime / RetargetDuration, 1.0);

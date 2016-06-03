@@ -86,6 +86,8 @@ Begin:
 	if (EndingPerk != none)
 	{
 		AnimParams.AnimName = class'XComPerkContent'.static.ChooseAnimationForCover( CasterUnit, EndingPerk.CasterDurationEndedAnim );
+		AnimParams.PlayRate = GetNonCriticalAnimationSpeed();
+
 		if ((EndingPerk.m_ActiveTargetCount == 0) && EndingPerk.CasterDurationEndedAnim.PlayAnimation && AnimParams.AnimName != '')
 		{
 			FinishAnim( CasterPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams) );

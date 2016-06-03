@@ -577,6 +577,36 @@ event bool HasRadialDamage()
 	return false;
 }
 
+event bool DestructionEmptiesTile()
+{
+	local DestructibleActorEvent kEvent;
+	local XComDestructibleActor_Action_SwapStaticMesh SwapAction;
+
+	// Check a few types to see if the destruction events will cause the object to disappear from the tile data instead of changing to a different mesh
+	// if more types are added to this loop (or perhaps if the action specific checks become too complicated), 
+	//    we should consider adding an interface to XComDestructibleActor_Action to delegate to instead.
+	foreach DestroyedEvents( kEvent )
+	{
+		if (kEvent.Action != none)
+		{
+			if (kEvent.Action.IsA('XComDestructibleActor_Action_Hide'))
+			{
+				return true;
+			}
+			else if (kEvent.Action.IsA('XComDestructibleActor_Action_SwapStaticMesh'))
+			{
+				SwapAction = XComDestructibleActor_Action_SwapStaticMesh( kEvent.Action );
+				if (SwapAction.bDisableCollision || (SwapAction.MeshCue == none) || (SwapAction.MeshCue.Pick() == none))
+				{
+					return true;
+				}
+			}
+		}
+	}
+
+	return false;
+}
+
 simulated event DestructibleTakeDamage(XComGameState_EnvironmentDamage DamageEvent)
 {
 	local bool TargetableDamage;
@@ -620,7 +650,8 @@ simulated native function SetStaticMesh(StaticMesh NewMesh, optional Vector NewT
 //Allow the actor to be set with a skeletal mesh
 simulated native function SetSkeletalMesh(SkeletalMesh InSkeletalMesh);
 
-simulated native function PreTriggerEvents(const out array<DestructibleActorEvent> Events);
+simulated native function PreTriggerEvents(const out array<DestructibleActorEvent> Events);			// trigger action code for changes to self/tile data
+simulated native function ResponseTriggerEvents(const out array<DestructibleActorEvent> Events);	// trigger action code that may submit new gamestates
 
 // Returns the number of events that haven't been activated
 simulated native function int TriggerEvents(const out array<DestructibleActorEvent> Events);
@@ -690,6 +721,10 @@ event StateObjectReference GetVisualizedStateReference()
 
 	Reference.ObjectID = ObjectID;
 	return Reference;
+}
+
+simulated event TriggerActionRespones( ) // trigger state actions that may want to submit new gamestates
+{
 }
 
 //-----------------------------------------------------------------------------
@@ -775,6 +810,11 @@ simulated state _Damaged extends _DamageState
 	{
 		CleanupEvents(DamagedEvents);
 	}
+
+	simulated event TriggerActionRespones( ) // trigger state actions that may want to submit new gamestates
+	{
+		ResponseTriggerEvents( DamagedEvents );
+	}
 }
 
 simulated state _DestructionStarted extends _DamageState
@@ -816,6 +856,21 @@ simulated state _DestructionStarted extends _DamageState
 		else
 		{
 			PreTriggerEvents(AnnihilatedEvents);
+		}
+	}
+
+	simulated event TriggerActionRespones( ) // trigger state actions that may want to submit new gamestates
+	{
+		// Use destroyed events when health is reduced to zero and there are no annihilated events
+		// regardless of previous state. This preserves the previous behavior for most destructible actors.
+		if(bDamaged || AnnihilatedEvents.Length <= 0)
+		{
+			ResponseTriggerEvents(DestroyedEvents);
+		}
+		// Use annihilated events if present and health is reduced to zero only when the previous state is pristine (currently only for trees).
+		else
+		{
+			ResponseTriggerEvents(AnnihilatedEvents);
 		}
 	}
 }

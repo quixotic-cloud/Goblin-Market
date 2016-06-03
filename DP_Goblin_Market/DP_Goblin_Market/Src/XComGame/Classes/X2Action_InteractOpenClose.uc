@@ -54,7 +54,7 @@ Begin:
 
 	Interactor.AnimNode.SetActiveChild(0, 1.0f);
 	
-	Sleep(1.0f);
+	Sleep(1.0f * GetDelayModifier());
 
 	CompleteAction();
 }

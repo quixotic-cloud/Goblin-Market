@@ -76,7 +76,7 @@ Begin:
 
 	for( TimeDelayIndex = 0; TimeDelayIndex < ProjectileTimeDelaySecArray.Length; ++TimeDelayIndex )
 	{
-		Sleep(ProjectileTimeDelaySecArray[TimeDelayIndex]);
+		Sleep(ProjectileTimeDelaySecArray[TimeDelayIndex] * GetDelayModifier());
 		AddProjectiles(TimeDelayIndex);
 	}
 
@@ -87,7 +87,7 @@ Begin:
 
 	UnitPawn.SetCurrentWeapon(PreviousWeapon);
 
-	Sleep(0.5f); // Sleep to allow destruction to be seenw
+	Sleep(0.5f * GetDelayModifier()); // Sleep to allow destruction to be seenw
 
 	CompleteAction();
 }

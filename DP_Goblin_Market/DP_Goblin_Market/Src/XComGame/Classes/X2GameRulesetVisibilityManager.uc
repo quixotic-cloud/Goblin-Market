@@ -8,6 +8,8 @@
 //---------------------------------------------------------------------------------------
 class X2GameRulesetVisibilityManager extends Actor
 	dependson(XComGameState, XComGameState_BaseObject, X2GameRulesetVisibilityDataStructures)
+	config(GameCore)
+
 	native(Core);
 
 // Represents visibility state for each history frame in which visibility could potentially have changed (so not every history frame has a Visibility frame)
@@ -22,9 +24,12 @@ var GameRulesCache_VisibilityInfo X2ConditionCachedVisInfo;
 //This observer object is responsible for responding to new visibility info frames and keeping the model visibility state up to date
 var X2VisibilityObserver ActorVisibilityMgr;
 
+
+var private const config bool EnableSphereChecks;
+
 cpptext
 {	
-	bool BuildVisibilityInfoFromGameState(class UXComGameState& NewGameState, const FVisibilityInfoFrame* PreviousVisibilityInfo, FVisibilityInfoFrame& OutNewVisibilityInfo, UBOOL bFullUpdate);
+	bool BuildVisibilityInfoFromGameState(class UXComGameState& NewGameState, const FVisibilityInfoFrame* PreviousVisibilityInfo, FVisibilityInfoFrame& OutNewVisibilityInfo, UBOOL bFullUpdate, const FSphere& UpdateSphere);
 	const FVisibilityInfoFrame* GetInfoFrameInternal(INT HistoryIndex = -1) const;
 };
 

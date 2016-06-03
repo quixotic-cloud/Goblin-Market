@@ -25,5 +25,6 @@ static function array<X2DataTemplate> CreateTemplates()
 		`log("X2MPCharacterTemplate_DefaultCharacters::" $ GetFuncName() @ `ShowVar(MPCharacterName) @ `ShowVar(Template.Cost) @ `ShowVar(Template.DisplayName),, 'XCom_Net');
 		Templates.AddItem(Template);
 	}
+	
 	return Templates;
 }

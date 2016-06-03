@@ -104,10 +104,7 @@ static function array<X2DataTemplate> CreateTemplates()
 
 	// Doom Reduction Rewards
 	Rewards.AddItem(CreateDoomReductionRewardTemplate());
-
-	// Schematic Rewards
-	Rewards.AddItem(CreateSchematicRewardTemplate());
-
+	
 	// Unlock Rewards
 	Rewards.AddItem(CreateUnlockResearchRewardTemplate());
 	Rewards.AddItem(CreateUnlockItemRewardTemplate());
@@ -517,7 +514,7 @@ function GeneratePersonnelReward(XComGameState_Reward RewardState, XComGameState
 	local XComGameStateHistory History;
 	local XComGameState_Unit NewUnitState;
 	local XComGameState_WorldRegion RegionState;
-	local int i, idx, NewRank;
+	local int idx, NewRank;
 	local name nmCountry;
 
 	History = `XCOMHISTORY;
@@ -532,9 +529,8 @@ function GeneratePersonnelReward(XComGameState_Reward RewardState, XComGameState
 	}
 
 	//Use the character pool's creation method to retrieve a unit
-	NewUnitState = `CHARACTERPOOLMGR.CreateCharacter(NewGameState, class'XComGameState_HeadquartersXCom'.default.RewardUnitCharacterPoolSelectionMode, RewardState.GetMyTemplate().rewardObjectTemplateName, nmCountry);
+	NewUnitState = `CHARACTERPOOLMGR.CreateCharacter(NewGameState, `XPROFILESETTINGS.Data.m_eCharPoolUsage, RewardState.GetMyTemplate().rewardObjectTemplateName, nmCountry);
 	NewUnitState.RandomizeStats();
-	NewUnitState.GiveRandomPersonality();
 	NewGameState.AddStateObject(NewUnitState);
 
 	if(RewardState.GetMyTemplate().rewardObjectTemplateName == 'Soldier')
@@ -558,10 +554,7 @@ function GeneratePersonnelReward(XComGameState_Reward RewardState, XComGameState
 			{
 				NewUnitState.RankUpSoldier(NewGameState, ResistanceHQ.SelectNextSoldierClass());
 				NewUnitState.ApplySquaddieLoadout(NewGameState);
-				for(i = 0; i < NewUnitState.GetSoldierClassTemplate().GetAbilityTree(0).Length; ++i)
-				{
-					NewUnitState.BuySoldierProgressionAbility(NewGameState, 0, i);
-				}
+				NewUnitState.bNeedsNewClassPopup = false;
 			}
 			else
 			{
@@ -1290,7 +1283,6 @@ function GenerateDeckedItemReward(XComGameState_Reward RewardState, XComGameStat
 	local XComGameState_HeadquartersXCom XComHQ;
 	local XComGameState_Tech TechState;
 	local XComGameState_Item ItemState;
-	local array<XComGameState_Tech> CompletedTechs;
 	local X2ItemTemplateManager ItemTemplateManager;
 	local X2ItemTemplate ItemTemplate;
 	local X2CardManager CardManager;
@@ -1317,21 +1309,9 @@ function GenerateDeckedItemReward(XComGameState_Reward RewardState, XComGameStat
 	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
 	ItemTemplate = ItemTemplateManager.FindItemTemplate(name(RewardName));
 
-	// If it is possible for this item to be upgraded, check to see if the upgrade has already been researched
-	if (ItemTemplate.UpgradeItem != '')
-	{
-		XComHQ = class'UIUtilities_Strategy'.static.GetXComHQ();
-		CompletedTechs = XComHQ.GetCompletedProvingGroundTechStates();
-		foreach CompletedTechs(TechState)
-		{
-			if (TechState.GetMyTemplate().ItemsToUpgrade.Find(ItemTemplate.DataName) != INDEX_NONE)
-			{
-				// A tech has already been completed which has upgraded this item, so replace the template with the upgraded version
-				ItemTemplate = ItemTemplateManager.FindItemTemplate(ItemTemplate.UpgradeItem);
-				break;
-			}
-		}
-	}
+	// Find the highest available upgraded version of the item
+	XComHQ = class'UIUtilities_Strategy'.static.GetXComHQ();
+	XComHQ.UpdateItemTemplateToHighestAvailableUpgrade(ItemTemplate);
 
 	ItemState = ItemTemplate.CreateInstanceFromTemplate(NewGameState);
 	NewGameState.AddStateObject(ItemState);
@@ -1487,7 +1467,7 @@ function GiveLootTableReward(XComGameState NewGameState, XComGameState_Reward Re
 		ItemTemplate = ItemTemplateManager.FindItemTemplate(LootName);
 		ItemState = ItemTemplate.CreateInstanceFromTemplate(NewGameState);
 		NewGameState.AddStateObject(ItemState);
-		XComHQ.PutItemInInventory(NewGameState, ItemState, true);
+		XComHQ.PutItemInInventory(NewGameState, ItemState);
 
 		RewardState.RewardString $= ItemTemplate.GetItemFriendlyName();
 		if (idx < (LootToGive.LootToBeCreated.Length - 1))
@@ -1646,67 +1626,6 @@ function GiveDoomReductionReward(XComGameState NewGameState, XComGameState_Rewar
 function string GetDoomReductionRewardString(XComGameState_Reward RewardState)
 {
 	return RewardState.GetMyTemplate().DisplayName $ ":" @ class'UIUtilities_Text'.static.GetTimeRemainingString(RewardState.Quantity);
-}
-
-// #######################################################################################
-// -------------------- SCHEMATIC REWARDS ------------------------------------------------
-// #######################################################################################
-static function X2DataTemplate CreateSchematicRewardTemplate()
-{
-	local X2RewardTemplate Template;
-
-	`CREATE_X2Reward_TEMPLATE(Template, 'Reward_Schematic');
-
-	Template.GenerateRewardFn = GenerateSchematicReward;
-	Template.SetRewardFn = SetSchematicReward;
-	Template.GiveRewardFn = GiveSchematicReward;
-	Template.GetRewardStringFn = GetSchematicRewardString;
-
-	return Template;
-}
-function GenerateSchematicReward(XComGameState_Reward RewardState, XComGameState NewGameState, optional float RewardScalar = 1.0, optional StateObjectReference RegionRef)
-{
-	local XComGameState_Item ItemState;
-	local X2SchematicTemplate SchematicTemplate;
-
-	SchematicTemplate = class'X2ItemTemplateManager'.static.GetItemTemplateManager().RollForValidSchematic();
-	ItemState = SchematicTemplate.CreateInstanceFromTemplate(NewGameState);
-	NewGameState.AddStateObject(ItemState);
-
-	RewardState.RewardObjectReference = ItemState.GetReference();
-}
-function SetSchematicReward(XComGameState_Reward RewardState, optional StateObjectReference RewardObjectRef, optional int Amount)
-{
-	RewardState.RewardObjectReference = RewardObjectRef;
-}
-function GiveSchematicReward(XComGameState NewGameState, XComGameState_Reward RewardState, optional StateObjectReference AuxRef, optional bool bOrder = false, optional int OrderHours = -1)
-{
-	local XComGameState_HeadquartersXCom XComHQ;
-	local XComGameState_Item ItemState;
-	local XComGameStateHistory History;
-	local StateObjectReference EmptyRef;
-
-	History = `XCOMHISTORY;
-
-	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
-	XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));	
-	NewGameState.AddStateObject(XComHQ);
-
-	if(RewardState.RewardObjectReference == EmptyRef)
-	{
-		GenerateSchematicReward(RewardState, NewGameState, 0);
-		ItemState = XComGameState_Item(NewGameState.GetGameStateForObjectID(RewardState.RewardObjectReference.ObjectID));
-	}
-	else
-	{
-		ItemState = XComGameState_Item(History.GetGameStateForObjectID(RewardState.RewardObjectReference.ObjectID));
-	}
-
-	XComHQ.PutItemInInventory(NewGameState, ItemState);
-}
-function string GetSchematicRewardString(XComGameState_Reward RewardState)
-{
-	return "1" @ RewardState.GetMyTemplate().DisplayName;
 }
 
 // #######################################################################################

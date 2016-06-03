@@ -19,7 +19,7 @@ class XComGameInfo extends GameInfo
 	abstract;
 
 var protectedwrite X2GameRuleset GameRuleset;
-var XGCharacterGenerator m_CharacterGen;
+var deprecated XGCharacterGenerator m_CharacterGen;
 var X2SimpleBodyPartFilter SharedBodyPartFilter;
 
 var class TacticalSaveGameClass;
@@ -451,7 +451,6 @@ event PreBeginPlay()
 	
 	SubscribeToOnCleanupWorld();
 	CreateGameRuleset();
-	m_CharacterGen = spawn( class 'XGCharacterGenerator' );
 }
 
 /**

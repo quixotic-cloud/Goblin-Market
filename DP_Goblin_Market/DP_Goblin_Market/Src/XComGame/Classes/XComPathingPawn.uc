@@ -102,10 +102,11 @@ var private const config linearcolor NonDashingBorderColor;
 var private XGUnitNativeBase LastActiveUnit; // the last unit to be active on this pawn
 var protected X2ReachableTilesCache ActiveCache; // allows us to switch to a waypoint cache when placing waypoints
 var private bool WaypointModifyMode; // toggle set by ui to show waypoint add/remove markers. doesn't change behavior, just looks
+var private bool ForceUpdateNextTick; // set to true if some operation requires the path to update (waypoint added or removed, etc)
 
 var privatewrite transient XComPath VisualPath; // the pulled path that traces the path tiles
 var privatewrite array<TTile> PathTiles;    // the actual tiles the unit will traverse if the move is confirmed
-var private transient TTile LastDestinationTile; // the last tile the path would end at. can be different from LastCursorTile if the cursor is on an invalid tile
+var privatewrite transient TTile LastDestinationTile; // the last tile the path would end at. can be different from LastCursorTile if the cursor is on an invalid tile
 
 var privatewrite transient XComGameState_BaseObject LastTargetObject; // Last actor the cursor was over, allows us to path info on change in target
 var private				   bool					WasDashing;
@@ -340,8 +341,7 @@ simulated event SetActive(XGUnitNativeBase kActiveXGUnit, optional bool bCanDash
 	else
 		ForceResetConcealment = false;
 
-	// set the last cursor tile to an impossible value to force an update on the next tick
-	LastDestinationTile.X = -1;
+	ForceUpdateNextTick = true;
 	LastActiveUnit = kActiveXGUnit;
 	ActiveCache = LastActiveUnit.m_kReachableTilesCache;
 
@@ -602,7 +602,6 @@ simulated event Tick(float DeltaTime)
 	}
 `endif
 
-
 	//Only update the concealment tiles once the current visualizations are finished
 	if (bConcealmentTilesNeedUpdate && !class'XComGameStateVisualizationMgr'.static.VisualizerBusy())
 	{
@@ -680,7 +679,8 @@ simulated event Tick(float DeltaTime)
 	}
 
 	// only update the path if we have a new destination or are targeting a pawn
-	if(PathDestination.X != LastDestinationTile.X 
+	if(ForceUpdateNextTick 
+		|| PathDestination.X != LastDestinationTile.X 
 		|| PathDestination.Y != LastDestinationTile.Y 
 		|| PathDestination.Z != LastDestinationTile.Z
 		|| TargetObject != LastTargetObject)
@@ -694,6 +694,7 @@ simulated event Tick(float DeltaTime)
 		LastTargetObject = TargetObject;
 
 		bConcealmentTilesNeedUpdate = false;
+		ForceUpdateNextTick = false;
 	}
 }
 
@@ -1059,7 +1060,7 @@ simulated function bool ClearAllWaypoints()
 
 	ActiveCache = LastActiveUnit != none ? LastActiveUnit.m_kReachableTilesCache : none;
 
-	LastDestinationTile.X = -1; // force a path rebuild
+	ForceUpdateNextTick = true;
 
 	return HadWaypoints;
 }
@@ -1091,7 +1092,7 @@ simulated private function AddWaypoint()
 	X2WaypointTilesCache(ActiveCache).WaypointTile = Waypoint.Tile;
 	X2WaypointTilesCache(ActiveCache).CostToWaypoint = Waypoint.Cost;
 
-	LastDestinationTile.X = -1; // force a path rebuild
+	ForceUpdateNextTick = true;
 }
 
 // Removes the waypoint at the given index in the Waypoints array (and any waypoints after that)
@@ -1134,7 +1135,7 @@ simulated private function RemoveWaypoint(int WaypointIndex)
 		X2WaypointTilesCache(ActiveCache).CostToWaypoint = Waypoint.Cost;
 		X2WaypointTilesCache(ActiveCache).ForceCacheUpdate();
 
-		LastDestinationTile.X = -1; // force a path rebuild
+		ForceUpdateNextTick = true;
 	}
 }
 

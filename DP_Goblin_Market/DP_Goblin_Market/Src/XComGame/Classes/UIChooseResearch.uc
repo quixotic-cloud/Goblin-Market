@@ -134,7 +134,7 @@ simulated function array<Commodity> ConvertTechsToCommodities()
 		else
 		{
 			TechComm.Cost = TechState.GetMyTemplate().Cost;
-			TechComm.Requirements = TechState.GetMyTemplate().Requirements;
+			TechComm.Requirements = GetBestStrategyRequirementsForUI(TechState.GetMyTemplate());
 			TechComm.CostScalars = XComHQ.ResearchCostScalars;
 		}
 
@@ -202,6 +202,24 @@ simulated function array<StateObjectReference> GetTechs()
 	return class'UIUtilities_Strategy'.static.GetXComHQ().GetAvailableTechsForResearch(bShadowChamber);
 }
 
+simulated function StrategyRequirement GetBestStrategyRequirementsForUI(X2TechTemplate TechTemplate)
+{
+	local StrategyRequirement AltRequirement;
+
+	if (!XComHQ.MeetsAllStrategyRequirements(TechTemplate.Requirements) && TechTemplate.AlternateRequirements.Length > 0)
+	{
+		foreach TechTemplate.AlternateRequirements(AltRequirement)
+		{
+			if (XComHQ.MeetsAllStrategyRequirements(AltRequirement))
+			{
+				return AltRequirement;
+			}
+		}
+	}
+
+	return TechTemplate.Requirements;
+}
+
 function int SortTechsInstant(StateObjectReference TechRefA, StateObjectReference TechRefB)
 {
 	local XComGameState_Tech TechStateA, TechStateB;
@@ -252,8 +270,8 @@ function int SortTechsCanResearch(StateObjectReference TechRefA, StateObjectRefe
 
 	TechTemplateA = XComGameState_Tech(History.GetGameStateForObjectID(TechRefA.ObjectID)).GetMyTemplate();
 	TechTemplateB = XComGameState_Tech(History.GetGameStateForObjectID(TechRefB.ObjectID)).GetMyTemplate();
-	CanResearchA = XComHQ.MeetsRequirmentsAndCanAffordCost(TechTemplateA.Requirements, TechTemplateA.Cost, XComHQ.ResearchCostScalars);
-	CanResearchB = XComHQ.MeetsRequirmentsAndCanAffordCost(TechTemplateB.Requirements, TechTemplateB.Cost, XComHQ.ResearchCostScalars);
+	CanResearchA = XComHQ.MeetsRequirmentsAndCanAffordCost(TechTemplateA.Requirements, TechTemplateA.Cost, XComHQ.ResearchCostScalars, 0.0, TechTemplateA.AlternateRequirements);
+	CanResearchB = XComHQ.MeetsRequirmentsAndCanAffordCost(TechTemplateB.Requirements, TechTemplateB.Cost, XComHQ.ResearchCostScalars, 0.0, TechTemplateB.AlternateRequirements);
 
 	if (CanResearchA && !CanResearchB)
 	{
@@ -330,7 +348,7 @@ function bool OnTechTableOption(int iOption)
 
 	TechState = XComGameState_Tech(History.GetGameStateForObjectID(m_arrRefs[iOption].ObjectID));
 
-	if(!XComHQ.HasPausedProject(m_arrRefs[iOption]) && !XComHQ.MeetsRequirmentsAndCanAffordCost(TechState.GetMyTemplate().Requirements, TechState.GetMyTemplate().Cost, XComHQ.ResearchCostScalars))
+	if(!XComHQ.HasPausedProject(m_arrRefs[iOption]) && !XComHQ.MeetsRequirmentsAndCanAffordCost(TechState.GetMyTemplate().Requirements, TechState.GetMyTemplate().Cost, XComHQ.ResearchCostScalars, 0.0, TechState.GetMyTemplate().AlternateRequirements))
 	{
 		//SOUND().PlaySFX(SNDLIB().SFX_UI_No);
 		return false;

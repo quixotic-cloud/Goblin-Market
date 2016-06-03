@@ -244,6 +244,9 @@ var SkeletalMeshComponent				m_kHeadMeshComponent; //Alias to the base mesh for 
 var SkeletalMeshComponent	            m_kTorsoComponent, m_kArmsMC, m_kLegsMC, m_kHelmetMC, m_kDecoKitMC, m_kEyeMC, m_kTeethMC, m_kHairMC, m_kBeardMC, m_kUpperFacialMC, m_kLowerFacialMC;
 var protectedwrite SkeletalMeshComponent HairComponent;       //  jbouscher - this was pulled from XComHumanPawn as it is needed in native code for terrible reasons
 
+//Independently selectable arm meshes
+var transient SkeletalMeshComponent     m_kLeftArm, m_kRightArm, m_kLeftArmDeco, m_kRightArmDeco;
+
 var array<ParticleSystemComponent>      m_arrRemovePSCOnDeath;
 
 var private bool                        m_bTexturesBoosted;     //  used in strategy for getting textures to load early
@@ -290,7 +293,7 @@ native function vector GetCollisionComponentLocation();
 native function Rotator GetFlyingDesiredRotation(optional float DesiredPathDistance = -1);
 
 native function SyncCarryingUnits();
-
+native function SetDesiredBoneSprings(bool bEnableLinear, bool bEnableAngular, float InBoneLinearSpring, float InBoneLinearDamping, float InBoneAngularSpring, float InBoneAngularDamping);
 simulated native function SetHidden(bool bNewHidden);
 simulated event SetVisible(bool bVisible)
 {
@@ -672,12 +675,22 @@ simulated function XComUpdateAnimSetList()
 	local XComPerkContent kPerkContent;
 	local XComGameState_Unit UnitState;
 	local XComGameState_Effect TestEffect;
-	local X2Action CurrentAction;
-
+	local XComGameStateHistory History;
+	local StateObjectReference EffectRef;
+	local XComGameState_Effect EffectState;
+	local X2Effect_AdditionalAnimSets AdditionalAnimSetsEffect;
+	
 	// MHU - Attempt to reset animsets to default (usually rifle animset)
 	//       If the default animset doesn't exist, do nothing.
 	if (RestoreAnimSetsToDefault())
 	{
+		kUnit = XGUnit(GetGameUnit());
+
+		if (kUnit != none)
+		{
+			UnitState = kUnit.GetVisualizedGameState();
+		}
+
 		currentWeapon = XComWeapon(Weapon);
 		if (currentWeapon != none)
 		{
@@ -702,27 +715,33 @@ simulated function XComUpdateAnimSetList()
 			}
 		}
 
-		// check if we should be updating our anim set. Certain effects will completely replace our current anim
-		// set with another, and we need to ensure that this is synchronized with whatever state is currently being
-		// visualized.
-		CurrentAction = `XCOMVISUALIZATIONMGR.GetCurrentTrackActionForVisualizer(m_kGameUnit);
-		if(CurrentAction != none)
-		{
-			// TODO JWATS: Generalize this the association between effects and custom anim sets. i.e., modders could 
-			// add a "drunk" effect and anim set. Please modders. You know what needs done.
-			UnitState = XComGameState_Unit(CurrentAction.Track.StateObject_NewState);
-			if( UnitState != None )
-			{
-				TestEffect = UnitState.GetUnitAffectedByEffectState(class'X2AbilityTemplateManager'.default.BeingCarriedEffectName);
-				if( TestEffect != None )
-				{
-					XComAddAnimSets(BeingCarriedAnimSets);
-				}
 
-				TestEffect = UnitState.GetUnitAffectedByEffectState(class'X2Ability_CarryUnit'.default.CarryUnitEffectName);
-				if( TestEffect != None )
+		if( UnitState != None )
+		{
+			TestEffect = UnitState.GetUnitAffectedByEffectState(class'X2AbilityTemplateManager'.default.BeingCarriedEffectName);
+			if( TestEffect != None )
+			{
+				XComAddAnimSets(BeingCarriedAnimSets);
+			}
+
+			TestEffect = UnitState.GetUnitAffectedByEffectState(class'X2Ability_CarryUnit'.default.CarryUnitEffectName);
+			if( TestEffect != None )
+			{
+				XComAddAnimSets(CarryingUnitAnimSets);
+			}
+		}
+
+		// Loop over extra anim sets added by any X2Effect_AdditionalAnimSetsEffect
+		if( UnitState != none )
+		{
+			History = `XCOMHISTORY;
+			foreach UnitState.AffectedByEffects(EffectRef)
+			{
+				EffectState = XComGameState_Effect(History.GetGameStateForObjectID(EffectRef.ObjectID));
+				AdditionalAnimSetsEffect = X2Effect_AdditionalAnimSets(EffectState.GetX2Effect());
+				if( AdditionalAnimSetsEffect != none )
 				{
-					XComAddAnimSets(CarryingUnitAnimSets);
+					XComAddAnimSets(AdditionalAnimSetsEffect.AdditonalAnimSets);
 				}
 			}
 		}
@@ -731,14 +750,53 @@ simulated function XComUpdateAnimSetList()
 	}
 }
 
+simulated final function XComReaddCarryAnimSets()
+{
+	local XGUnit kUnit;
+	local XComGameState_Unit UnitState;
+	local XComGameState_Effect TestEffect;
+
+	if (!IsA('XComCivilian'))
+	{
+		kUnit = XGUnit(GetGameUnit());
+
+		if (kUnit != none)
+		{
+			UnitState = kUnit.GetVisualizedGameState();
+		}
+
+		if (!IsA('XComCivilian') && UnitState != None)
+		{
+			TestEffect = UnitState.GetUnitAffectedByEffectState(class'X2AbilityTemplateManager'.default.BeingCarriedEffectName);
+			if (TestEffect != None)
+			{
+				XComRemoveAnimSet(BeingCarriedAnimSets);
+				XComAddAnimSets(BeingCarriedAnimSets);
+			}
+
+			TestEffect = UnitState.GetUnitAffectedByEffectState(class'X2Ability_CarryUnit'.default.CarryUnitEffectName);
+			if (TestEffect != None)
+			{
+				XComRemoveAnimSet(CarryingUnitAnimSets);
+				XComAddAnimSets(CarryingUnitAnimSets);
+			}
+		}
+	}
+}
+
 simulated final function XComAddAnimSetsExternal(const out array<AnimSet> CustomAnimSets)
 {
 	local int i;
 
-	for(i=0; i<CustomAnimSets.Length; i++)
+	for( i=0; i<CustomAnimSets.Length; i++ )
 	{
-		if (CustomAnimSets[i] != none && Mesh.AnimSets.Find(CustomAnimSets[i]) == INDEX_NONE)
-			Mesh.AnimSets[Mesh.AnimSets.Length] = CustomAnimSets[i];
+		if( CustomAnimSets[i] != none )
+		{
+			if( Mesh.AnimSets.Find(CustomAnimSets[i]) == INDEX_NONE )
+			{
+				Mesh.AnimSets[Mesh.AnimSets.Length] = CustomAnimSets[i];
+			}
+		}
 	}
 
 	Mesh.UpdateAnimations();
@@ -754,6 +812,17 @@ simulated final function private XComAddAnimSets(const out array<AnimSet> Custom
 	{
 		if (CustomAnimSets[i] != none && Mesh.AnimSets.Find(CustomAnimSets[i]) == INDEX_NONE)
 			Mesh.AnimSets[Mesh.AnimSets.Length] = CustomAnimSets[i];
+	}
+}
+
+simulated final function private XComRemoveAnimSet(const out array<AnimSet> CustomAnimSets)
+{
+	local int i;
+
+	for (i = 0; i < CustomAnimSets.Length; i++)
+	{
+		if (CustomAnimSets[i] != none)
+			Mesh.AnimSets.RemoveItem(CustomAnimSets[i]);
 	}
 }
 
@@ -800,6 +869,33 @@ simulated event RagdollNotify()
 	if (GetStateName() == 'RagDollBlend')
 	{
 		bWaitingForRagdollNotify = false; //Indicate that we would like to transition from bone springs to actual physics
+	}
+}
+
+//  jbouscher - called from AnimNotify_CosmeticUnit
+simulated event AnimateCosmeticUnit(name AnimName)
+{
+	local XComGameState_Unit UnitState;
+	local XComGameState_Item ItemState;
+	local XGUnit CosmeticUnit;
+	local CustomAnimParams AnimParams;
+	
+	if (AnimName != '')
+	{
+		UnitState = GetGameUnit().GetVisualizedGameState();
+		ItemState = UnitState.GetItemInSlot(eInvSlot_SecondaryWeapon);      //  bit of an optimization as we know cosmetic units are the secondary weapon
+		if (ItemState != none && ItemState.CosmeticUnitRef.ObjectID > 0)
+		{
+			CosmeticUnit = XGUnit(`XCOMHISTORY.GetVisualizer(ItemState.CosmeticUnitRef.ObjectID));
+			if (CosmeticUnit != none)
+			{
+				if (CosmeticUnit.GetPawn().GetAnimTreeController().CanPlayAnimation(AnimName))
+				{
+					AnimParams.AnimName = AnimName;
+					CosmeticUnit.GetPawn().GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams);
+				}
+			}
+		}
 	}
 }
 
@@ -1485,6 +1581,14 @@ simulated function UpdateHeadLookAtTarget()
 	History = `XCOMHISTORY;
 	PresLayer = `PRES;
 
+	// no heads turning on dead guys
+	if (m_kGameUnit != none && m_kGameUnit.IsDead())
+		return;
+
+	// similarly if we're not force updated or onscreen
+	if (!(Mesh.bUpdateSkelWhenNotRendered || Mesh.bRecentlyRendered))
+		return;
+
 	if( PresLayer != none && PresLayer.GetTacticalHUD() != None )
 	{
 		TargetingMethod = PresLayer.GetTacticalHUD().GetTargetingMethod();
@@ -1547,6 +1651,7 @@ event bool UpdatePawnVisibility()
 	else
 	{
 		`XWORLD.GetFloorTileForPosition(Location, PawnTile, true);
+		`XWORLD.ClampTile( PawnTile );
 
 		CoverPeekData = `XWORLD.GetCachedCoverAndPeekData(PawnTile);
 

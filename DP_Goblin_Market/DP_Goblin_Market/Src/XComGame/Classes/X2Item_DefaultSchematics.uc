@@ -51,16 +51,11 @@ static function X2DataTemplate CreateTemplate_AssaultRifle_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Mag_Rifle";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 1;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('AssaultRifle_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'AssaultRifle_MG';
 	Template.HideIfPurchased = 'AssaultRifle_BM';
 
@@ -90,17 +85,11 @@ static function X2DataTemplate CreateTemplate_AssaultRifle_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Beam_Rifle";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 3;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('AssaultRifle_CV');
-	Template.ItemsToUpgrade.AddItem('AssaultRifle_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'AssaultRifle_BM';
 
 	// Requirements
@@ -133,16 +122,11 @@ static function X2DataTemplate CreateTemplate_Shotgun_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Mag_Shotgun";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 2;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Shotgun_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Shotgun_MG';
 	Template.HideIfPurchased = 'Shotgun_BM';
 
@@ -172,17 +156,11 @@ static function X2DataTemplate CreateTemplate_Shotgun_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Beam_Shotgun";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 4;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Shotgun_CV');
-	Template.ItemsToUpgrade.AddItem('Shotgun_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Shotgun_BM';
 
 	// Requirements
@@ -215,16 +193,11 @@ static function X2DataTemplate CreateTemplate_Cannon_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Mag_Cannon";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 2;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Cannon_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Cannon_MG';
 	Template.HideIfPurchased = 'Cannon_BM';
 
@@ -254,17 +227,11 @@ static function X2DataTemplate CreateTemplate_Cannon_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Beam_Lmg";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 4;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Cannon_CV');
-	Template.ItemsToUpgrade.AddItem('Cannon_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Cannon_BM';
 
 	// Requirements
@@ -297,16 +264,11 @@ static function X2DataTemplate CreateTemplate_SniperRifle_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Mag_Sniper_Rifle";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 2;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('SniperRifle_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'SniperRifle_MG';
 	Template.HideIfPurchased = 'SniperRifle_BM';
 
@@ -336,17 +298,11 @@ static function X2DataTemplate CreateTemplate_SniperRifle_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Beam_Sniper_Rifle";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 4;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('SniperRifle_CV');
-	Template.ItemsToUpgrade.AddItem('SniperRifle_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'SniperRifle_BM';
 
 	// Requirements
@@ -379,16 +335,11 @@ static function X2DataTemplate CreateTemplate_Pistol_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Mag_Pistol";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 1;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Pistol_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Pistol_MG';
 	Template.HideIfPurchased = 'Pistol_BM';
 
@@ -418,17 +369,11 @@ static function X2DataTemplate CreateTemplate_Pistol_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Beam_Pistol";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 3;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Pistol_CV');
-	Template.ItemsToUpgrade.AddItem('Pistol_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Pistol_BM';
 
 	// Requirements
@@ -461,16 +406,11 @@ static function X2DataTemplate CreateTemplate_Sword_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Mag_Sword";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 1;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Sword_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Sword_MG';
 	Template.HideIfPurchased = 'Sword_BM';
 
@@ -500,17 +440,11 @@ static function X2DataTemplate CreateTemplate_Sword_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Beam_Sword";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 3;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Sword_CV');
-	Template.ItemsToUpgrade.AddItem('Sword_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Sword_BM';
 
 	// Requirements
@@ -543,16 +477,11 @@ static function X2DataTemplate CreateTemplate_Gremlin_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Gremlin_Drone_Mk2";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 1;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Gremlin_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Gremlin_MG';
 	Template.HideIfPurchased = 'Gremlin_BM';
 
@@ -582,17 +511,11 @@ static function X2DataTemplate CreateTemplate_Gremlin_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Gremlin_Drone_Mk3";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 3;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Gremlin_CV');
-	Template.ItemsToUpgrade.AddItem('Gremlin_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'Gremlin_BM';
 
 	// Requirements
@@ -625,16 +548,11 @@ static function X2DataTemplate CreateTemplate_PsiAmp_Magnetic_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Psi_AmpMK2";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 1;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('PsiAmp_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'PsiAmp_MG';
 	Template.HideIfPurchased = 'PsiAmp_BM';
 
@@ -672,17 +590,11 @@ static function X2DataTemplate CreateTemplate_PsiAmp_Beam_Schematic()
 
 	Template.ItemCat = 'weapon';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Psi_AmpMK3";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 3;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('PsiAmp_CV');
-	Template.ItemsToUpgrade.AddItem('PsiAmp_MG');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'PsiAmp_BM';
 
 	// Requirements
@@ -719,16 +631,11 @@ static function X2DataTemplate CreateTemplate_GrenadeLauncher_Magnetic_Schematic
 
 	Template.ItemCat = 'weapon'; 
 	Template.strImage = "img:///UILibrary_Common.MagSecondaryWeapons.MagLauncher";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 1;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('GrenadeLauncher_CV');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'GrenadeLauncher_MG';
 
 	// Requirements
@@ -762,16 +669,11 @@ static function X2DataTemplate CreateTemplate_MediumPlatedArmor_Schematic()
 
 	Template.ItemCat = 'armor';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Predator_Armor";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 1;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('KevlarArmor');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'MediumPlatedArmor';
 	Template.HideIfPurchased = 'MediumPoweredArmor';
 
@@ -805,17 +707,11 @@ static function X2DataTemplate CreateTemplate_MediumPoweredArmor_Schematic()
 
 	Template.ItemCat = 'armor';
 	Template.strImage = "img:///UILibrary_StrategyImages.X2InventoryIcons.Inv_Warden_Armor";
-	Template.CanBeBuilt = true;
-	Template.bOneTimeBuild = true;
-	Template.HideInInventory = true;
-	Template.HideInLootRecovered = true;
 	Template.PointsToComplete = 0;
 	Template.Tier = 2;
 	Template.OnBuiltFn = UpgradeItems;
 
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('KevlarArmor');
-	Template.ItemsToUpgrade.AddItem('MediumPlatedArmor');
+	// Reference Item
 	Template.ReferenceItemTemplate = 'MediumPoweredArmor';
 
 	// Requirements
@@ -846,149 +742,5 @@ static function X2DataTemplate CreateTemplate_MediumPoweredArmor_Schematic()
 
 static function UpgradeItems(XComGameState NewGameState, XComGameState_Item ItemState)
 {
-	local XComGameStateHistory History;
-	local XComGameState_HeadquartersXCom XComHQ;
-	local X2ItemTemplateManager ItemTemplateManager;
-	local X2ItemTemplate BaseItemTemplate, UpgradeItemTemplate;
-	local X2WeaponUpgradeTemplate WeaponUpgradeTemplate;
-	local XComGameState_Item InventoryItemState, BaseItemState, UpgradedItemState;
-	local array<X2WeaponUpgradeTemplate> WeaponUpgrades;
-	local array<XComGameState_Item> InventoryItems;
-	local array<XComGameState_Unit> Soldiers;
-	local EInventorySlot InventorySlot;
-	local array<name> ItemsToUpgrade;
-	local int idx, iSoldier, iItems;
-	local XComNarrativeMoment EquipNarrativeMoment;
-	local XComGameState_Unit HighestRankSoldier;
-
-	History = `XCOMHISTORY;
-	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
-
-	foreach NewGameState.IterateByClassType(class'XComGameState_HeadquartersXCom', XComHQ)
-	{
-		break;
-	}
-
-	if (XComHQ == none)
-	{
-		XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
-		XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
-		NewGameState.AddStateObject(XComHQ);
-	}
-
-	ItemsToUpgrade = X2SchematicTemplate(ItemState.GetMyTemplate()).ItemsToUpgrade;
-
-	for (idx = 0; idx < ItemsToUpgrade.Length; idx++)
-	{
-		BaseItemTemplate = ItemTemplateManager.FindItemTemplate(ItemsToUpgrade[idx]);
-		UpgradeItemTemplate = ItemTemplateManager.FindItemTemplate(BaseItemTemplate.UpgradeItem);
-
-		// If the base item can be upgraded twice, and the second upgrade matches the referenced schematic item, skip over the first upgrade
-		if (UpgradeItemTemplate.UpgradeItem != '' && UpgradeItemTemplate.UpgradeItem == X2SchematicTemplate(ItemState.GetMyTemplate()).ReferenceItemTemplate)
-		{
-			UpgradeItemTemplate = ItemTemplateManager.FindItemTemplate(UpgradeItemTemplate.UpgradeItem);
-		}
-
-		// If the new item is infinite, just add it directly to the inventory
-		if (UpgradeItemTemplate.bInfiniteItem)
-		{
-			// But only add the infinite item if it isn't already in the inventory
-			if (!XComHQ.HasItem(UpgradeItemTemplate))
-			{
-				UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
-				NewGameState.AddStateObject(UpgradedItemState);
-				XComHQ.AddItemToHQInventory(UpgradedItemState);
-			}
-		}
-		else
-		{
-			// Otherwise check if the base item is in the XComHQ inventory
-			BaseItemState = XComHQ.GetItemByName(BaseItemTemplate.DataName);
-			
-			// If it is not, we have nothing to replace, so move on
-			if (BaseItemState != none)
-			{
-				// Otherwise match the base items quantity
-				UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
-				NewGameState.AddStateObject(UpgradedItemState);
-				UpgradedItemState.Quantity = BaseItemState.Quantity;
-							
-				// Then add the upgrade item and remove all of the base items from the inventory
-				XComHQ.PutItemInInventory(NewGameState, UpgradedItemState);
-				XComHQ.RemoveItemFromInventory(NewGameState, BaseItemState.GetReference(), BaseItemState.Quantity);
-				NewGameState.RemoveStateObject(BaseItemState.GetReference().ObjectID);
-			}
-		}
-
-		// Check the inventory for any unequipped items with weapon upgrades attached, make sure they get updated
-		for (iItems = 0; iItems < XComHQ.Inventory.Length; iItems++)
-		{
-			InventoryItemState = XComGameState_Item(History.GetGameStateForObjectID(XComHQ.Inventory[iItems].ObjectID));
-			if (InventoryItemState.GetMyTemplateName() == BaseItemTemplate.DataName && InventoryItemState.GetMyWeaponUpgradeTemplates().Length > 0)
-			{
-				UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
-				NewGameState.AddStateObject(UpgradedItemState);
-
-				// Transfer over all weapon upgrades to the new item
-				WeaponUpgrades = InventoryItemState.GetMyWeaponUpgradeTemplates();
-				foreach WeaponUpgrades(WeaponUpgradeTemplate)
-				{
-					UpgradedItemState.ApplyWeaponUpgradeTemplate(WeaponUpgradeTemplate);
-				}
-
-				// Delete the old item, and add the new item to the inventory
-				NewGameState.RemoveStateObject(InventoryItemState.GetReference().ObjectID);
-				XComHQ.RemoveItemFromInventory(NewGameState, InventoryItemState.GetReference(), InventoryItemState.Quantity);
-				XComHQ.PutItemInInventory(NewGameState, UpgradedItemState);
-			}
-		}
-
-		// Then check every soldier's inventory and replace the old item with a new one
-		Soldiers = XComHQ.GetSoldiers();
-		for (iSoldier = 0; iSoldier < Soldiers.Length; iSoldier++)
-		{
-			InventoryItems = Soldiers[iSoldier].GetAllInventoryItems(NewGameState, false);
-
-			foreach InventoryItems(InventoryItemState)
-			{
-				if (InventoryItemState.GetMyTemplateName() == BaseItemTemplate.DataName)
-				{
-					UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
-					NewGameState.AddStateObject(UpgradedItemState);
-					InventorySlot = InventoryItemState.InventorySlot; // save the slot location for the new item
-
-					// Remove the old item from the soldier and transfer over all weapon upgrades to the new item
-					Soldiers[iSoldier].RemoveItemFromInventory(InventoryItemState, NewGameState);
-					WeaponUpgrades = InventoryItemState.GetMyWeaponUpgradeTemplates();
-					foreach WeaponUpgrades(WeaponUpgradeTemplate)
-					{
-						UpgradedItemState.ApplyWeaponUpgradeTemplate(WeaponUpgradeTemplate);
-					}
-
-					// Delete the old item
-					NewGameState.RemoveStateObject(InventoryItemState.GetReference().ObjectID);
-
-					// Then add the new item to the soldier in the same slot
-					Soldiers[iSoldier].AddItemToInventory(UpgradedItemState, InventorySlot, NewGameState);
-
-					// Store the highest ranking soldier to get the upgraded item
-					if(HighestRankSoldier == none || Soldiers[iSoldier].GetRank() > HighestRankSoldier.GetRank() )
-					{
-						HighestRankSoldier = Soldiers[iSoldier];
-					}
-				}
-			}
-		}
-
-		// Play a narrative if there is one and there is a valid soldier
-		if(HighestRankSoldier != none && X2EquipmentTemplate(UpgradeItemTemplate).EquipNarrative != "")
-		{
-			EquipNarrativeMoment = XComNarrativeMoment(`CONTENT.RequestGameArchetype(X2EquipmentTemplate(UpgradeItemTemplate).EquipNarrative));
-			if(EquipNarrativeMoment != None && XComHQ.CanPlayArmorIntroNarrativeMoment(EquipNarrativeMoment))
-			{
-				XComHQ.UpdatePlayedArmorIntroNarrativeMoments(EquipNarrativeMoment);
-				`HQPRES.UIArmorIntroCinematic(EquipNarrativeMoment.nmRemoteEvent, 'CIN_ArmorIntro_Done', HighestRankSoldier.GetReference());
-			}
-		}
-	}
+	class'XComGameState_HeadquartersXCom'.static.UpgradeItems(NewGameState, ItemState.GetMyTemplateName());
 }

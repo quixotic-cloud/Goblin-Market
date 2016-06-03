@@ -59,6 +59,8 @@ var() transient native Array_Mirror DestructibleActors{TArray<IDestructible*>};
 var() transient native Set_Mirror UniqueRemovedChunks{TSet<UINT>};
 var() transient native array<XComLadder> DestroyedLadders;
 
+var bool bAllowDestructionOfDamageCauseCover;
+
 //Returns true if this damage event resulted in actors being damaged or destroyed
 native function bool CausedDestruction();
 
@@ -69,7 +71,7 @@ simulated event OnStateSubmitted( )
 	`XEVENTMGR.TriggerEvent( 'OnEnvironmentalDamage', self, self, XComGameState(Outer) );
 }
 
-function VisualizeSecondaryFires(XComGameState GameState, out array<VisualizationTrack> VisualizationTracks)
+static function VisualizeSecondaryFires(XComGameState GameState, out array<VisualizationTrack> VisualizationTracks)
 {
 	local X2Effect ApplyEffect;
 	local VisualizationTrack BuildTrack;

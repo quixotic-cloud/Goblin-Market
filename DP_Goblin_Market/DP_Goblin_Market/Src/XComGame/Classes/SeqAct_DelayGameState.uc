@@ -5,6 +5,7 @@ class SeqAct_DelayGameState extends SequenceAction
 	implements(X2KismetSeqOpVisualizer);
 
 var() float Duration;
+var() bool bIgnoreZipMode;
 
 function ModifyKismetGameState(out XComGameState GameState);
 
@@ -26,6 +27,7 @@ function BuildVisualization(XComGameState GameState, out array<VisualizationTrac
 
 	DelayAction = X2Action_Delay( class'X2Action_Delay'.static.AddToVisualizationTrack( BuildTrack, GameState.GetContext() ) );
 	DelayAction.Duration = Duration;
+	DelayAction.bIgnoreZipMode = bIgnoreZipMode;
 	
 	VisualizationTracks.AddItem(BuildTrack);
 }

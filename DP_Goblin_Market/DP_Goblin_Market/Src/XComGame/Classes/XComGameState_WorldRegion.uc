@@ -417,7 +417,7 @@ function bool Update(XComGameState NewGameState)
 	bModified = false;
 
 	// Do not trigger anything while the Avenger or Skyranger are flying, or if another popup is already being presented
-	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.IsCurrentClass(class'UIAlert'))
 	{
 		if (bUpdateShortestPathsToMissions)
 		{
@@ -1283,8 +1283,11 @@ simulated function MakeContactCallback(EUIAction eAction, UIAlert AlertData, opt
 				`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
 			}
 
-			// Avenger should fly to the region to make contact
-			XComHQ.SetPendingPointOfTravel(RegionState);
+			// Avenger should fly to the region to make contact if it isn't already there
+			if (XComHQ.CurrentLocation.ObjectID != ObjectID)
+			{
+				XComHQ.SetPendingPointOfTravel(RegionState);
+			}
 		}
 		else
 		{
@@ -1324,8 +1327,11 @@ simulated function BuildOutpostCallback(eUIAction eAction, UIAlert AlertData, op
 
 			`XSTRATEGYSOUNDMGR.PlaySoundEvent("Geoscape_PopularSupportThreshold");
 
-			// Avenger should fly to the region to build the outpost
-			XComHQ.SetPendingPointOfTravel(RegionState);
+			// Avenger should fly to the region to build the outpost if it isn't already there
+			if (XComHQ.CurrentLocation.ObjectID != ObjectID)
+			{
+				XComHQ.SetPendingPointOfTravel(RegionState);
+			}
 		}
 		else
 		{

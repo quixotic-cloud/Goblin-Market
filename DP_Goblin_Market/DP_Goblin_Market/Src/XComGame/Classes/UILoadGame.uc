@@ -330,23 +330,12 @@ simulated function LoadSelectedSlot()
 		DialogData.eType = eDialog_Warning;
 		DialogData.strTitle = m_sMissingDLCTitle;
 		DialogData.strAccept = class'UIDialogueBox'.default.m_strDefaultAcceptLabel;
+				
+		DialogData.strText = Repl(m_sMissingDLCText, "%modnames%", MissingDLC);
 
-		//if( WorldInfo.IsConsoleBuild(CONSOLE_PS3) )
-		//	DialogData.strText = repl(m_sMissingDLCText, ":", "");
-		//else
-			DialogData.strText = m_sMissingDLCText $ "\n" $ MissingDLC;
-
-		DialogData.fnCallback = MissingDLCCheckCallback;
-
-		// Allow devs to override the DLC check
-		`if(`notdefined(ShippingPC))
-		
-			DialogData.strTitle = "";
-			DialogData.strAccept = m_strLoadAnyway;
-			DialogData.strCancel = class'UIDialogueBox'.default.m_strDefaultCancelLabel;
-			DialogData.fnCallback = DevDownloadableContentCheckOverride;
-		
-		`endif
+		DialogData.strAccept = m_strLoadAnyway;
+		DialogData.strCancel = class'UIDialogueBox'.default.m_strDefaultCancelLabel;
+		DialogData.fnCallback = DevDownloadableContentCheckOverride;
 
 		Movie.Pres.UIRaiseDialog( DialogData );
 	}

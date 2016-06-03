@@ -15,12 +15,23 @@ var private X2GrapplePuck GrapplePuck;
 
 function Init(AvailableAction InAction)
 {
+	local X2Camera_LookAtLocationTimed LookAtCamera;
+	local vector TargetLocation;
 
 	super.Init(InAction);
 
 	// create the actor to draw the target location tiles on the ground
 	GrapplePuck = `CURSOR.Spawn(class'X2GrapplePuck', `CURSOR);
 	GrapplePuck.InitForUnitState(UnitState);
+
+	// have a camera look at the default location
+	if(GrapplePuck.GetGrappleTargetLocation(TargetLocation))
+	{
+		LookAtCamera = new class'X2Camera_LookAtLocationTimed';
+		LookAtCamera.LookAtLocation = TargetLocation;
+		LookAtCamera.LookAtDuration = 0.0f;
+		`CAMERASTACK.AddCamera(LookAtCamera);
+	}
 }
 
 function Update(float DeltaTime);

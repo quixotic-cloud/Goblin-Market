@@ -26,6 +26,8 @@ var UIList LockerList;
 
 var UIArmory_LoadoutItemTooltip InfoTooltip;
 
+var array<EInventorySlot> CannotEditSlotsList;
+
 var localized string m_strInventoryTitle;
 var localized string m_strLockerTitle;
 var localized string m_strInventoryLabels[EInventorySlot.EnumCount]<BoundEnum=EInventorySlot>;
@@ -38,10 +40,14 @@ var localized string m_strTooltipStripItems;
 var localized string m_strTooltipStripItemsDisabled;
 var localized string m_strTooltipStripGear;
 var localized string m_strTooltipStripGearDisabled;
+var localized string m_strTooltipStripWeapons;
+var localized string m_strTooltipStripWeaponsDisabled;
+var localized string m_strCannotEdit;
 
 var XGParamTag LocTag; // optimization
 var bool bGearStripped;
 var bool bItemsStripped;
+var bool bWeaponsStripped;
 var array<StateObjectReference> StrippedUnits;
 var bool bTutorialJumpOut;
 
@@ -94,6 +100,15 @@ simulated function UpdateNavHelp()
 		else
 		{
 			NavHelp.AddRightHelp(class'UISquadSelect'.default.m_strStripItems, "", OnStripItems, false, m_strTooltipStripItems, class'UIUtilities'.const.ANCHOR_BOTTOM_CENTER);
+		}
+		
+		if (bWeaponsStripped)
+		{
+			NavHelp.AddRightHelp(class'UISquadSelect'.default.m_strStripWeapons, "", none, true, m_strTooltipStripWeaponsDisabled, class'UIUtilities'.const.ANCHOR_BOTTOM_CENTER);
+		}
+		else
+		{
+			NavHelp.AddRightHelp(class'UISquadSelect'.default.m_strStripWeapons, "", OnStripWeapons, false, m_strTooltipStripWeapons, class'UIUtilities'.const.ANCHOR_BOTTOM_CENTER);
 		}
 
 		if(bGearStripped)
@@ -202,6 +217,54 @@ simulated function OnStripGearDialogCallback(eUIAction eAction)
 	}
 }
 
+simulated function OnStripWeapons()
+{
+	local TDialogueBoxData DialogData;
+	DialogData.eType = eDialog_Normal;
+	DialogData.strTitle = class'UISquadSelect'.default.m_strStripWeaponsConfirm;
+	DialogData.strText = class'UISquadSelect'.default.m_strStripWeaponsConfirmDesc;
+	DialogData.fnCallback = OnStripWeaponsDialogCallback;
+	DialogData.strAccept = class'UIDialogueBox'.default.m_strDefaultAcceptLabel;
+	DialogData.strCancel = class'UIDialogueBox'.default.m_strDefaultCancelLabel;
+	Movie.Pres.UIRaiseDialog(DialogData);
+}
+simulated function OnStripWeaponsDialogCallback(eUIAction eAction)
+{
+	local XComGameState_Unit UnitState;
+	local array<EInventorySlot> RelevantSlots;
+	local array<XComGameState_Unit> Soldiers;
+	local XComGameState NewGameState;
+	local int idx;
+
+	if (eAction == eUIAction_Accept)
+	{
+		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Strip Gear");
+		Soldiers = GetSoldiersToStrip();
+
+		RelevantSlots.AddItem(eInvSlot_PrimaryWeapon);
+		RelevantSlots.AddItem(eInvSlot_SecondaryWeapon);
+		RelevantSlots.AddItem(eInvSlot_HeavyWeapon);
+
+		for (idx = 0; idx < Soldiers.Length; idx++)
+		{
+			UnitState = XComGameState_Unit(NewGameState.CreateStateObject(class'XComGameState_Unit', Soldiers[idx].ObjectID));
+			NewGameState.AddStateObject(UnitState);
+			UnitState.MakeItemsAvailable(NewGameState, true, RelevantSlots);
+
+			if (StrippedUnits.Find('ObjectID', UnitState.ObjectID) == INDEX_NONE)
+			{
+				StrippedUnits.AddItem(UnitState.GetReference());
+			}
+		}
+
+		`GAMERULES.SubmitGameState(NewGameState);
+
+		bWeaponsStripped = true;
+		UpdateNavHelp();
+		UpdateLockerList();
+	}
+}
+
 simulated function ResetAvailableEquipment()
 {
 	local XComGameState_Unit UnitState;
@@ -210,6 +273,7 @@ simulated function ResetAvailableEquipment()
 
 	bGearStripped = false;
 	bItemsStripped = false;
+	bWeaponsStripped = false;
 
 	if(StrippedUnits.Length > 0)
 	{
@@ -323,21 +387,34 @@ simulated function UpdateEquippedList()
 
 	// units can only have one item equipped in the slots bellow
 	Item = UIArmory_LoadoutItem(EquippedList.CreateItem(class'UIArmory_LoadoutItem'));
-	Item.InitLoadoutItem(GetEquippedItem(eInvSlot_Armor), eInvSlot_Armor, true);
+	if (CannotEditSlotsList.Find(eInvSlot_Armor) != INDEX_NONE)
+		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_Armor), eInvSlot_Armor, true, m_strCannotEdit);
+	else
+		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_Armor), eInvSlot_Armor, true);
 
 	Item = UIArmory_LoadoutItem(EquippedList.CreateItem(class'UIArmory_LoadoutItem'));
-	Item.InitLoadoutItem(GetEquippedItem(eInvSlot_PrimaryWeapon), eInvSlot_PrimaryWeapon, true);
+	if (CannotEditSlotsList.Find(eInvSlot_PrimaryWeapon) != INDEX_NONE)
+		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_PrimaryWeapon), eInvSlot_PrimaryWeapon, true, m_strCannotEdit);
+	else
+		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_PrimaryWeapon), eInvSlot_PrimaryWeapon, true);
 
 	// don't show secondary weapon slot on rookies
 	if(UpdatedUnit.GetRank() > 0)
 	{
 		Item = UIArmory_LoadoutItem(EquippedList.CreateItem(class'UIArmory_LoadoutItem'));
-		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_SecondaryWeapon), eInvSlot_SecondaryWeapon, true);
+		if (CannotEditSlotsList.Find(eInvSlot_SecondaryWeapon) != INDEX_NONE)
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_SecondaryWeapon), eInvSlot_SecondaryWeapon, true, m_strCannotEdit);
+		else
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_SecondaryWeapon), eInvSlot_SecondaryWeapon, true);
 	}
+
 	if (UpdatedUnit.HasHeavyWeapon(CheckGameState))
 	{
 		Item = UIArmory_LoadoutItem(EquippedList.CreateItem(class'UIArmory_LoadoutItem'));
-		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_HeavyWeapon), eInvSlot_HeavyWeapon, true);
+		if (CannotEditSlotsList.Find(eInvSlot_HeavyWeapon) != INDEX_NONE)
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_HeavyWeapon), eInvSlot_HeavyWeapon, true, m_strCannotEdit);
+		else
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_HeavyWeapon), eInvSlot_HeavyWeapon, true);
 	}
 
 	// units can have multiple utility items
@@ -350,23 +427,35 @@ simulated function UpdateEquippedList()
 
 		if(UtilityItems.Length >= (i + 1))
 		{
-			Item.InitLoadoutItem(UtilityItems[i], eInvSlot_Utility, true);
+			if (CannotEditSlotsList.Find(eInvSlot_Utility) != INDEX_NONE)
+				Item.InitLoadoutItem(UtilityItems[i], eInvSlot_Utility, true, m_strCannotEdit);
+			else
+				Item.InitLoadoutItem(UtilityItems[i], eInvSlot_Utility, true);
 		}
 		else
 		{
-			Item.InitLoadoutItem(none, eInvSlot_Utility, true);
+			if (CannotEditSlotsList.Find(eInvSlot_Utility) != INDEX_NONE)
+				Item.InitLoadoutItem(none, eInvSlot_Utility, true, m_strCannotEdit);
+			else
+				Item.InitLoadoutItem(none, eInvSlot_Utility, true);
 		}
 	}
 
 	if (UpdatedUnit.HasGrenadePocket())
 	{
 		Item = UIArmory_LoadoutItem(EquippedList.CreateItem(class'UIArmory_LoadoutItem'));
-		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_GrenadePocket), eInvSlot_GrenadePocket, true);
+		if (CannotEditSlotsList.Find(eInvSlot_GrenadePocket) != INDEX_NONE)
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_GrenadePocket), eInvSlot_GrenadePocket, true, m_strCannotEdit);
+		else
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_GrenadePocket), eInvSlot_GrenadePocket, true);
 	}
 	if (UpdatedUnit.HasAmmoPocket())
 	{
 		Item = UIArmory_LoadoutItem(EquippedList.CreateItem(class'UIArmory_LoadoutItem'));
-		Item.InitLoadoutItem(GetEquippedItem(eInvSlot_AmmoPocket), eInvSlot_AmmoPocket, true);
+		if (CannotEditSlotsList.Find(eInvSlot_AmmoPocket) != INDEX_NONE)
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_AmmoPocket), eInvSlot_AmmoPocket, true, m_strCannotEdit);
+		else
+			Item.InitLoadoutItem(GetEquippedItem(eInvSlot_AmmoPocket), eInvSlot_AmmoPocket, true);
 	}
 }
 
@@ -461,7 +550,7 @@ function bool MeetsDisplayRequirement(X2ItemTemplate ItemTemplate)
 
 	XComHQ = class'UIUtilities_Strategy'.static.GetXComHQ();
 
-	return (!XComHQ.IsTechResearched(ItemTemplate.HideIfResearched));
+	return (!XComHQ.IsTechResearched(ItemTemplate.HideIfResearched) && !XComHQ.HasItemByName(ItemTemplate.HideIfPurchased));
 }
 
 simulated function string GetDisabledReason(XComGameState_Item Item, EInventorySlot SelectedSlot)
@@ -471,6 +560,7 @@ simulated function string GetDisabledReason(XComGameState_Item Item, EInventoryS
 	local X2ItemTemplate ItemTemplate;
 	local X2AmmoTemplate AmmoTemplate;
 	local X2WeaponTemplate WeaponTemplate;
+	local X2ArmorTemplate ArmorTemplate;
 	local X2SoldierClassTemplate SoldierClassTemplate, AllowedSoldierClassTemplate;
 	local XComGameState_Unit UpdatedUnit;
 
@@ -490,6 +580,30 @@ simulated function string GetDisabledReason(XComGameState_Item Item, EInventoryS
 				DisabledReason = m_strMissingAllowedClass;
 			}
 			else if(AllowedSoldierClassTemplate.DataName == class'X2SoldierClassTemplateManager'.default.DefaultSoldierClass)
+			{
+				LocTag.StrValue0 = SoldierClassTemplate.DisplayName;
+				DisabledReason = class'UIUtilities_Text'.static.CapsCheckForGermanScharfesS(`XEXPAND.ExpandString(m_strUnavailableToClass));
+			}
+			else
+			{
+				LocTag.StrValue0 = AllowedSoldierClassTemplate.DisplayName;
+				DisabledReason = class'UIUtilities_Text'.static.CapsCheckForGermanScharfesS(`XEXPAND.ExpandString(m_strNeedsSoldierClass));
+			}
+		}
+	}
+
+	ArmorTemplate = X2ArmorTemplate(ItemTemplate);
+	if (ArmorTemplate != none)
+	{
+		SoldierClassTemplate = UpdatedUnit.GetSoldierClassTemplate();
+		if (SoldierClassTemplate != none && !SoldierClassTemplate.IsArmorAllowedByClass(ArmorTemplate))
+		{
+			AllowedSoldierClassTemplate = class'UIUtilities_Strategy'.static.GetAllowedClassForArmor(ArmorTemplate);
+			if (AllowedSoldierClassTemplate == none)
+			{
+				DisabledReason = m_strMissingAllowedClass;
+			}
+			else if (AllowedSoldierClassTemplate.DataName == class'X2SoldierClassTemplateManager'.default.DefaultSoldierClass)
 			{
 				LocTag.StrValue0 = SoldierClassTemplate.DisplayName;
 				DisabledReason = class'UIUtilities_Text'.static.CapsCheckForGermanScharfesS(`XEXPAND.ExpandString(m_strUnavailableToClass));
@@ -775,6 +889,13 @@ simulated function bool EquipItem(UIArmory_LoadoutItem Item)
 		{
 			AddToFront = PrevItemRef.ObjectID == PrevUtilityItems[0].ObjectID;
 		}
+
+		//If this is an unmodified primary weapon, transfer weapon customization options from the unit.
+		if (!NewItem.HasBeenModified() && GetSelectedSlot() == eInvSlot_PrimaryWeapon)
+		{
+			NewItem.WeaponAppearance.iWeaponTint = UpdatedUnit.kAppearance.iWeaponTint;
+			NewItem.WeaponAppearance.nmWeaponPattern = UpdatedUnit.kAppearance.nmWeaponPattern;
+		}
 		
 		EquipSucceeded = UpdatedUnit.AddItemToInventory(NewItem, GetSelectedSlot(), UpdatedState, AddToFront);
 
@@ -817,15 +938,31 @@ simulated function bool EquipItem(UIArmory_LoadoutItem Item)
 		{
 			EquipNarrativeMoment = XComNarrativeMoment(`CONTENT.RequestGameArchetype(X2EquipmentTemplate(Item.ItemTemplate).EquipNarrative));
 			XComHQ = XComGameState_HeadquartersXCom(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
-			if(EquipNarrativeMoment != None && XComHQ.CanPlayArmorIntroNarrativeMoment(EquipNarrativeMoment))
+			if(EquipNarrativeMoment != None)
 			{
-				UpdatedState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Update Played Armor Intro List");
-				XComHQ = XComGameState_HeadquartersXCom(UpdatedState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
-				UpdatedState.AddStateObject(XComHQ);
-				XComHQ.UpdatePlayedArmorIntroNarrativeMoments(EquipNarrativeMoment);
-				`XCOMGAME.GameRuleset.SubmitGameState(UpdatedState);
+				if (Item.ItemTemplate.ItemCat == 'armor')
+				{
+					if (XComHQ.CanPlayArmorIntroNarrativeMoment(EquipNarrativeMoment))
+					{
+						UpdatedState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Update Played Armor Intro List");
+						XComHQ = XComGameState_HeadquartersXCom(UpdatedState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+						UpdatedState.AddStateObject(XComHQ);
+						XComHQ.UpdatePlayedArmorIntroNarrativeMoments(EquipNarrativeMoment);
+						`XCOMGAME.GameRuleset.SubmitGameState(UpdatedState);
 
-				`HQPRES.UIArmorIntroCinematic(EquipNarrativeMoment.nmRemoteEvent, 'CIN_ArmorIntro_Done', UnitReference);
+						`HQPRES.UIArmorIntroCinematic(EquipNarrativeMoment.nmRemoteEvent, 'CIN_ArmorIntro_Done', UnitReference);
+					}
+				}
+				else if (XComHQ.CanPlayEquipItemNarrativeMoment(EquipNarrativeMoment))
+				{
+					UpdatedState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Update Equip Item Intro List");
+					XComHQ = XComGameState_HeadquartersXCom(UpdatedState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+					UpdatedState.AddStateObject(XComHQ);
+					XComHQ.UpdateEquipItemNarrativeMoments(EquipNarrativeMoment);
+					`XCOMGAME.GameRuleset.SubmitGameState(UpdatedState);
+					
+					`HQPRES.UINarrative(EquipNarrativeMoment);
+				}
 			}
 		}	
 	}

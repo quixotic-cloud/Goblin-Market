@@ -424,7 +424,7 @@ simulated function bool EndTurn(EPlayerEndTurnType eEndTurnType)
 		`LogAIActions("Calling XGPlayer::EndTurn()");
 	}
 
-	`LogAI("XGPlayer::EndTurn::"$GetStateName() @m_eTeam);
+	`LogAI("XGPlayer::EndTurn::"$GetStateName() @m_eTeam@ eEndTurnType);
 
 	// deselect the current unit immediately, to prevent players exploiting a one frame window
 	// where they would still be able to activate abilities

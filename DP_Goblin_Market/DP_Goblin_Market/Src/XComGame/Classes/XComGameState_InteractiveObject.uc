@@ -417,7 +417,7 @@ function bool HasDestroyAnim()
 /// <summary>
 /// Returns true if this object can currently be interacted with "normally". I.e., it's not locked or just a key
 /// </summary>
-function bool CanInteractNormally(XComGameState_Unit Unit, XComInteractiveLevelActor kInteractActor=None)
+event bool CanInteractNormally(XComGameState_Unit Unit, optional XComInteractiveLevelActor kInteractActor)
 {
 	local XComInteractiveLevelActor VisActor;
 	local XComInteractiveLockInfo LockInfo;
@@ -460,7 +460,7 @@ function bool CanBeLooted(XComGameState_Unit Unit)
 /// <summary>
 /// Returns true if this object can currently be interacted with by hacking.
 /// </summary>
-function bool CanInteractHack(XComGameState_Unit Unit)
+event bool CanInteractHack(XComGameState_Unit Unit)
 {
 	local array<Name> CurrentHackRewards;
 

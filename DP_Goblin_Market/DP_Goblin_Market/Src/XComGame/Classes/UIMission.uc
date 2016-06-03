@@ -348,10 +348,41 @@ simulated function UpdateShadowChamber()
 {
 	local XComGameState NewGameState;
 	local XComGameState_MissionSite MissionState;
+	local XComOnlineEventMgr EventManager;
+	local array<X2DownloadableContentInfo> DLCInfos;
+	local bool bSpawnUpdateFromDLC;
+	local int i;
 
 	// Shadow Chamber
 	if( ShouldDrawShadowInfo() )
 	{
+		// Check for update to spawning from DLC
+		EventManager = `ONLINEEVENTMGR;
+		DLCInfos = EventManager.GetDLCInfos(false);
+		bSpawnUpdateFromDLC = false;
+		for(i = 0; i < DLCInfos.Length; ++i)
+		{
+			if(DLCInfos[i].UpdateShadowChamberMissionInfo(MissionRef))
+			{
+				bSpawnUpdateFromDLC = true;
+			}
+		}
+
+		// If we have a spawning update, clear out the missions selected spawn data so that it regenerates
+		if(bSpawnUpdateFromDLC)
+		{
+			MissionState = XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(MissionRef.ObjectID));
+
+			if(MissionState.SelectedMissionData.SelectedMissionScheduleName != '')
+			{
+				NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Clear Cached Mission Data");
+				MissionState = XComGameState_MissionSite(NewGameState.CreateStateObject(class'XComGameState_MissionSite', MissionState.ObjectID));
+				NewGameState.AddStateObject(MissionState);
+				MissionState.SelectedMissionData.SelectedMissionScheduleName = '';
+				`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
+			}
+		}
+
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Update Cached Mission Data");
 		MissionState = XComGameState_MissionSite(NewGameState.CreateStateObject(class'XComGameState_MissionSite', MissionRef.ObjectID));
 		NewGameState.AddStateObject(MissionState);

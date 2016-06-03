@@ -17,10 +17,12 @@ var config int BLAZING_PINIONS_NUM_TARGETS;
 var config float BLAZING_PINIONS_IMPACT_RADIUS_METERS;
 var config int BLAZING_PINIONS_ENVIRONMENT_DAMAGE_AMOUNT;
 
+var config int BLAZING_PINIONSMP_LOCAL_COOLDOWN;
+
 var name BlazingPinionsStage1EffectName;
 
 var privatewrite name BlazingPinionsStage2AbilityName;
-var private name BlazingPinionsStage2TriggerName;
+var privatewrite name BlazingPinionsStage2TriggerName;
 
 static function array<X2DataTemplate> CreateTemplates()
 {
@@ -31,6 +33,9 @@ static function array<X2DataTemplate> CreateTemplates()
 	Templates.AddItem(CreateBlazingPinionsStage1Ability());
 	Templates.AddItem(CreateBlazingPinionsStage2Ability());
 	Templates.AddItem(PurePassive('FrenzyInfo', "img:///UILibrary_PerkIcons.UIPerk_archon_beserk"));
+
+	// MP Versions of Abilities
+	Templates.AddItem(CreateBlazingPinionsStage1MPAbility());
 	
 	return Templates;
 }
@@ -42,6 +47,7 @@ static function X2AbilityTemplate CreateFrenzyDamageListenerAbility()
 	local X2Condition_UnitEffects ExcludeEffects;
 	local X2Condition_UnitProperty UnitProperty;
 	local X2Effect_RunBehaviorTree FrenzyBehaviorEffect;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'FrenzyDamageListener');
 	Template.eAbilityIconBehaviorHUD = EAbilityIconBehavior_NeverShow;
@@ -56,7 +62,9 @@ static function X2AbilityTemplate CreateFrenzyDamageListenerAbility()
 	Template.AdditionalAbilities.AddItem('FrenzyInfo');
 	Template.AdditionalAbilities.AddItem('FrenzyTrigger');
 
-	Template.AddShooterEffectExclusions();
+	// Frenzy may trigger if the unit is burning
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	// This ability fires when the unit takes damage
 	EventListener = new class'X2AbilityTrigger_EventListener';
@@ -88,6 +96,7 @@ static function X2AbilityTemplate CreateFrenzyTriggerAbility()
 	local X2Condition_UnitEffects ExcludeEffects;
 	local X2Condition_UnitProperty UnitProperty;
 	local X2Effect_Frenzy FrenzyEffect;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'FrenzyTrigger');
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_archon_beserk"; // TODO: This needs to be changed
@@ -101,7 +110,10 @@ static function X2AbilityTemplate CreateFrenzyTriggerAbility()
 	Template.AbilityShooterConditions.AddItem(UnitProperty);
 
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
+
+	// Frenzy may trigger if the unit is burning
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	// The shooter must not have Frenzy activated
 	ExcludeEffects = new class'X2Condition_UnitEffects';
@@ -290,6 +302,9 @@ simulated function BlazingPinionsStage1_ModifyActivatedAbilityContext(XComGameSt
 	
 	// get the path points
 	class'X2PathSolver'.static.GetPathPointsFromPath(UnitState, InputData.MovementTiles, InputData.MovementData);
+
+	// make the flight path nice and smooth
+	class'XComPath'.static.PerformStringPulling(XGUnitNativeBase(UnitState.GetVisualizer()), InputData.MovementData);
 
 	//Now add the path to the input context
 	InputData.MovingUnitRef = UnitState.GetReference();
@@ -509,6 +524,7 @@ simulated function BlazingPinionsStage2_ModifyActivatedAbilityContext(XComGameSt
 	LandingLocation = TargetLocation;
 	LandingLocation.Z = World.GetFloorZForPosition(TargetLocation, true);
 	LandingTile = World.GetTileCoordinatesFromPosition(LandingLocation);
+	LandingTile = class'Helpers'.static.GetClosestValidTile(LandingTile);
 
 	if( !World.CanUnitsEnterTile(LandingTile) )
 	{
@@ -540,6 +556,9 @@ simulated function BlazingPinionsStage2_ModifyActivatedAbilityContext(XComGameSt
 
 		// get the path points
 		class'X2PathSolver'.static.GetPathPointsFromPath(UnitState, InputData.MovementTiles, InputData.MovementData);
+
+		// string pull the path to smooth it out
+		class'XComPath'.static.PerformStringPulling(XGUnitNativeBase(UnitState.GetVisualizer()), InputData.MovementData);
 
 		//Now add the path to the input context
 		InputData.MovingUnitRef = UnitState.GetReference();
@@ -749,6 +768,96 @@ simulated function BlazingPinionsStage2_BuildVisualization(XComGameState Visuali
 			OutVisualizationTracks.AddItem(BuildTrack);
 		}
 	}
+}
+
+// #######################################################################################
+// -------------------- MP Abilities -----------------------------------------------------
+// #######################################################################################
+
+static function X2DataTemplate CreateBlazingPinionsStage1MPAbility()
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityCost_ActionPoints ActionPointCost;
+	local X2AbilityCooldown_LocalAndGlobal Cooldown;
+	local X2AbilityMultiTarget_BlazingPinions BlazingPinionsMultiTarget;
+	local X2AbilityTarget_Cursor CursorTarget;
+	local X2Condition_UnitProperty UnitProperty;
+	local X2Effect_DelayedAbilityActivation BlazingPinionsStage1DelayEffect;
+	local X2Effect_Persistent BlazingPinionsStage1Effect;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'BlazingPinionsStage1MP');
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_archon_blazingpinions"; // TODO: Change this icon
+	Template.Hostility = eHostility_Offensive;
+	Template.AbilitySourceName = 'eAbilitySource_Standard';
+	Template.bShowActivation = true;
+	Template.eAbilityIconBehaviorHUD = eAbilityIconBehavior_AlwaysShow;
+	Template.TwoTurnAttackAbility = default.BlazingPinionsStage2AbilityName;
+	Template.MP_PerkOverride = 'BlazingPinionsStage1';
+
+	ActionPointCost = new class'X2AbilityCost_ActionPoints';
+	ActionPointCost.iNumPoints = 1;
+	ActionPointCost.bConsumeAllPoints = true;
+	Template.AbilityCosts.AddItem(ActionPointCost);
+
+	Cooldown = new class'X2AbilityCooldown_LocalAndGlobal';
+	Cooldown.iNumTurns = default.BLAZING_PINIONSMP_LOCAL_COOLDOWN;
+	Cooldown.NumGlobalTurns = default.BLAZING_PINIONS_GLOBAL_COOLDOWN;
+	Template.AbilityCooldown = Cooldown;
+
+	UnitProperty = new class'X2Condition_UnitProperty';
+	UnitProperty.ExcludeDead = true;
+	UnitProperty.HasClearanceToMaxZ = true;
+	Template.AbilityShooterConditions.AddItem(UnitProperty);
+
+	Template.AbilityToHitCalc = default.DeadEye;
+	Template.AddShooterEffectExclusions();
+	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
+
+	Template.TargetingMethod = class'X2TargetingMethod_BlazingPinions';
+
+	// The target locations are enemies
+	UnitProperty = new class'X2Condition_UnitProperty';
+	UnitProperty.ExcludeFriendlyToSource = true;
+	UnitProperty.ExcludeCivilian = true;
+	UnitProperty.ExcludeDead = true;
+	UnitProperty.HasClearanceToMaxZ = true;
+	UnitProperty.FailOnNonUnits = true;
+	Template.AbilityMultiTargetConditions.AddItem(UnitProperty);
+
+	BlazingPinionsMultiTarget = new class'X2AbilityMultiTarget_BlazingPinions';
+	BlazingPinionsMultiTarget.fTargetRadius = default.BLAZING_PINIONS_TARGETING_AREA_RADIUS;
+	BlazingPinionsMultiTarget.NumTargetsRequired = default.BLAZING_PINIONS_NUM_TARGETS;
+	Template.AbilityMultiTargetStyle = BlazingPinionsMultiTarget;
+
+	CursorTarget = new class'X2AbilityTarget_Cursor';
+	CursorTarget.FixedAbilityRange = default.BLAZING_PINIONS_SELECTION_RANGE;
+	Template.AbilityTargetStyle = CursorTarget;
+
+	//Delayed Effect to cause the second Blazing Pinions stage to occur
+	BlazingPinionsStage1DelayEffect = new class 'X2Effect_DelayedAbilityActivation';
+	BlazingPinionsStage1DelayEffect.BuildPersistentEffect(1, false, false, , eGameRule_PlayerTurnBegin);
+	BlazingPinionsStage1DelayEffect.EffectName = 'BlazingPinionsStage1Delay';
+	BlazingPinionsStage1DelayEffect.TriggerEventName = default.BlazingPinionsStage2TriggerName;
+	BlazingPinionsStage1DelayEffect.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.GetMyLongDescription(), Template.IconImage, true, , Template.AbilitySourceName);
+	Template.AddShooterEffect(BlazingPinionsStage1DelayEffect);
+
+	// An effect to attach Perk FX to
+	BlazingPinionsStage1Effect = new class'X2Effect_Persistent';
+	BlazingPinionsStage1Effect.BuildPersistentEffect(1, true, false, true);
+	BlazingPinionsStage1Effect.EffectName = default.BlazingPinionsStage1EffectName;
+	Template.AddShooterEffect(BlazingPinionsStage1Effect);
+
+	//  The target FX goes in target array as there will be no single target hit and no side effects of this touching a unit
+	Template.AddShooterEffect(new class'X2Effect_ApplyBlazingPinionsTargetToWorld');
+
+	Template.ModifyNewContextFn = BlazingPinionsStage1_ModifyActivatedAbilityContext;
+	Template.BuildNewGameStateFn = BlazingPinionsStage1_BuildGameState;
+	Template.BuildInterruptGameStateFn = TypicalAbility_BuildInterruptGameState;
+	Template.BuildVisualizationFn = BlazingPinionsStage1_BuildVisualization;
+	Template.BuildAppliedVisualizationSyncFn = BlazingPinionsStage1_BuildVisualizationSync;
+	Template.CinescriptCameraType = "Archon_BlazingPinions_Stage1";
+
+	return Template;
 }
 
 defaultproperties

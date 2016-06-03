@@ -24,6 +24,8 @@ struct HeadshotRequest
 	var array <delegate<OnPhotoRequestFinished> > FinishedDelegates;
 	var X2SoldierPersonalityTemplate Personality;
 	var XComUnitPawn PicturePawn;
+    var bool bArchetypeIsLoaded;
+    var bool bArchetypeIsRequested;
 };
 
 struct RenderTargetInfo
@@ -112,14 +114,35 @@ function AddHeadshotRequest(const out StateObjectReference UnitRef, name LocTag,
 		PendingHeadshotRequests.AddItem(NewRequest);
 	}
 
+	`log( "Adding headshot Request " $ UnitRef.ObjectID );
+
 	if(!bHeadshotInProgress)
 	{
 		StartHeadshot();
 	}
 }
 
+private function OnPawnLoaded(XComGameState_Unit Unit)
+{
+    local int i;
+
+    `log( 'Pawn is Loaded' $ Unit.ObjectID);
+
+    for( i=0; i< PendingHeadshotRequests.Length; i++ )
+	{
+        if( PendingHeadshotRequests[i].RequestInfo.UnitRef.ObjectID == Unit.ObjectID)
+        {
+            PendingHeadshotRequests[i].bArchetypeIsLoaded = true;
+		    `log( 'Request found' $ Unit.ObjectID) ;
+        }
+	}
+
+	
+}
+
 private function StartHeadshot()
 {
+    local XComUnitPawn Pawn;
 	local HeadshotRequestInfo RequestInfo;
 
 	`assert(PendingHeadshotRequests.Length > 0);
@@ -129,9 +152,30 @@ private function StartHeadshot()
 	//Make and place the pawn
 	ExecutingRequest = PendingHeadshotRequests[0];
 	RequestInfo = ExecutingRequest.RequestInfo;
-	ExecutingRequest.PicturePawn = CreateUnitPawn(RequestInfo.LocationTag, RequestInfo.UnitRef);
+
+    if( ExecutingRequest.bArchetypeIsLoaded )
+    {
+        Pawn = CreateUnitPawn(RequestInfo.LocationTag, RequestInfo.UnitRef, false);
+	    Pawn.GotoState('PortraitCapture');	
+        ExecutingRequest.PicturePawn = Pawn;
+
+        StartHeadshotCapture();
+
+    }
+    else
+    {
+        if( ! ExecutingRequest.bArchetypeIsRequested)
+        {
+            CreateUnitPawn(RequestInfo.LocationTag, RequestInfo.UnitRef, true);
+            ExecutingRequest.bArchetypeIsRequested = true;
+        }
+    
+
+        // if it's not ready we wait a quarter of a second and try again
+	    SetTimer(0.25f, false, nameof(StartHeadshot));
+    }
+
 	
-	SetTimer(0.25f, false, nameof(StartHeadshotCapture));
 }
 
 private function TextureRenderTarget2D AcquireRenderTarget(int ImgWidth, int ImgHeight)
@@ -247,12 +291,12 @@ private function OnSoldierHeadCaptureFinished(TextureRenderTarget2D RenderTarget
 	}
 }
 
-private function XComUnitPawn CreateUnitPawn(name PawnPlacementActorTag, const out StateObjectReference UnitRef)
+private function XComUnitPawn CreateUnitPawn(name PawnPlacementActorTag, const out StateObjectReference UnitRef, bool bAsync = false)
 {
+    local XComUnitPawn UnitPawn;
 	local Rotator PawnRotation;
 	local PointInSpace PlacementActor;
 	local XComGameState_Unit UnitStateObject;
-	local XComUnitPawn Pawn;
 	local name PrevPawnType;
 
 	foreach WorldInfo.AllActors(class'PointInSpace', PlacementActor)
@@ -277,10 +321,19 @@ private function XComUnitPawn CreateUnitPawn(name PawnPlacementActorTag, const o
 			UnitStateObject.kAppearance.nmPawn = 'XCom_Soldier_F';
 		}		
 	}
-	Pawn = UnitStateObject.CreatePawn(self, PlacementActor.Location, PawnRotation);	
-	UnitStateObject.kAppearance.nmPawn = PrevPawnType;
 
-	Pawn.GotoState('PortraitCapture');	
+    `log( "Requesting Unit Pawn Creation" $ UnitStateObject.ObjectID);
 
-	return Pawn;
+    if( bAsync )
+    {
+	    UnitStateObject.CreatePawnAsync(self, PlacementActor.Location, PawnRotation, OnPawnLoaded);	
+	    UnitStateObject.kAppearance.nmPawn = PrevPawnType;
+    }
+    else
+    {
+	    UnitPawn = UnitStateObject.CreatePawn(self, PlacementActor.Location, PawnRotation);	
+    }
+
+    return UnitPawn;
+
 }

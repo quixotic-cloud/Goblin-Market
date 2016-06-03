@@ -508,7 +508,7 @@ function PerformTriggerEvent()
 //==============================================================================
 //		DAILY CHALLENGE HANDLERS:
 //==============================================================================
-function OnReceivedChallengeModeIntervals(qword IntervalSeedID, int ExpirationDate, int TimeLength, EChallengeStateType IntervalState)
+function OnReceivedChallengeModeIntervals(qword IntervalSeedID, int ExpirationDate, int TimeLength, EChallengeStateType IntervalState, string IntervalName, array<byte> StartState)
 {
 	local int Idx;
 	`log(`location @ QWordToString(IntervalSeedID) @ `ShowVar(ExpirationDate) @ `ShowVar(TimeLength) @ `ShowEnum(EChallengeStateType, IntervalState, IntervalState),,'XCom_Online');
@@ -518,6 +518,8 @@ function OnReceivedChallengeModeIntervals(qword IntervalSeedID, int ExpirationDa
 	m_arrIntervals[Idx].DateEnd.B = ExpirationDate;
 	m_arrIntervals[Idx].TimeLimit = TimeLength;
 	m_arrIntervals[Idx].IntervalState = IntervalState;
+	m_arrIntervals[Idx].IntervalName = IntervalName;
+	m_arrIntervals[Idx].StartState = StartState;
 
 	UpdateIntervalDropdown();
 	m_InformationText.SetText("Received an Interval from the server. Total (" $ m_arrIntervals.Length $ ")");
@@ -1297,13 +1299,13 @@ function GenerateRandomLoadout()
 
 	m_InformationText.SetText("Generating Random Loadout ...");
 
-	//Feed from soldier selection screen eventually
-	CharacterGenerator = spawn( class 'XGCharacterGenerator' );
-
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('Soldier');
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	for( PlayerIdx = 0; PlayerIdx < m_BattleData.PlayerTurnOrder.Length; ++PlayerIdx)
 	{

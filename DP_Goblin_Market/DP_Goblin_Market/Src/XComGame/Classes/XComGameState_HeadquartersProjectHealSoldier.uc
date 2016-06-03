@@ -72,10 +72,10 @@ function SetProjectFocus(StateObjectReference FocusRef, optional XComGameState N
 }
 
 //---------------------------------------------------------------------------------------
-function int GetWoundPoints(XComGameState_Unit UnitState)
+function int GetWoundPoints(XComGameState_Unit UnitState, optional int MinimumPoints)
 {
 	local array<WoundSeverity> WoundSeverities;
-	local int idx, WoundPoints;
+	local int idx, WoundPoints, MinPoints, MaxPoints;
 	local float HealthPercent;
 
 	HealthPercent = (UnitState.GetCurrentStat(eStat_HP) / UnitState.GetBaseStat(eStat_HP)) * 100.0;
@@ -85,7 +85,10 @@ function int GetWoundPoints(XComGameState_Unit UnitState)
 	{
 		if(HealthPercent >= WoundSeverities[idx].MinHealthPercent && HealthPercent <= WoundSeverities[idx].MaxHealthPercent)
 		{
-			WoundPoints = WoundSeverities[idx].MinPointsToHeal + `SYNC_RAND(WoundSeverities[idx].MaxPointsToHeal - WoundSeverities[idx].MinPointsToHeal + 1);
+			MinPoints = max(WoundSeverities[idx].MinPointsToHeal, MinimumPoints);
+			MaxPoints = WoundSeverities[idx].MaxPointsToHeal;
+
+			WoundPoints = MinPoints + `SYNC_RAND(MaxPoints - MinPoints + 1);
 			return (WoundPoints * class'X2StrategyGameRulesetDataStructures'.default.HealSoldierProject_TimeScalar[`DIFFICULTYSETTING]);
 		}
 	}

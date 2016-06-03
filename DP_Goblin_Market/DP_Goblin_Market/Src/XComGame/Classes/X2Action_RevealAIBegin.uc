@@ -151,6 +151,7 @@ simulated state Executing
 		}
 		InitialLookAtCam.Priority = eCameraPriority_CharacterMovementAndFraming;
 		InitialLookAtCam.LookAtDuration = 100.0f; // we'll manually pop it
+		InitialLookAtCam.UpdateWhenInactive = true;
 		`CAMERASTACK.AddCamera(InitialLookAtCam);
 	}
 
@@ -181,7 +182,8 @@ simulated state Executing
 		}
 		LookAtCam.LookAtDuration = 10.0f; //This camera will be manually removed in the end reveal
 		LookAtCam.Priority = eCameraPriority_CharacterMovementAndFraming;
-		`CAMERASTACK.AddCamera(LookAtCam);		
+		LookAtCam.UpdateWhenInactive = true;
+		`CAMERASTACK.AddCamera(LookAtCam);
 
 		Battle = XGBattle_SP(`BATTLE);
 		Battle.GetAIPlayer().SetAssociatedCamera(LookAtCam);
@@ -213,17 +215,55 @@ simulated state Executing
 		}
 	}
 
+	private function bool ShouldPlayLookatCamera()
+	{
+		local XComGameStateHistory History;
+		local XComGameStateContext_CinematicSpawn CinematicContext;
+		local XComGameState_Unit UnitState;
+
+		History = `XCOMHISTORY;
+
+		// if this unit was cinematically spawned, then we don't need to do another reveal animation
+		foreach History.IterateContextsByClassType(class'XComGameStateContext_CinematicSpawn', CinematicContext,, true)
+		{
+			foreach CinematicContext.AssociatedState.IterateByClassType(class'XComGameState_Unit', UnitState)
+			{
+				if(UnitState.ObjectID == MatineeFocusUnitState.ObjectID)
+				{
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
 	function bool ShouldPlayRevealMatinee()
 	{
 		local XComGameStateHistory History;
 		local XComGameStateContext_ChangeContainer Context;
 		local XComGameState_AIReinforcementSpawner SpawnState;
 		local XComGameState_AIUnitData AIUnitData;
+		local UnitValue ImmobilizeValue;
 
 		// not if glam cams are turned off in the options screen
 		if(!`Battle.ProfileSettingsGlamCam())
 		{
 			return false;
+		}
+
+		if(!ShouldPlayLookatCamera())
+		{
+			return false;
+		}
+
+		// not if the reveal focus unit is currently immobilized
+		if(MatineeFocusUnitState.GetUnitValue(class'X2Ability_DefaultAbilitySet'.default.ImmobilizedValueName, ImmobilizeValue))
+		{
+			if(ImmobilizeValue.fValue != 0)
+			{
+				return false;
+			}
 		}
 
 		History = `XCOMHISTORY;
@@ -359,7 +399,7 @@ Begin:
 		FaceRevealUnitsTowardsEnemy();
 
 		//Pan over to the revealing AI group
-		if( !bNewUnitSelected )
+		if( !bNewUnitSelected && ShouldPlayLookatCamera() )
 		{
 			RequestInitialLookAtCamera();
 		}
@@ -371,13 +411,13 @@ Begin:
 		}
 
 		// wait for he camera to get over there
-		while( InitialLookAtCam != None && !InitialLookAtCam.HasArrived )
+		while( InitialLookAtCam != None && !InitialLookAtCam.HasArrived && InitialLookAtCam.IsLookAtValid() )
 		{
 			Sleep(0.0f);
 		}
 
 		// do the normal framing delay so it's consistent with the flow of ability activation
-		Sleep(class'X2Action_CameraFrameAbility'.default.FrameDuration);
+		Sleep(class'X2Action_CameraFrameAbility'.default.FrameDuration * GetDelayModifier());
 
 		// Wait for the reveal units to finish turning. They should already be done due to the camera movement and
 		// delay, but just in case
@@ -416,7 +456,7 @@ Begin:
 		if( RevealContext.FirstSightingMoment != none )
 		{
 			`PRESBASE.UINarrative(RevealContext.FirstSightingMoment);
-			Sleep(FirstSightedDelay);
+			Sleep(FirstSightedDelay * GetDelayModifier());
 		}
 
 		//Play a narrative moment for sighting this type of enemy

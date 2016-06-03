@@ -120,6 +120,7 @@ Begin:
 
 	// Start
 	AnimParams.AnimName = m_StartAnim;
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
 	StartingAtom.Rotation = QuatFromRotator(Rotator(m_vFacing));
 	StartingAtom.Scale = 1.0f;
 	StartingAtom.Translation.Z = Unit.GetDesiredZForLocation(StartingAtom.Translation);
@@ -130,6 +131,7 @@ Begin:
 	if (fLadderHeight > 400)
 	{
 		AnimParams = default.AnimParams;
+		AnimParams.PlayRate = GetMoveAnimationSpeed();
 		AnimParams.AnimName = m_LoopAnim;
 		FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams));
 	}
@@ -142,6 +144,7 @@ Begin:
 
 	// Stop
 	AnimParams = default.AnimParams;
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
 	AnimParams.AnimName = m_StopAnim;
 	AnimParams.HasDesiredEndingAtom = true;
 	AnimParams.DesiredEndingAtom.Translation = Destination;

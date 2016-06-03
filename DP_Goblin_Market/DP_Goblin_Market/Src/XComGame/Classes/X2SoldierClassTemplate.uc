@@ -13,6 +13,8 @@ class X2SoldierClassTemplate extends X2DataTemplate
 
 var config protected array<SoldierClassRank> SoldierRanks;
 var config array<SoldierClassWeaponType>    AllowedWeapons;
+var config array<name>						AllowedArmors;
+var config array<name>                      ExcludedAbilities;  //  Abilities that are not eligible to roll from AWC for this calss
 var config name					SquaddieLoadout;
 var config string				IconImage;
 var config int					NumInForcedDeck;
@@ -20,12 +22,21 @@ var config int					NumInDeck;
 var config int					ClassPoints;    // Number of "points" associated with using this class type, i.e. Multiplayer or Daily Challenge
 var config int                  KillAssistsPerKill;     //  Number of kill assists that count as a kill for ranking up
 var config int                  PsiCreditsPerKill;      //  Number of psi credits that count as a kill for ranking up
-var config protectedwrite bool  bMultiplayerOnly; 
+var config bool					bAllowAWCAbilities; // If this class should receive or share AWC abilities
+var config bool					bUniqueTacticalToStrategyTransfer; // If this class has unique tactical to strategy transfer code, used for DLC and modding
+var config bool					bIgnoreInjuries; // This class can go on missions even if they are wounded
+var config bool					bBlockRankingUp; // Do not let soldiers of this class rank up in the normal way from XP
+var config array<EInventorySlot> CannotEditSlots; // Slots which cannot be edited in the armory loadout
+var config protectedwrite bool  bMultiplayerOnly;
+var config protectedwrite bool	bHideInCharacterPool;
 
 var localized string			DisplayName;
 var localized string			ClassSummary;
 var localized string			LeftAbilityTreeTitle;
 var localized string			RightAbilityTreeTitle;
+var localized array<string>		RankNames;				//  there should be one name for each rank; e.g. Rookie, Squaddie, etc.
+var localized array<string>		ShortNames;				//  the abbreviated rank name; e.g. Rk., Sq., etc.
+var localized array<string>		RankIcons;				//  strings of image names for specialized rank icons
 var localized array<String>     RandomNickNames;        //  Selected randomly when the soldier hits a certain rank, if the player has not set one already.
 var localized array<String>     RandomNickNames_Female; //  Female only nicknames.
 var localized array<String>     RandomNickNames_Male;   //  Male only nicknames.
@@ -71,6 +82,9 @@ function SCATProgression GetSCATProgressionForAbility(name AbilityName)
 	local SCATProgression Progression;
 	local int rankIdx, branchIdx;
 
+	Progression.iBranch = INDEX_NONE;
+	Progression.iRank = INDEX_NONE;
+
 	for (rankIdx = 0; rankIdx < SoldierRanks.Length; ++rankIdx)
 	{
 		for (branchIdx = 0; branchIdx < SoldierRanks[rankIdx].aAbilityTree.Length; ++branchIdx)
@@ -103,6 +117,25 @@ function bool IsWeaponAllowedByClass(X2WeaponTemplate WeaponTemplate)
 	{
 		if (WeaponTemplate.InventorySlot == AllowedWeapons[i].SlotType &&
 			WeaponTemplate.WeaponCat == AllowedWeapons[i].WeaponType)
+			return true;
+	}
+	return false;
+}
+
+function bool IsArmorAllowedByClass(X2ArmorTemplate ArmorTemplate)
+{
+	local int i;
+
+	switch (ArmorTemplate.InventorySlot)
+	{
+	case eInvSlot_Armor: break;
+	default:
+		return true;
+	}
+	
+	for (i = 0; i < AllowedArmors.Length; ++i)
+	{
+		if (ArmorTemplate.ArmorCat == AllowedArmors[i])
 			return true;
 	}
 	return false;

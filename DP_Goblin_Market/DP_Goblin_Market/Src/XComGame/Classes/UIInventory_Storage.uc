@@ -28,6 +28,7 @@ simulated function CloseScreen()
 simulated function PopulateData()
 {
 	local XComGameState_Item Item;
+	local X2ItemTemplate ItemTemplate;
 	local StateObjectReference ItemRef;
 	local UIInventory_ListItem ListItem;
 	local array<XComGameState_Item> InventoryItems;
@@ -40,7 +41,9 @@ simulated function PopulateData()
 		if (Item == None || Item.GetMyTemplate() == None)
 			continue;
 
-		if((Item.HasBeenModified() || (!Item.IsStartingItem() && !Item.GetMyTemplate().bInfiniteItem)) && !Item.GetMyTemplate().HideInInventory)
+		ItemTemplate = Item.GetMyTemplate();
+		if((Item.HasBeenModified() || !ItemTemplate.bInfiniteItem) && !ItemTemplate.HideInInventory && 
+			!XComHQ.IsTechResearched(ItemTemplate.HideIfResearched) && !XComHQ.HasItemByName(ItemTemplate.HideIfPurchased))
 		{
 			InventoryItems.AddItem(Item);
 		}
