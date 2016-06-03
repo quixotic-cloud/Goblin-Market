@@ -6,6 +6,7 @@ class X2Effect_Sustained extends X2Effect_Persistent;
 var name SustainedAbilityName;
 var array<name> EffectsToRemoveFromSource;
 var array<name> EffectsToRemoveFromTarget;
+var array<name> RegisterAdditionalEventsLikeImpair;
 
 // If the sustained effect's source unit takes more damage in a full turn than this 
 // amount, then the sustain is broken
@@ -17,17 +18,9 @@ simulated function OnEffectRemoved(const out EffectAppliedData ApplyEffectParame
 	local XComGameState_Effect EffectState;
 	local X2Effect_Persistent PersistentEffect;
 	local XComGameState_Unit SustainedEffectSourceUnit, SustainedEffectTargetUnit;
-	local X2EventManager EventManager;
 	local XComGameStateHistory History;
-	local Object ThisObj;
 
 	super.OnEffectRemoved(ApplyEffectParameters, NewGameState, bCleansed, RemovedEffectState);
-
-	ThisObj = self;
-	EventManager = `XEVENTMGR;
-	EventManager.UnRegisterFromEvent(ThisObj, 'FireSustainedAbility');
-	EventManager.UnRegisterFromEvent(ThisObj, 'UnitTakeEffectDamage');
-	EventManager.UnRegisterFromEvent(ThisObj, 'ImpairingEffect');
 
 	History = `XCOMHISTORY;
 	// Remove the associated source effects
@@ -86,7 +79,7 @@ simulated function bool OnEffectTicked(const out EffectAppliedData ApplyEffectPa
 
 	bContinueTicking = super.OnEffectTicked(ApplyEffectParameters, kNewEffectState, NewGameState, FirstApplication);
 
-	if(FullTurnComplete(kNewEffectState))
+	if((SustainedAbilityName != '') && FullTurnComplete(kNewEffectState))
 	{
 		History = `XCOMHISTORY;
 	
@@ -124,6 +117,7 @@ function RegisterForEvents(XComGameState_Effect EffectGameState)
 	local XComGameState_Unit SourceUnitState;
 	local XComGameStateHistory History;
 	local Object EffectObj;
+	local int i;
 
 	History = `XCOMHISTORY;
 	EventMgr = `XEVENTMGR;
@@ -135,6 +129,11 @@ function RegisterForEvents(XComGameState_Effect EffectGameState)
 	EventMgr.RegisterForEvent(EffectObj, 'UnitTakeEffectDamage', EffectGameState.OnSourceUnitTookEffectDamage, ELD_OnStateSubmitted,, SourceUnitState);
 	EventMgr.RegisterForEvent(EffectObj, 'ImpairingEffect', EffectGameState.OnSourceBecameImpaired, ELD_OnStateSubmitted,, SourceUnitState);
 	EventMgr.RegisterForEvent(EffectObj, 'FireSustainedAbility', EffectGameState.OnFireSustainedAbility, ELD_OnStateSubmitted,, SourceUnitState);
+
+	for( i = 0; i < RegisterAdditionalEventsLikeImpair.Length; ++i )
+	{
+		EventMgr.RegisterForEvent(EffectObj, RegisterAdditionalEventsLikeImpair[i], EffectGameState.OnSourceBecameImpaired, ELD_OnStateSubmitted,, SourceUnitState);
+	}
 }
 
 defaultproperties
@@ -142,4 +141,5 @@ defaultproperties
 	bUseSourcePlayerState=true
 	FragileAmount=0
 	bBringRemoveVisualizationForward=false
+	SustainedAbilityName=""
 }

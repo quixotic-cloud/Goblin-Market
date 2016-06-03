@@ -236,7 +236,7 @@ function PrepareTacticalBattle(int MissionID)
 function LaunchTacticalBattle(optional int MissionID = -1)
 {
 	local int RewardIndex;
-	local int UnitIndex, ItemIndex;
+	local int UnitIndex, ItemIndex, i;
 	local bool FirstMission;
 	local XComGameStateHistory History;	
 	local XComGameState NewStartState;
@@ -263,6 +263,8 @@ function LaunchTacticalBattle(optional int MissionID = -1)
 	local XComGameState_WorldNarrativeTracker NarrativeTracker;
 	local XComGameState_ScanningSite ScanningSiteState;
 	local XComGameState_HeadquartersProjectResearch ResearchProjectState;
+	local XComOnlineEventMgr EventManager;
+	local array<X2DownloadableContentInfo> DLCInfos;
 
 	`XCOMVISUALIZATIONMGR.DisableForShutdown();
 
@@ -490,6 +492,13 @@ function LaunchTacticalBattle(optional int MissionID = -1)
 		}
 	}
 
+	EventManager = `ONLINEEVENTMGR;
+	DLCInfos = EventManager.GetDLCInfos(false);
+	for (i = 0; i < DLCInfos.Length; ++i)
+	{
+		DLCInfos[i].OnPreMission(NewStartState, MissionState);
+	}
+
 	//Add the start state to the history
 	History.AddGameStateToHistory(NewStartState);
 
@@ -561,6 +570,20 @@ function TDateTime GetGameTime()
 	}
 	`assert(TimeState != none);
 	return TimeState.CurrentTime;
+}
+
+function UpdateDLCLoadingStrategyGame()
+{
+	local XComOnlineEventMgr EventManager;
+	local array<X2DownloadableContentInfo> DLCInfos;
+	local int i;
+
+	EventManager = `ONLINEEVENTMGR;
+	DLCInfos = EventManager.GetDLCInfos(false);
+	for (i = 0; i < DLCInfos.Length; ++i)
+	{
+		DLCInfos[i].OnLoadedSavedGameToStrategy();
+	}
 }
 
 state Headquarters
@@ -769,7 +792,8 @@ state StartingDebugCheatGame
 		local XComGameState NewGameState;
 		local XComGameState_HeadquartersXCom XComHQ;
 		local XComGameState_Unit UnitState;
-		local int idx, i;
+		local XComOnlineProfileSettings ProfileSettings;
+		local int idx;
 
 		History = `XCOMHISTORY;
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("DEBUG Init Soldiers");
@@ -777,9 +801,11 @@ state StartingDebugCheatGame
 		XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
 		NewGameState.AddStateObject(XComHQ);
 
+		ProfileSettings = `XPROFILESETTINGS;
+
 		for(idx = 0; idx < default.DEBUG_StartingSoldierClasses.Length; idx++)
 		{
-			UnitState = `CHARACTERPOOLMGR.CreateCharacter(NewGameState, class'XComGameState_HeadquartersXCom'.default.InitialSoldiersCharacterPoolSelectionMode);
+			UnitState = `CHARACTERPOOLMGR.CreateCharacter(NewGameState, ProfileSettings.Data.m_eCharPoolUsage);
 			NewGameState.AddStateObject(UnitState);
 			UnitState.RandomizeStats();
 			UnitState.ApplyInventoryLoadout(NewGameState);
@@ -791,12 +817,9 @@ state StartingDebugCheatGame
 			}
 			UnitState.RankUpSoldier(NewGameState, default.DEBUG_StartingSoldierClasses[idx]);
 			UnitState.ApplySquaddieLoadout(NewGameState, XComHQ);
-			for(i = 0; i < UnitState.GetSoldierClassTemplate().GetAbilityTree(0).Length; ++i)
-			{
-				UnitState.BuySoldierProgressionAbility(NewGameState, 0, i);
-			}
 			UnitState.StartingRank = 1;
 			UnitState.SetXPForRank(1);
+			UnitState.bNeedsNewClassPopup = false;
 			XComHQ.AddToCrew(NewGameState, UnitState);
 		}
 
@@ -953,7 +976,9 @@ Begin:
 	{
 		Sleep(0);
 	}
-		
+	
+	GetGeoscape().m_kBase.UpdateFacilityProps();
+
 	WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(true);
 
 	Sleep(1.0f); //We don't want to populate the base rooms while capturing the environment, as it is very demanding on the games resources
@@ -1005,6 +1030,10 @@ Begin:
 		Sleep(0);
 	}
 
+	UpdateDLCLoadingStrategyGame();
+
+	GetGeoscape().m_kBase.UpdateFacilityProps(); 
+
 	WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(true);
 
 	Sleep(1.0f); //We don't want to populate the base rooms while capturing the environment, as it is very demanding on the games resources
@@ -1015,6 +1044,7 @@ Begin:
 	GetGeoscape().m_kBase.SetAvengerCapVisibility(false);
 	GetGeoscape().m_kBase.SetPostMissionSequenceVisibility(false);
 
+	`XSTRATEGYSOUNDMGR.PlayBaseViewMusic();
 	GoToHQ();
 }
 
@@ -1061,6 +1091,8 @@ Begin:
 	//This is only true if the game is NOT using seamless travel and instead just puts the player into a streamed in drop ship while the rest of the levels stream in around them
 	if(ShowDropshipInterior()) 
 	{
+		WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(TRUE);
+
 		//DropshipLocation.Z -= 2000.0f; //Locate the drop ship below the map
 		`MAPS.AddStreamingMap("CIN_Loading_Interior", DropshipLocation, DropshipRotation, false);// .bForceNoDupe = true;
 		while(!`MAPS.IsStreamingComplete())
@@ -1072,6 +1104,8 @@ Begin:
 
 		XComPlayerController(`HQPRES.Owner).NotifyStartTacticalSeamlessLoad();
 		class'WorldInfo'.static.GetWorldInfo().GetALocalPlayerController().ClientSetCameraFade(false);
+
+		WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(FALSE);
 	}	
 	else
 	{
@@ -1126,6 +1160,8 @@ Begin:
 		}
 	}
 
+	GetGeoscape().m_kBase.UpdateFacilityProps();
+
 	WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(true);
 
 	Sleep(1.0f); //We don't want to populate the base rooms while capturing the environment, as it is very demanding on the games resources
@@ -1170,6 +1206,8 @@ Begin:
 	{
 		Sleep(0);
 	}
+
+	GetGeoscape().m_kBase.UpdateFacilityProps();
 
 	WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(true);
 

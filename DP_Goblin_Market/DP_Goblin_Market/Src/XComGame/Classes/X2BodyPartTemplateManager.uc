@@ -29,7 +29,7 @@ native function X2BodyPartTemplate FindUberTemplate(string BodyPartType, name Pa
 native function GetUberTemplates(string BodyPartType,  out array<X2BodyPartTemplate> Templates );
 native function GetFilteredUberTemplates(string BodyPartType,  Object CallbackObject, delegate<X2BodyPartFilter.FilterCallback> CallbackFn, out array<X2BodyPartTemplate> Templates );
 native function X2BodyPartTemplate GetRandomUberTemplate(string BodyPartType, Object CallbackObject, delegate<X2BodyPartFilter.FilterCallback> CallbackFn);
-
+native function array<name> GetPartPackNames();
 
 
 
@@ -87,12 +87,16 @@ protected event InitTemplatesInternal()
 		Template.CharacterTemplate  = PartInfo.CharacterTemplate;
 		Template.SpecializedType	= PartInfo.SpecializedType;
 		Template.Tech				= PartInfo.Tech;
+		Template.SetNames			= PartInfo.SetNames;
 
 		// Language
 		Template.Language			= PartInfo.Language;
 
+		// Which content pack this part belongs to, either DLC or Mod
+		Template.DLCName			= name(PartInfo.DLCName);
+
 		Template.SetTemplateName(PartInfo.TemplateName);
-		AddUberTemplate(Template.PartType, Template);
+		AddUberTemplate(Template.PartType, Template, true);
 
 		`log(`location @ "Adding BodyPartTemplate: " @ `ShowVar(Template.DataName) @ `ShowVar(Template) @ `ShowVar(Template.PartType),,'XCom_Templates');
 	}

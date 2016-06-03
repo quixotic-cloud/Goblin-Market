@@ -109,7 +109,7 @@ Begin:
 	//If the loot source is a unit pawn, give the ragdoll time to settle before setting off the loot fountain
 	if(LootSourceUnitPawn != none)
 	{	
-		sleep(2.0f);
+		sleep(2.0f * GetDelayModifier());
 	}
 	
 	BeginFountain();

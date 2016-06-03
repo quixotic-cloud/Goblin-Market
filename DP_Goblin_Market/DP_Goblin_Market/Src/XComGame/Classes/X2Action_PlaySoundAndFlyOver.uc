@@ -62,7 +62,7 @@ Begin:
 			Unit.UnitSpeak(CharSpeech);
 		}
 
-		if( !bNewUnitSelected && LookAtDuration > 0 )
+		if( !bNewUnitSelected && LookAtDuration > 0 && !ShouldSkipCameraLookat() )
 		{
 			LookAtActorCamera = new class'X2Camera_LookAtActorTimed';
 			LookAtActorCamera.ActorToFollow = Unit;
@@ -84,11 +84,31 @@ Begin:
 
 		if( !bNewUnitSelected && BlockUntilFinished )
 		{
-			Sleep(DelayDuration);
+			Sleep(DelayDuration * GetDelayModifier());
 		}
 	}
 
 	CompleteAction();
+}
+
+function bool ShouldSkipCameraLookat()
+{
+	local XComGameState_Unit VisualizedGameState;
+	local XComGameStateContext_Ability ChainStartContext;
+
+	// if this flyover is being played on a unit that is in a framed ability, then skip the camera.
+	// they are already guaranteed to be framed on screen, and the camera constantly jumping around
+	// mid ability looks really bad. This is a systemic feature, please do not hack around it
+	// unless design is okay with it!
+	VisualizedGameState = Unit.GetVisualizedGameState();
+	ChainStartContext = XComGameStateContext_Ability(VisualizedGameState.GetParentGameState().GetContext().GetFirstStateInEventChain().GetContext());
+
+	if(ChainStartContext != none)
+	{
+		return ChainStartContext.ShouldFrameAbility();
+	}
+
+	return false;
 }
 
 //------------------------------------------------------------------------------------------------

@@ -4,6 +4,7 @@ var(X2ArmorTemplate) bool bHeavyWeapon <Tooltip="Armor will allow access to Heav
 var(X2ArmorTemplate) bool bAddsUtilitySlot <Tooltip="Allows soldier to bring a second utility item.">;
 var(X2ArmorTemplate) name ArmorTechCat;
 var(X2ArmorTemplate) name AkAudioSoldierArmorSwitch;
+var(X2ArmorTemplate) name ArmorCat; // If the armor has a specialized category, so it is only usable by certain classes
 
 function bool ValidateTemplate(out string strError)
 {
@@ -23,4 +24,5 @@ DefaultProperties
 {
 	InventorySlot=eInvSlot_Armor
 	ItemCat="armor"
+	ArmorCat="soldier"
 }

@@ -406,6 +406,7 @@ function bool Init( XGPlayer kPlayer, XGSquad kSquad, XComGameState_Unit UnitSta
 	local Vector NewWorldSpaceOffset;
 	local XComUnitPawn PawnArchetype;
 	local XComHumanPawn HumanPawn;
+	local CharacterPoolManager CharacterPoolMgr;
 
 	super.Init(kPlayer, kSquad, UnitState, bDestroyOnBadLocation);	
 
@@ -441,6 +442,10 @@ function bool Init( XGPlayer kPlayer, XGSquad kSquad, XComGameState_Unit UnitSta
 	HumanPawn = XComHumanPawn(m_kPawn);
 	if(HumanPawn != none)
 	{
+		// This is a last chance check whether the body parts selected for this character are available / valid and replace them if not.
+		CharacterPoolMgr = CharacterPoolManager(`XENGINE.GetCharacterPoolManager());
+		CharacterPoolMgr.FixAppearanceOfInvalidAttributes(UnitState.kAppearance);
+
 		HumanPawn.SetAppearance(UnitState.kAppearance);
 	}
 
@@ -503,7 +508,7 @@ simulated function ApplyLoadoutFromGameState(XComGameState_Unit UnitState, XComG
 	local XGInventory kInventory;
 	local XComWeapon ItemWeapon;
 	local bool bMultipleItems;
-	local XGWeapon HeavyWeaponVisualizer;
+	local XGWeapon HeavyWeaponVisualizer, ItemVis;
 
 	kInventory = GetInventory();
 	if( kInventory == none )
@@ -568,66 +573,35 @@ simulated function ApplyLoadoutFromGameState(XComGameState_Unit UnitState, XComG
 		HeavyWeaponVisualizer = XGWeapon(ItemState.GetVisualizer());
 		kInventory.PresEquip(HeavyWeaponVisualizer, true);
 	}
-
-	if (kInventory.m_kPrimaryWeapon != none)
-		kItemToEquip = kInventory.m_kPrimaryWeapon;
-	else if (kInventory.m_kSecondaryWeapon != none)
-		kItemToEquip = kInventory.m_kSecondaryWeapon;
-	
-	if (kItemToEquip != none)
+	ItemState = UnitState.GetItemInSlot(eInvSlot_TertiaryWeapon);
+	if (ItemState != none)
 	{
-		kInventory.EquipItem( kItemToEquip, true, true );
+		ItemVis = XGWeapon(ItemState.GetVisualizer());
+		kInventory.PresEquip(ItemVis, true);
 	}
-}
-
-simulated function ResetWeaponsToDefaultSockets()
-{
-	local XGInventory kInventory;
-	local XGInventoryItem kItemToEquip;
-	local Attachment Attach;
-	local SkeletalMeshComponent SkeletalMesh;
-	local array<Attachment> ToBeDetached;
-	local int NumAttachments;
-	local int scan;
-	local name PrimarySocketName;
-	local name SecondarySocketName;
-	
-	kInventory = GetInventory();
-
-	//Removing any attachment on the primary and secondary Weapon socket if any exist
-	if( kInventory.m_kPrimaryWeapon != none )
+	ItemState = UnitState.GetItemInSlot(eInvSlot_QuaternaryWeapon);
+	if (ItemState != none)
 	{
-		PrimarySocketName = XComWeapon(kInventory.m_kPrimaryWeapon.m_kEntity).DefaultSocket;
+		ItemVis = XGWeapon(ItemState.GetVisualizer());
+		kInventory.PresEquip(ItemVis, true);
 	}
-	if( kInventory.m_kSecondaryWeapon != none )
+	ItemState = UnitState.GetItemInSlot(eInvSlot_QuinaryWeapon);
+	if (ItemState != none)
 	{
-		SecondarySocketName = XComWeapon(kInventory.m_kSecondaryWeapon.m_kEntity).DefaultSocket;
+		ItemVis = XGWeapon(ItemState.GetVisualizer());
+		kInventory.PresEquip(ItemVis, true);
 	}
-	
-	SkeletalMesh = GetPawn().Mesh;
-	NumAttachments = SkeletalMesh.Attachments.Length;
-	for (scan = 0; scan < NumAttachments; ++scan)
+	ItemState = UnitState.GetItemInSlot(eInvSlot_SenaryWeapon);
+	if (ItemState != none)
 	{
-		Attach = SkeletalMesh.Attachments[scan];
-		if(Attach.Component == none || Attach.SocketName == '')
-		{
-			continue;
-		}
-
-		if (Attach.SocketName == PrimarySocketName || Attach.SocketName == SecondarySocketName)
-		{
-			ToBeDetached.AddItem(Attach);
-		}
+		ItemVis = XGWeapon(ItemState.GetVisualizer());
+		kInventory.PresEquip(ItemVis, true);
 	}
-	foreach ToBeDetached(Attach)
+	ItemState = UnitState.GetItemInSlot(eInvSlot_SeptenaryWeapon);
+	if (ItemState != none)
 	{
-		SkeletalMesh.DetachComponent(Attach.Component);
-	}
-
-	//using same logic as per ApplyLoadoutFromGameState to then equip the Original weapons
-	if( kInventory.m_kSecondaryWeapon != none)
-	{
-		kInventory.PresEquip(kInventory.m_kSecondaryWeapon, true);
+		ItemVis = XGWeapon(ItemState.GetVisualizer());
+		kInventory.PresEquip(ItemVis, true);
 	}
 
 	if (kInventory.m_kPrimaryWeapon != none)
@@ -3390,11 +3364,13 @@ simulated function GenerateSafeCharacterNames()
 	local string strFirstName, strLastName;
 	local int iUnderscoreLocation, iAlienNumber;
 	local XComGameState_Unit kGameStateUnit;
+	
 	kGameStateUnit = GetVisualizedGameState();
 
 	if (IsSoldier() || IsCivilianChar())
 	{
-		CharacterGenerator = `XCOMGRI.Spawn(class'XGCharacterGenerator');
+		CharacterGenerator = `XCOMGRI.Spawn(kGameStateUnit.GetMyTemplate().CharacterGeneratorClass);
+		`assert(CharacterGenerator != none);
 		CharacterGenerator.GenerateName(m_SavedAppearance.iGender, m_SavedAppearance.nmFlag, strFirstName, strLastName, m_SavedAppearance.iRace);
 	}
 	else
@@ -3660,7 +3636,7 @@ simulated static function CreateVisualizer(XComGameState FullState, XComGameStat
 	for (i = 0; i < SyncUnitState.Abilities.Length; ++i)
 	{
 		Ability = XComGameState_Ability(`XCOMHISTORY.GetGameStateForObjectID(SyncUnitState.Abilities[i].ObjectID));
-		UnitVisualizer.GetPawn().AppendAbilityPerks( Ability.GetMyTemplateName() );
+		UnitVisualizer.GetPawn().AppendAbilityPerks( Ability.GetMyTemplate().GetPerkAssociationName() );
 	}
 	UnitVisualizer.GetPawn().StartPersistentPawnPerkFX( );
 

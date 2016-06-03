@@ -340,6 +340,7 @@ function InitStatic3DUI(const out XComGameState_GeoscapeEntity GeoscapeEntity)
 		if(kItem.GeoscapeEntityRef == self.GeoscapeEntityRef)
 		{
 			MapItem3D = kItem;
+			break;
 		}
 	}
 
@@ -374,6 +375,7 @@ function InitAnimated3DUI(const out XComGameState_GeoscapeEntity GeoscapeEntity)
 		if (kItem.GeoscapeEntityRef == self.GeoscapeEntityRef)
 		{
 			AnimMapItem3D = kItem;
+			break;
 		}
 	}
 

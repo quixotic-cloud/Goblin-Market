@@ -92,6 +92,7 @@ static function array<X2DataTemplate> CreateTemplates()
 	Templates.AddItem(CreateSpeakerTemplate('PropagandaAnnouncer', "Propaganda Announcer", "img:///UILibrary_Common.Head_Propaganda"));
 	Templates.AddItem(CreateSpeakerTemplate('AngelisEthereal', "Angelis Ethereal", "img:///UILibrary_Common.Head_AngelisEthereal"));
 	Templates.AddItem(CreateSpeakerTemplate('ShadowShen', "Avenger", "img:///UILibrary_Common.Head_ShadowShen"));
+	Templates.AddItem(CreateSpeakerTemplate('EmptyHead', "Empty Head", "img:///UILibrary_Common.Head_Empty"));
 	return Templates;
 }
 
@@ -134,6 +135,7 @@ static function X2CharacterTemplate CreateSoldierTemplate()
 	CharTemplate.bStaffingAllowed = true;
 	CharTemplate.strMatineePackages.AddItem("CIN_Soldier");
 
+	CharTemplate.DefaultSoldierClass = 'Rookie';
 	CharTemplate.DefaultLoadout = 'RookieSoldier';
 	CharTemplate.RequiredLoadout = 'RequiredSoldier';
 	CharTemplate.Abilities.AddItem('Loot');
@@ -154,6 +156,7 @@ static function X2CharacterTemplate CreateSoldierTemplate()
 	CharTemplate.MPPointValue = CharTemplate.XpKillscore * 10;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_XCom;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -217,6 +220,7 @@ static function X2CharacterTemplate CreateTutorialCentralTemplate()
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_XCom;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -290,6 +294,7 @@ static function X2CharacterTemplate CreateStrategyCentralTemplate()
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_XCom;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -337,6 +342,7 @@ static function X2CharacterTemplate CreateCivilianTemplate(optional name Templat
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Civilian;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -386,6 +392,7 @@ static function X2CharacterTemplate CreateFacelessCivilianTemplate(optional name
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Civilian;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -455,6 +462,7 @@ static function X2CharacterTemplate CreateFriendlyVIPCivilianTemplate(optional n
 	CharTemplate.strPanicBT="";
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_VIP;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 
@@ -512,6 +520,7 @@ static function X2CharacterTemplate CreateCommanderVIPTemplate(optional name Tem
 	CharTemplate.strBehaviorTree="VIPRoot";
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_VIP;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -568,6 +577,7 @@ static function X2CharacterTemplate CreateStasisSuitVIPTemplate(optional name Te
 	CharTemplate.strBehaviorTree="VIPRoot";
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_VIP;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -694,6 +704,7 @@ static function X2CharacterTemplate CreateScientistTemplate()
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Civilian;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -762,6 +773,7 @@ static function X2CharacterTemplate CreateHeadScientistTemplate()
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Civilian;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -832,6 +844,7 @@ static function X2CharacterTemplate CreateEngineerTemplate()
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Civilian;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -900,6 +913,7 @@ static function X2CharacterTemplate CreateHeadEngineerTemplate()
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Civilian;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -957,6 +971,7 @@ static function X2CharacterTemplate CreateHeadquartersClerkTemplate()
 	CharTemplate.bShouldCreateDifficultyVariants = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Civilian;
+	CharTemplate.CharacterGeneratorClass = class'XGCharacterGenerator';
 
 	return CharTemplate;
 }
@@ -1753,12 +1768,24 @@ static function X2CharacterTemplate CreateTemplate_AdvPsiWitchM3()
 	CharTemplate.ImmuneTypes.AddItem('Mental');
 
 	CharTemplate.SightedNarrativeMoments.AddItem(XComNarrativeMoment'X2NarrativeMoments.T_Incomplete_Avatar_Sighted_Tygan');
+	CharTemplate.DeathEvent = 'KilledAnAvatar';
 
 	CharTemplate.bAllowSpawnFromATT = false;
 
 	CharTemplate.strTargetIconImage = class'UIUtilities_Image'.const.TargetIcon_Advent;
 
+	CharTemplate.OnStatAssignmentCompleteFn = OnPsiWitchStatAssignmentComplete;
+
 	return CharTemplate;
+}
+
+function OnPsiWitchStatAssignmentComplete(XComGameState_Unit UnitState)
+{
+	if ((class'XComGameState_HeadquartersXCom'.static.GetObjectiveStatus('T1_M5_SKULLJACKCodex') == eObjectiveState_InProgress || 
+		class'XComGameState_HeadquartersXCom'.static.GetObjectiveStatus('T1_M6_KillAvatar') == eObjectiveState_InProgress))
+	{
+		UnitState.SetCurrentStat(eStat_HP, UnitState.GetMaxStat(eStat_HP) * class'X2TacticalGameRuleset'.default.DepletedAvatarHealthMod);
+	}
 }
 
 static function X2CharacterTemplate CreateTemplate_AdvShieldBearerM2()
@@ -2838,6 +2865,7 @@ static function X2CharacterTemplate CreateTemplate_Cyberus()
 	
 	CharTemplate.SightedNarrativeMoments.AddItem(XComNarrativeMoment'X2NarrativeMoments.TACTICAL.goldenpath.GP_FirstCodexAppears');
 	CharTemplate.SightedEvents.AddItem('CyberusSighted');
+	CharTemplate.DeathEvent = 'KilledACodex';
 
 	CharTemplate.SpawnRequirements.RequiredObjectives.AddItem('T1_M2_HackACaptain');
 
@@ -3460,6 +3488,7 @@ static function X2CharacterTemplate CreateTemplate_PsiZombie(Name TemplateName =
 	CharTemplate.ImmuneTypes.AddItem(class'X2Item_DefaultDamageTypes'.default.ParthenogenicPoisonType);
 
 	CharTemplate.Abilities.AddItem('StandardMove');
+	CharTemplate.Abilities.AddItem('ZombieInitialization');
 
 	CharTemplate.SightedNarrativeMoments.AddItem(XComNarrativeMoment'X2NarrativeMoments.TACTICAL.AlienSitings.T_Central_AlienSightings_PsiZombie');
 	
@@ -3569,7 +3598,7 @@ static function X2CharacterTemplate CreateTemplate_MimicBeacon()
 	CharTemplate.bCanUse_eTraversal_WallClimb = false;
 	CharTemplate.bCanUse_eTraversal_BreakWall = false;
 	CharTemplate.bAppearanceDefinesPawn = false;
-	CharTemplate.bCanTakeCover = true;
+	CharTemplate.bCanTakeCover = false;
 
 	CharTemplate.bSkipDefaultAbilities = true;
 
@@ -3591,6 +3620,7 @@ static function X2CharacterTemplate CreateTemplate_MimicBeacon()
 	CharTemplate.bNeverSelectable = true;
 
 	CharTemplate.Abilities.AddItem('MimicBeaconInitialize');
+	CharTemplate.Abilities.AddItem('GuaranteedToHit');
 
 	return CharTemplate;
 }
@@ -3679,6 +3709,3 @@ static function X2CharacterTemplate CreateSpeakerTemplate(Name CharacterName, op
 
 	return CharTemplate;
 }
-
-
-

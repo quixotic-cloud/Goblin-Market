@@ -83,7 +83,7 @@ const ANALYTICS_NUM_MAGUSES = 'NUM_MAGUSES';
 
 struct native ChallengeModeScoringTableEntry
 {
-	var name MissionSource;
+	var name MissionType;
 	var array<int> Points;
 };
 
@@ -93,13 +93,24 @@ struct UnitAnalyticEntry
 	var float Value;
 };
 
+struct native AnalyticEntry
+{
+	var name Key;
+	var float Value;
+};
+
 var config array<ChallengeModeScoringTableEntry> ChallengeModeScoringTable;
+var config int ChallengeModeEnemyBonusPerForceLevel;
 
 var private native Map_Mirror AnalyticMap{ TMap<FName, double> };
 var private native Map_Mirror TacticalAnalyticMap{ TMap<FName, double> };
 var private native array<int> TacticalAnalyticUnits;
 
 var private int CampaignDifficulty;
+
+var bool SubmitToFiraxisLive;
+
+native function bool Validate(XComGameState HistoryGameState, INT GameStateIndex) const;
 
 protected native function AddValueImpl(name Metric, float Value);
 protected native function SetValueImpl(name Metric, float Value);
@@ -117,6 +128,11 @@ native function string GetTacticalValueAsString( name metric, string Default = "
 native function double GetTacticalValue( name metric ) const;
 native function float GetTacticalFloatValue( name metric ) const; // Unrealscript has trouble converting from double to float.  This works around the compiler issue.
 native function DumpTacticalValues( ) const;
+
+native final iterator function IterateGlobalAnalytics( out AnalyticEntry outEntry, optional bool IncludeUnits = true );
+native final iterator function IterateTacticalAnalytics( out AnalyticEntry outEntry, optional bool IncludeUnits = true );
+
+native function SingletonCopyForHistoryDiffDuplicate( XComGameState_BaseObject NewState );
 
 private function name BuildUnitMetric( int UnitID, name Metric )
 {
@@ -185,7 +201,10 @@ function AddValue(name Metric, float Value, optional StateObjectReference UnitRe
 	}
 
 	// send to server stats
-	`FXSLIVE.StatAddValue( name(Metric$"_"$CampaignDifficulty), Value, eKVPSCOPE_USERANDGLOBAL);
+	if (SubmitToFiraxisLive)
+	{
+		`FXSLIVE.StatAddValue( name(Metric$"_"$CampaignDifficulty), Value, eKVPSCOPE_USERANDGLOBAL);
+	}
 }
 
 
@@ -194,7 +213,10 @@ function SetValue(name Metric, float Value)
 	SetValueImpl(Metric, Value);
 
 	// send to server stats
-	`FXSLIVE.StatSetValue(name(Metric$"_"$CampaignDifficulty), Value, eKVPSCOPE_USERANDGLOBAL);
+	if (SubmitToFiraxisLive)
+	{
+		`FXSLIVE.StatSetValue(name(Metric$"_"$CampaignDifficulty), Value, eKVPSCOPE_USERANDGLOBAL);
+	}
 }
 
 function AddTacticalValue( name Metric, int Value, optional StateObjectReference UnitRef )
@@ -215,7 +237,10 @@ function AddTacticalValue( name Metric, int Value, optional StateObjectReference
 	}
 
 	// send to server stats
-	`FXSLIVE.StatAddValue( name(Metric$"_"$CampaignDifficulty), Value, eKVPSCOPE_USERANDGLOBAL );
+	if (SubmitToFiraxisLive)
+	{
+		`FXSLIVE.StatAddValue( name(Metric$"_"$CampaignDifficulty), Value, eKVPSCOPE_USERANDGLOBAL );
+	}
 }
 
 function UnitAnalyticEntry GetLargestTacticalAnalyticForMetric( name Metric )
@@ -352,7 +377,7 @@ function AddTacticalGameEnd()
 
 	`ANALYTICSLOG("STAT_END_MISSION:"@bMissionSuccess);
 
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Mission End");
+	NewGameState = class'XComGameStateContext_ChallengeScore'.static.CreateChangeState( CMPN_AliveSoldiers );
 
 	AnalyticsObject = XComGameState_Analytics(NewGameState.CreateStateObject(class'XComGameState_Analytics', self.ObjectID));
 
@@ -410,9 +435,9 @@ function AddTacticalGameEnd()
 		}
 	}
 
-	if (`ONLINEEVENTMGR.bIsChallengeModeGame)
+	if (`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) != none)
 	{
-		AnalyticsObject.HandleChallengeModeEnd();
+		AnalyticsObject.HandleChallengeModeEnd(NewGameState);
 	}
 
 	NewGameState.AddStateObject(AnalyticsObject);
@@ -575,10 +600,10 @@ function AddKillMail(XComGameState_Unit SourceUnit, XComGameState_Unit KilledUni
 	local XComGameState NewGameState;
 	local XComGameState_Analytics AnalyticsObject;
 
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Kill Mail");
+	NewGameState = class'XComGameStateContext_ChallengeScore'.static.CreateChangeState( CMPN_KilledEnemy );
 
 	AnalyticsObject = XComGameState_Analytics(NewGameState.CreateStateObject(class'XComGameState_Analytics', self.ObjectID));
-	AnalyticsObject.HandleKillMail(SourceUnit, KilledUnit);
+	AnalyticsObject.HandleKillMail(SourceUnit, KilledUnit, NewGameState);
 	
 	NewGameState.AddStateObject(AnalyticsObject);
 	SubmitGameState(NewGameState);
@@ -589,10 +614,10 @@ function AddMissionObjectiveComplete()
 	local XComGameState NewGameState;
 	local XComGameState_Analytics AnalyticsObject;
 
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Mission Objective Complete");
+	NewGameState = class'XComGameStateContext_ChallengeScore'.static.CreateChangeState( CMPN_CompletedObjective );
 
 	AnalyticsObject = XComGameState_Analytics(NewGameState.CreateStateObject(class'XComGameState_Analytics', self.ObjectID));
-	AnalyticsObject.HandleMissionObjectiveComplete();
+	AnalyticsObject.HandleMissionObjectiveComplete(NewGameState);
 
 	NewGameState.AddStateObject(AnalyticsObject);
 	SubmitGameState(NewGameState);
@@ -603,10 +628,10 @@ function AddCivilianRescued(XComGameState_Unit SourceUnit, XComGameState_Unit Re
 	local XComGameState NewGameState;
 	local XComGameState_Analytics AnalyticsObject;
 
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Civilian Rescued");
+	NewGameState = class'XComGameStateContext_ChallengeScore'.static.CreateChangeState( CMPN_CiviliansSaved );
 
 	AnalyticsObject = XComGameState_Analytics(NewGameState.CreateStateObject(class'XComGameState_Analytics', self.ObjectID));
-	AnalyticsObject.HandleCivilianRescued(SourceUnit, RescuedUnit);
+	AnalyticsObject.HandleCivilianRescued(SourceUnit, RescuedUnit, NewGameState);
 
 	NewGameState.AddStateObject(AnalyticsObject);
 	SubmitGameState(NewGameState);
@@ -1021,17 +1046,144 @@ function AddUnitPromotion( XComGameState_Unit PromotedUnit, XComGameState_Unit P
 	SubmitGameState( NewGameState );
 }
 
+protected function name GetAlienStatName( name TemplateName, bool WasKilled )
+{
+	local string StatString;
+
+	switch (TemplateName)
+	{
+		case 'TutorialAdvTrooperM1':
+		case 'AdvTrooperM1':		StatString = "ADVENT_TROOPER_MK1";
+			break;
+
+		case 'AdvTrooperM2':		StatString = "ADVENT_TROOPER_MK2";
+			break;
+
+		case 'AdvTrooperM3':		StatString = "ADVENT_TROOPER_MK3";
+			break;
+
+		case 'AdvCaptainM1':		StatString = "ADVENT_CAPTAIN_MK1";
+			break;
+
+		case 'AdvCaptainM2':		StatString = "ADVENT_CAPTAIN_MK2";
+			break;
+
+		case 'AdvCaptainM3':		StatString = "ADVENT_CAPTAIN_MK3";
+			break;
+
+		case 'AdvStunLancerM1':		StatString = "ADVENT_STUN_LANCER_MK1";
+			break;
+
+		case 'AdvStunLancerM2':		StatString = "ADVENT_STUN_LANCER_MK2";
+			break;
+
+		case 'AdvStunLancerM3':		StatString = "ADVENT_STUN_LANCER_MK3";
+			break;
+
+		case 'AdvShieldBearerM2':	StatString = "ADVENT_SHIELDBEARER_MK2";
+			break;
+
+		case 'AdvShieldBearerM3':	StatString = "ADVENT_SHIELDBEARER_MK3";
+			break;
+
+		case 'AdvPsiWitchM3':		StatString = "ADVENT_PSI_WITCH_MK3";
+			break;
+
+		case 'AdvMEC_M1':			StatString = "ADVENT_MEC_MK1";
+			break;
+
+		case 'AdvMEC_M2':			StatString = "ADVENT_MEC_MK2";
+			break;
+
+		case 'AdvShortTurretM3':
+		case 'AdvShortTurretM2':
+		case 'AdvShortTurretM1':
+		case 'AdvShortTurret':
+		case 'AdvTurretM3':
+		case 'AdvTurretM2':
+		case 'AdvTurretM1':			StatString = "ADVENT_TURRETS";
+			break;
+
+		case 'PrototypeSectopod':
+		case 'Sectopod':			StatString = "SECTOPODS";
+			break;
+
+		case 'Sectoid':				StatString = "SECTOIDS";
+			break;
+
+		case 'Archon':				StatString = "ARCHONS";
+			break;
+
+		case 'ArchonKing':			StatString = "ARCHON_KING";
+			break;
+
+		case 'ViperNeonate':
+		case 'Viper':				StatString = "VIPERS";
+			break;
+
+		case 'ViperKing':			StatString = "VIPER_KING";
+			break;
+
+		case 'Muton':				StatString = "MUTONS";
+			break;
+
+		case 'Berserker':			StatString = "MUTON_BERSERKERS";
+			break;
+
+		case 'BerserkerQueen':		StatString = "BERSERKER_QUEEN";
+			break;
+
+		case 'Cyberus':				StatString = "CYBERUS";
+			break;
+
+		case 'Gatekeeper':			StatString = "GATEKEEPERS";
+			break;
+
+		case 'ChryssalidCocoonHuman':
+		case 'ChryssalidCocoon':
+		case 'Chryssalid':			StatString = "CHRYSSALIDS";
+			break;
+
+		case 'Andromedon':			StatString = "ANDROMEDONS";
+			break;
+
+		case 'Faceless':			StatString = "FACELESS";
+			break;
+
+		case 'PsiZombieHuman':
+		case 'PsiZombie':			StatString = "ZOMBIES";
+			break;
+
+		case 'AndromedonRobot':		StatString = "ANDROMEDON_ROBOT";
+			break;
+
+		default:					StatString = "UNKNOWN_ENEMY_TYPE";
+			break;
+	}
+
+	if (WasKilled)
+	{
+		StatString = StatString $ "_KILLED";
+	}
+	else
+	{
+		StatString = "SOLDIERS_KILLED_BY_" $ StatString;
+	}
+
+	return name(StatString);
+}
+
 protected function PlayerKilledOther(XComGameState_Unit SourceUnit, XComGameState_Unit KilledUnit)
 {
-	local name GroupName, TemplateName;
+	local name TemplateName;
 	local X2SoldierClassTemplate SoldierClass;
 	local StateObjectReference UnitRef;
+	local X2CharacterTemplate SourceTemplate;
 
-	GroupName = KilledUnit.GetMyTemplate().CharacterGroupName;
 	TemplateName = KilledUnit.GetMyTemplateName();
 	UnitRef.ObjectID = SourceUnit.ObjectID;
 
-	`ANALYTICSLOG("STAT_KILLED:"@TemplateName$"/"$GroupName);
+	`ANALYTICSLOG("STAT_KILLED:"@TemplateName);
 
 	AddTacticalValue(ANALYTICS_UNIT_KILLS, 1, UnitRef);
 
@@ -1063,128 +1215,10 @@ protected function PlayerKilledOther(XComGameState_Unit SourceUnit, XComGameStat
 			break;
 	}
 
-	// check metric by template (specific)
-	switch (TemplateName)
-	{
-		case 'TutorialAdvTrooperM1':
-		case 'AdvTrooperM1':
-			AddValue('ADVENT_TROOPER_MK1_KILLED', 1, UnitRef);
-			break;
-	
-		case 'AdvTrooperM2':
-			AddValue('ADVENT_TROOPER_MK2_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvTrooperM3':
-			AddValue('ADVENT_TROOPER_MK3_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvCaptainM1':
-			AddValue('ADVENT_CAPTAIN_MK1_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvCaptainM2':
-			AddValue('ADVENT_CAPTAIN_MK2_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvCaptainM3':
-			AddValue('ADVENT_CAPTAIN_MK3_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvStunLancerM1':
-			AddValue('ADVENT_STUN_LANCER_MK1_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvStunLancerM2':
-			AddValue('ADVENT_STUN_LANCER_MK2_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvStunLancerM3':
-			AddValue('ADVENT_STUN_LANCER_MK3_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvShieldBearerM2':
-			AddValue('ADVENT_SHIELDBEARER_MK2_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvShieldBearerM3':
-			AddValue('ADVENT_SHIELDBEARER_MK3_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvPsiWitchM2':
-			AddValue('ADVENT_PSI_WITCH_MK2_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvPsiWitchM3':
-			AddValue('ADVENT_PSI_WITCH_MK3_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvMEC_M1':
-			AddValue('ADVENT_MEC_MK1_KILLED', 1, UnitRef);
-			break;
-
-		case 'AdvMEC_M2':
-			AddValue('ADVENT_MEC_MK2_KILLED', 1, UnitRef);
-			break;
-	}
-
-	// check metric by group (generic)
-	switch (GroupName)
-	{
-		case 'AdventTurret':
-			AddValue('ADVENT_TURRETS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Sectopod':
-			AddValue('SECTOPODS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Sectoid':
-			AddValue('SECTOIDS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Archon':
-			AddValue('ARCHONS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Viper':
-			AddValue('VIPERS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Muton':
-			AddValue('MUTONS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Berserker':
-			AddValue('MUTON_BERSERKERS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Cyberus':
-			AddValue('CYBERUS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Gatekeeper':
-			AddValue('GATEKEEPERS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Chryssalid':
-			AddValue('CHRYSSALIDS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Andromedon':
-			AddValue('ANDROMEDONS_KILLED', 1, UnitRef);
-			break;
-
-		case 'Faceless':
-			AddValue('FACELESS_KILLED', 1, UnitRef);
-			break;
-
-		case 'PsiZombie':
-			AddValue('ZOMBIES_KILLED', 1, UnitRef);
-			break;
-	}
+	AddValue( GetAlienStatName( TemplateName, true ), 1, UnitRef );
 
 	// check source soldier class kills
+	SourceTemplate = SourceUnit.GetMyTemplateManager().FindCharacterTemplate( SourceUnit.GetMyTemplateName() );
 	SoldierClass = SourceUnit.GetSoldierClassTemplate();
 
 	if (SoldierClass != None)
@@ -1212,149 +1246,75 @@ protected function PlayerKilledOther(XComGameState_Unit SourceUnit, XComGameStat
 			case 'PsiOperative':
 				AddValue('TOTAL_PSI_OPERATIVE_KILLS', 1, UnitRef);
 				break;
+
+			case 'Rookie':
+				AddValue('TOTAL_ROOKIE_KILLS', 1, UnitRef);
+				break;
+
+			default:
+				AddValue('TOTAL_UNKNOWN_SOLDIER_CLASS_KILLS', 1, UnitRef);
+				break;
 		}
+	}
+	else if (SourceTemplate.DataName == 'NestCentral')
+	{
+		AddValue('TOTAL_CENTRAL_KILLS', 1, UnitRef );
+	}
+	else if (SourceTemplate.DataName == 'AdvPsiWitchM2')
+	{
+		AddValue('TOTAL_COMMANDER_KILLS', 1, UnitRef );
+	}
+	else if (SourceTemplate.bIsRobotic)
+	{
+		AddValue( 'TOTAL_HACKED_ROBOTIC_KILLS', 1, UnitRef );
+	}
+	else if (SourceTemplate.bIsAdvent)
+	{
+		AddValue( 'TOTAL_CONTROLLED_ADVENT_KILLS', 1, UnitRef );
+	}
+	else if (SourceTemplate.bIsAlien)
+	{
+		AddValue( 'TOTAL_CONTROLLED_ALIEN_KILLS', 1, UnitRef );
+	}
+	else
+	{
+		AddValue( 'TOTAL_UNKNOWN_KILLS', 1, UnitRef );
 	}
 }
 
 
 protected function OtherKilledPlayer(XComGameState_Unit SourceUnit, XComGameState_Unit KilledUnit)
 {
-	local name GroupName, TemplateName;
+	local name TemplateName;
 	local X2SoldierClassTemplate SoldierClass;
 	local int TimeDiffHours;
 	local StateObjectReference UnitRef;
 
-	GroupName = SourceUnit.GetMyTemplate().CharacterGroupName;
 	TemplateName = SourceUnit.GetMyTemplateName();
 
 	UnitRef.ObjectID = KilledUnit.ObjectID;
 
-	`ANALYTICSLOG("STAT_KILLBY:"@TemplateName$"/"$GroupName);
+	`ANALYTICSLOG("STAT_KILLBY:"@TemplateName);
 
 	AddValue('SOLDIERS_KILLED_TOTAL', 1);
 
 	TimeDiffHours = class'X2StrategyGameRulesetDataStructures'.static.DifferenceInHours( KilledUnit.m_KIADate, KilledUnit.m_RecruitDate );
 	AddValue(ANALYTICS_UNIT_SERVICE_HOURS, TimeDiffHours, UnitRef );
 
-	// check metric by template (specific)
-	switch (TemplateName)
+	if (SourceUnit != none)
 	{
-		case 'TutorialAdvTrooperM1':
-		case 'AdvTrooperM1':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_TROOPER_MK1', 1);
-			break;
-
-		case 'AdvTrooperM2':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_TROOPER_MK2', 1);
-			break;
-
-		case 'AdvTrooperM3':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_TROOPER_MK3', 1);
-			break;
-
-		case 'AdvCaptainM1':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_CAPTAIN_MK1', 1);
-			break;
-
-		case 'AdvCaptainM2':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_CAPTAIN_MK2', 1);
-			break;
-
-		case 'AdvCaptainM3':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_CAPTAIN_MK3', 1);
-			break;
-
-		case 'AdvStunLancerM1':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_STUN_LANCER_MK1', 1);
-			break;
-
-		case 'AdvStunLancerM2':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_STUN_LANCER_MK2', 1);
-			break;
-
-		case 'AdvStunLancerM3':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_STUN_LANCER_MK3', 1);
-			break;
-
-		case 'AdvShieldBearerM2':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_SHIELDBEARER_MK2', 1);
-			break;
-
-		case 'AdvShieldBearerM3':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_SHIELDBEARER_MK3', 1);
-			break;
-
-		case 'AdvPsiWitchM2':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_PSI_WITCH_MK2', 1);
-			break;
-
-		case 'AdvPsiWitchM3':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_PSI_WITCH_MK3', 1);
-			break;
-
-		case 'AdvMEC_M1':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_MEC_MK1', 1);
-			break;
-
-		case 'AdvMEC_M2':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_MEC_MK2', 1);
-			break;
+		if (!SourceUnit.IsASoldier())
+		{
+			AddValue( GetAlienStatName( TemplateName, false ), 1, UnitRef );
+		}
+		else
+		{
+			AddValue( 'SOLDIERS_KILLED_BY_CONTROLLED_FRIENDLY', 1, UnitRef );
+		}
 	}
-
-	// check metric by group (generic)
-	switch (GroupName)
+	else
 	{
-		case 'AdventTurret':
-			AddValue('SOLDIERS_KILLED_BY_ADVENT_TURRETS', 1);
-			break;
-
-		case 'Sectopod':
-			AddValue('SOLDIERS_KILLED_BY_SECTOPODS', 1);
-			break;
-
-		case 'Sectoid':
-			AddValue('SOLDIERS_KILLED_BY_SECTOIDS', 1);
-			break;
-
-		case 'Archon':
-			AddValue('SOLDIERS_KILLED_BY_ARCHONS', 1);
-			break;
-
-		case 'Viper':
-			AddValue('SOLDIERS_KILLED_BY_VIPERS', 1);
-			break;
-
-		case 'Muton':
-			AddValue('SOLDIERS_KILLED_BY_MUTONS', 1);
-			break;
-
-		case 'Berserker':
-			AddValue('SOLDIERS_KILLED_BY_MUTON_BERSERKERS', 1);
-			break;
-
-		case 'Cyberus':
-			AddValue('SOLDIERS_KILLED_BY_CYBERUS', 1);
-			break;
-
-		case 'Gatekeeper':
-			AddValue('SOLDIERS_KILLED_BY_GATEKEEPERS', 1);
-			break;
-
-		case 'Chryssalid':
-			AddValue('SOLDIERS_KILLED_BY_CHRYSSALIDS', 1);
-			break;
-
-		case 'Andromedon':
-			AddValue('SOLDIERS_KILLED_BY_ANDROMEDONS', 1);
-			break;
-
-		case 'Faceless':
-			AddValue('SOLDIERS_KILLED_BY_FACELESS', 1);
-			break;
-
-		case 'PsiZombie':
-			AddValue('SOLDIERS_KILLED_BY_ZOMBIES', 1);
-			break;			
+		AddValue( 'SOLDIERS_KILLED_BY_ENVIRONMENT', 1, UnitRef );
 	}
 
 	// check killed soldier rank
@@ -1369,6 +1329,9 @@ protected function OtherKilledPlayer(XComGameState_Unit SourceUnit, XComGameStat
 		case 6: AddValue('MAJORS_KILLED', 1); break;
 		case 7: AddValue('COLONELS_KILLED', 1); break;
 		case 8: AddValue('BRIGADIER_KILLED', 1); break;
+
+		default: AddValue('UNKNOWN_RANK_KILLED', 1);
+			break;
 	}
 
 	// check killed soldier class
@@ -1399,12 +1362,24 @@ protected function OtherKilledPlayer(XComGameState_Unit SourceUnit, XComGameStat
 			case 'PsiOperative':
 				AddValue('PSI_OPERATIVES_KILLED', 1);
 				break;
+
+			case 'Rookie':
+				AddValue('ROOKIE_SOLIDER_KILLED', 1);
+				break;
+
+			default:
+				AddValue( 'UNKNOWN_SOLDIER_CLASS_KILLED', 1);
+				break;
 		}
+	}
+	else if (KilledUnit.GetMyTemplateName( ) == 'NestCentral')
+	{
+		AddValue( 'CENTRALS_KILLED', 1, UnitRef );
 	}
 }
 
 
-protected function HandleKillMail(XComGameState_Unit SourceUnit, XComGameState_Unit KilledUnit)
+protected function HandleKillMail(XComGameState_Unit SourceUnit, XComGameState_Unit KilledUnit, XComGameState NewGameState)
 {
 	local StateObjectReference UnitRef;
 
@@ -1420,9 +1395,9 @@ protected function HandleKillMail(XComGameState_Unit SourceUnit, XComGameState_U
 		else
 		{
 			PlayerKilledOther(SourceUnit, KilledUnit);
-			if (`ONLINEEVENTMGR.bIsChallengeModeGame)
+			if ((KilledUnit.GetTeam() == eTeam_Alien) && (`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) != none))
 			{
-				HandleChallengeModeEnemyKill(SourceUnit);
+				HandleChallengeModeEnemyKill(SourceUnit, NewGameState);
 			}
 		}
 	}
@@ -1530,108 +1505,173 @@ protected function HandleWeaponKill(XComGameState_Unit SourceUnit, XComGameState
 		case 'Sword_BM':
 			AddValue('KILLS_WITH_SWORDS', 1, UnitRef);
 			break;
-	}
 
-	if ((X2GrenadeTemplate(Item.GetMyTemplate()) != none) || (X2GrenadeTemplate(Item.GetLoadedAmmoTemplate(Ability)) != none))
-	{
-		AddValue(ANALYTICS_GRENADE_KILL, 1, UnitRef );
+		case 'AlienHunterRifle_CV':
+		case 'AlienHunterRifle_MG':
+		case 'AlienHunterRifle_BM':
+			AddValue('KILLS_WITH_HUNTER_RIFLES', 1, UnitRef);
+			break;
+
+		case 'AlienHunterPistol_CV':
+		case 'AlienHunterPistol_MG':
+		case 'AlienHunterPistol_BM':
+			AddValue('KILLS_WITH_HUNTER_PISTOLS', 1, UnitRef);
+			break;
+
+		case 'AlienHunterAxe_CV':
+		case 'AlienHunterAxe_MG':
+		case 'AlienHunterAxe_BM':
+		case 'AlienHunterAxeThrown_CV':
+		case 'AlienHunterAxeThrown_MG':
+		case 'AlienHunterAxeThrown_BM':
+			AddValue('KILLS_WITH_HUNTER_AXES', 1, UnitRef);
+			break;
+
+		case 'HeavyAlienArmor':
+		case 'HeavyAlienArmorMk2':
+			AddValue('KILLS_WITH_ALIEN_ARMOR', 1, UnitRef);
+			break;
+
+		default:
+			if ((X2GrenadeTemplate( Item.GetMyTemplate( ) ) != none) || (X2GrenadeTemplate( Item.GetLoadedAmmoTemplate( Ability ) ) != none))
+			{
+				AddValue( ANALYTICS_GRENADE_KILL, 1, UnitRef );
+			}
+			else
+			{
+				AddValue('KILLS_WITH_UNKNOWN_WEAPONS', 1, UnitRef);
+			}
+			break;
 	}
 }
 
-protected function HandleMissionObjectiveComplete()
-{
-	if (`ONLINEEVENTMGR.bIsChallengeModeGame)
-	{
-		HandleChallengeModeObjectiveComplete();
-	}
-}
-
-protected function HandleCivilianRescued(XComGameState_Unit SourceUnit, XComGameState_Unit RescuedUnit)
-{
-	if (`ONLINEEVENTMGR.bIsChallengeModeGame)
-	{
-		HandleChallengeModeCivilianRescued(SourceUnit);
-	}
-}
-
-private function HandleChallengeModeObjectiveComplete()
+protected function HandleMissionObjectiveComplete(XComGameState NewGameState)
 {
 	local int Points;
 	local int PlayerIndex;
 	local XComGameStateHistory History;
 	local XComGameState_BattleData BattleData;
 	local XComGameState_Player ControllingPlayer;
+	local XComGameStateContext_ChallengeScore ChallengeContext;
 
 	History = `XCOMHISTORY;
-	BattleData = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
+
+	if (History.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) == none)
+	{
+		return;
+	}
+
+	BattleData = XComGameState_BattleData( History.GetSingleGameStateObjectForClass( class'XComGameState_BattleData' ) );
 	for (PlayerIndex = 0; PlayerIndex < BattleData.PlayerTurnOrder.Length; ++PlayerIndex)
 	{
-		ControllingPlayer = XComGameState_Player(History.GetGameStateForObjectID(BattleData.PlayerTurnOrder[PlayerIndex].ObjectID));
-		if (!ControllingPlayer.IsAIPlayer())
+		ControllingPlayer = XComGameState_Player( History.GetGameStateForObjectID( BattleData.PlayerTurnOrder[ PlayerIndex ].ObjectID ) );
+		if (!ControllingPlayer.IsAIPlayer( ))
 		{
 			break;
 		}
 	}
 
-	Points = GetChallengeModePoints(CMPN_CompletedObjective) - ((ControllingPlayer.PlayerTurnCount - 1) * 1000);
-	AddValue('CM_OBJECTIVE_COMPLETE_SCORE', Points);
-	AddValue('CM_TOTAL_SCORE', Points);
+	ChallengeContext = XComGameStateContext_ChallengeScore( NewGameState.GetContext( ) );
+	ChallengeContext.CategoryPointValue = GetChallengeModePoints( CMPN_CompletedObjective );
+
+	Points = ChallengeContext.CategoryPointValue - ((ControllingPlayer.PlayerTurnCount - 1) * 1000);
+	Points = Max( 0, Points );
+
+	AddValue( 'CM_OBJECTIVE_COMPLETE_SCORE', Points );
+	AddValue( 'CM_TOTAL_SCORE', Points );
+	ChallengeContext.AddedPoints = Points;
+
+	`XEVENTMGR.TriggerEvent( 'ChallengeModeScoreChange', , , NewGameState );
 	`log("--->Challenge Mode Objective Complete Points:" @ Points);
 }
 
-private function HandleChallengeModeEnemyKill(XComGameState_Unit SourceUnit)
-{
-	local int Points;
-	local XComGameStateHistory History;
-	local XComGameState_HeadquartersAlien AlienHQ;
-	local XComGameState_Player ControllingPlayer;
-
-	History = `XCOMHISTORY;
-	AlienHQ = XComGameState_HeadquartersAlien(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersAlien'));
-	ControllingPlayer = XComGameState_Player(History.GetGameStateForObjectID(SourceUnit.ControllingPlayer.ObjectID));
-
-	Points = (GetChallengeModePoints(CMPN_KilledEnemy) + (50 * AlienHQ.ForceLevel)) * (1.0 - ((ControllingPlayer.PlayerTurnCount - 1) * 0.1f));
-	AddValue('CM_ENEMY_KILL_SCORE', Points);
-	AddValue('CM_TOTAL_SCORE', Points);
-	`log("--->Challenge Mode Kill Points:" @ Points);
-}
-
-private function HandleChallengeModeCivilianRescued(XComGameState_Unit SourceUnit)
+protected function HandleCivilianRescued(XComGameState_Unit SourceUnit, XComGameState_Unit RescuedUnit, XComGameState NewGameState)
 {
 	local int Points;
 	local int PlayerIndex;
 	local XComGameStateHistory History;
 	local XComGameState_BattleData BattleData;
 	local XComGameState_Player ControllingPlayer;
+	local XComGameStateContext_ChallengeScore ChallengeContext;
+	local float AwardPercentage;
 
 	History = `XCOMHISTORY;
 
+	if (History.GetSingleGameStateObjectForClass( class'XComGameState_ChallengeData', true ) == none)
+	{
+		return;
+	}
+
 	if (SourceUnit != none)
 	{
-		ControllingPlayer = XComGameState_Player(History.GetGameStateForObjectID(SourceUnit.ControllingPlayer.ObjectID));
+		ControllingPlayer = XComGameState_Player( History.GetGameStateForObjectID( SourceUnit.ControllingPlayer.ObjectID ) );
 	}
 	else
 	{
-		BattleData = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
+		BattleData = XComGameState_BattleData( History.GetSingleGameStateObjectForClass( class'XComGameState_BattleData' ) );
 		for (PlayerIndex = 0; PlayerIndex < BattleData.PlayerTurnOrder.Length; ++PlayerIndex)
 		{
-			ControllingPlayer = XComGameState_Player(History.GetGameStateForObjectID(BattleData.PlayerTurnOrder[PlayerIndex].ObjectID));
-			if (!ControllingPlayer.IsAIPlayer())
+			ControllingPlayer = XComGameState_Player( History.GetGameStateForObjectID( BattleData.PlayerTurnOrder[ PlayerIndex ].ObjectID ) );
+			if (!ControllingPlayer.IsAIPlayer( ))
 			{
 				break;
 			}
 		}
 	}
-	Points = GetChallengeModePoints(CMPN_CiviliansSaved) * (1.0 - ((ControllingPlayer.PlayerTurnCount - 1) * 0.1f));
-	AddValue('CM_CIVILIANS_RESCUED_SCORE', Points);
-	AddValue('CM_TOTAL_SCORE', Points);
+
+	ChallengeContext = XComGameStateContext_ChallengeScore( NewGameState.GetContext( ) );
+
+	ChallengeContext.CategoryPointValue = GetChallengeModePoints( CMPN_CiviliansSaved );
+	AwardPercentage = (1.0 - ((ControllingPlayer.PlayerTurnCount - 1) * 0.1f)); // reduce by 10% every turn beyond the 1st
+
+	Points = ChallengeContext.CategoryPointValue * AwardPercentage;
+	Points = Max( 0, Points );
+
+	AddValue( 'CM_CIVILIANS_RESCUED_SCORE', Points );
+	AddValue( 'CM_TOTAL_SCORE', Points );
+	ChallengeContext.AddedPoints = Points;
+
+	`XEVENTMGR.TriggerEvent( 'ChallengeModeScoreChange', , , NewGameState );
 }
 
-private function HandleChallengeModeEnd()
+private function HandleChallengeModeEnemyKill(XComGameState_Unit SourceUnit, XComGameState NewGameState)
 {
 	local int Points;
 	local XComGameStateHistory History;
+	local XComGameState_BattleData BattleData;
+	local XComGameState_Player ControllingPlayer;
+	local XComGameStateContext_ChallengeScore ChallengeContext;
+	local float AwardPercentage;
+
+	History = `XCOMHISTORY;
+	BattleData = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
+	ControllingPlayer = XComGameState_Player( History.GetGameStateForObjectID( SourceUnit.ControllingPlayer.ObjectID ) );
+
+	ChallengeContext = XComGameStateContext_ChallengeScore( NewGameState.GetContext( ) );
+
+	ChallengeContext.CategoryPointValue = GetChallengeModePoints( CMPN_KilledEnemy ) + (ChallengeModeEnemyBonusPerForceLevel * BattleData.m_iForceLevel);
+	AwardPercentage = (1.0 - ((ControllingPlayer.PlayerTurnCount - 1) * 0.1f)); // reduce by 10% every turn beyond the 1st
+
+	Points = ChallengeContext.CategoryPointValue * AwardPercentage;
+	Points = Max( 0, Points );
+
+	AddValue('CM_ENEMY_KILL_SCORE', Points);
+	AddValue( 'CM_TOTAL_SCORE', Points );
+	ChallengeContext.AddedPoints = Points;
+
+	`XEVENTMGR.TriggerEvent( 'ChallengeModeScoreChange', , , NewGameState );
+	`log("--->Challenge Mode Kill Points:" @ Points);
+}
+
+private function HandleChallengeModeEnd(XComGameState NewGameState)
+{
+	local int Points, TotalPoints;
+	local XComGameStateHistory History;
 	local XComGameState_Unit UnitState;
+	local int Uninjured, Alive;
+
+	Uninjured = GetChallengeModePoints(CMPN_UninjuredSoldiers);
+	Alive = GetChallengeModePoints(CMPN_AliveSoldiers);
 
 	History = `XCOMHISTORY;
 	foreach History.IterateByClassType(class'XComGameState_Unit', UnitState)
@@ -1641,47 +1681,62 @@ private function HandleChallengeModeEnd()
 		{
 			if (!UnitState.IsInjured())
 			{
-				Points = GetChallengeModePoints(CMPN_UninjuredSoldiers);
+				Points = Uninjured;
 				AddValue('CM_UNINJURED_SOLDIERS_SCORE', Points);
 			}
 			else if (UnitState.IsAlive())
 			{
-				Points = GetChallengeModePoints(CMPN_AliveSoldiers);
+				Points = Alive;
 				AddValue('CM_ALIVE_SOLDIERS_SCORE', Points);
 			}
-		}
-
-		if (Points > 0)
-		{
-			AddValue('CM_TOTAL_SCORE', Points);
+			TotalPoints += Points;
 		}
 	}
+
+	AddValue( 'CM_TOTAL_SCORE', TotalPoints );
+	XComGameStateContext_ChallengeScore( NewGameState.GetContext( ) ).AddedPoints = TotalPoints;
+	XComGameStateContext_ChallengeScore( NewGameState.GetContext( ) ).CategoryPointValue = Max( Uninjured, Alive );
+
+	`XEVENTMGR.TriggerEvent( 'ChallengeModeScoreChange', , , NewGameState );
+}
+
+function ChallengeModeScoringTableEntry GetChallengePointsTable( )
+{
+	local ChallengeModeScoringTableEntry ScoreEntry;
+	local XComGameStateHistory History;
+	local XComGameState_BattleData BattleData;
+	local Name MissionType;
+
+	History = `XCOMHISTORY;
+
+	BattleData = XComGameState_BattleData( History.GetSingleGameStateObjectForClass( class'XComGameState_BattleData' ) );
+	MissionType = name( BattleData.MapData.ActiveMission.sType );
+
+	foreach ChallengeModeScoringTable( ScoreEntry )
+	{
+		if (ScoreEntry.MissionType == MissionType)
+		{
+			return ScoreEntry;
+		}
+	}
+
+	ScoreEntry.MissionType = MissionType;
+	ScoreEntry.Points[ CMPN_CompletedObjective ] = 0;
+	ScoreEntry.Points[ CMPN_KilledEnemy ] = 0;
+	ScoreEntry.Points[ CMPN_UninjuredSoldiers ] = 0;
+	ScoreEntry.Points[ CMPN_AliveSoldiers ] = 0;
+	ScoreEntry.Points[ CMPN_CiviliansSaved ] = 0;
+
+	return ScoreEntry;
 }
 
 private function int GetChallengeModePoints(ChallengeModePointName PointName)
 {
-	local XComGameStateHistory History;
 	local ChallengeModeScoringTableEntry ScoreEntry;
-	local XComGameState_MissionSite ChallengeMission;
-	local Name MissionSource;
 
-	History = `XCOMHISTORY;
+	ScoreEntry = GetChallengePointsTable( );
 
-	foreach History.IterateByClassType(class'XComGameState_MissionSite', ChallengeMission)
-	{
-		MissionSource = ChallengeMission.GetMissionSource().DataName;
-		break;
-	}
-
-	foreach ChallengeModeScoringTable(ScoreEntry)
-	{
-		if (ScoreEntry.MissionSource == MissionSource)
-		{
-			return ScoreEntry.Points[PointName];
-		}
-	}
-
-	return 0;
+	return ScoreEntry.Points[ PointName ];
 }
 
 
@@ -1694,4 +1749,5 @@ DefaultProperties
 {
 	CampaignDifficulty=-1
 	bSingletonStateType=true
+	SubmitToFiraxisLive=true
 }

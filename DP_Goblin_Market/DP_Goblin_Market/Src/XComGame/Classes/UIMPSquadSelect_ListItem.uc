@@ -50,7 +50,7 @@ simulated function SetUnit(XCOMGameState_Unit editUnit)
 	bIsDirty = false;
 	m_kEditUnit = editUnit;
 
-	if(bIsInited && m_kSquadLoadout != none)
+	if(bIsInited && m_kSquadLoadout != none && editUnit != none)
 		UpdateData();
 }
 
@@ -58,7 +58,7 @@ simulated function SetLoadout(XComGameState squadLoadout)
 {
 	m_kSquadLoadout = squadLoadout;
 
-	if(bIsInited && m_kEditUnit != none)
+	if(bIsInited && m_kEditUnit != none && squadLoadout != none)
 		UpdateData();
 }
 
@@ -239,7 +239,7 @@ function OnCharacterTemplateCancel()
 	`SCREENSTACK.PopFirstInstanceOfClass(class'UIMPShell_CharacterTemplateSelector');
 }
 
-simulated function UpdateData(optional int Index = -1, optional bool bDisableEditAndRemove, optional bool bDisableDismiss)
+simulated function UpdateData(optional int Index = -1, optional bool bDisableEditAndRemove, optional bool bDisableDismiss, optional bool bDisableLoadout, optional array<EInventorySlot> CannotEditItemsList)
 {
 	local name TmpName;
 	local int i, NumUtilitySlots;

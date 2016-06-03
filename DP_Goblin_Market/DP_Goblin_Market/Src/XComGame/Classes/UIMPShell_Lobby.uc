@@ -285,6 +285,7 @@ function ReadLobbyLoadouts()
 
 function InitSquadCostPanels()
 {
+	`log(`location,, 'XCom_Online');
 	Super.InitSquadCostPanels();
 
 	// @TODO tsmith: the cost values will be filled in by the actual squad
@@ -439,11 +440,9 @@ function SetupMapData(XComGameState StrategyStartState, XComGameState TacticalSt
 	local X2MissionSourceTemplate			MissionSource;
 	local XComGameState_Reward				RewardState;
 	local X2RewardTemplate					RewardTemplate;
-	local Vector2D							RandomLocation;
 	local X2StrategyElementTemplateManager	StratMgr;
 	local array<XComGameState_WorldRegion>  arrRegions;
 	local XComGameState_WorldRegion         RegionState;
-	local Vector                            RandomVector, CenterLoc, RegionExtents;
 	local string                            PlotType;
 	local string                            Biome;
 	local GeneratedMissionData              EmptyData;
@@ -479,15 +478,6 @@ function SetupMapData(XComGameState StrategyStartState, XComGameState TacticalSt
 	}
 	RegionState = arrRegions[`SYNC_RAND_STATIC(arrRegions.Length)];
 
-	// Choose random location from the region
-	RegionExtents.X = (RegionState.GetMyTemplate().Bounds[0].fRight - RegionState.GetMyTemplate().Bounds[0].fLeft) / 2.0f;
-	RegionExtents.Y = (RegionState.GetMyTemplate().Bounds[0].fBottom - RegionState.GetMyTemplate().Bounds[0].fTop) / 2.0f;
-	CenterLoc.x = RegionState.GetMyTemplate().Bounds[0].fLeft + RegionExtents.X;
-	CenterLoc.y = RegionState.GetMyTemplate().Bounds[0].fTop + RegionExtents.Y;
-	RandomVector = CenterLoc + (`SYNC_VRAND() * RegionExtents);
-	RandomLocation.x = RandomVector.x;
-	RandomLocation.y = RandomVector.y;
-
 	// Build the mission
 	MPMission.GeneratedMission = EmptyData;
 	MPMission.GeneratedMission.MissionID = MPMission.ObjectID;
@@ -495,11 +485,7 @@ function SetupMapData(XComGameState StrategyStartState, XComGameState TacticalSt
 	MPMission.GeneratedMission.LevelSeed = class'Engine'.static.GetEngine().GetSyncSeed();
 	MPMission.GeneratedMission.BattleDesc = "";
 	MPMission.GeneratedMission.MissionQuestItemTemplate = MissionMgr.ChooseQuestItemTemplate(MissionSource.DataName, RewardState.GetMyTemplate(), MPMission.GeneratedMission.Mission);
-	if(Biome == "")
-	{
-		Biome = class'X2StrategyGameRulesetDataStructures'.static.GetBiome(RandomLocation);
-	}
-	MPMission.GeneratedMission.Biome = ParcelMgr.GetBiomeDefinition(Biome);
+	
 	MPMission.GeneratedMission.BattleOpName = class'XGMission'.static.GenerateOpName(false);
 	ParcelMgr.GetValidPlotsForMission(arrValidPlots, MPMission.GeneratedMission.Mission, Biome);
 	if(PlotType == "")
@@ -523,6 +509,17 @@ function SetupMapData(XComGameState StrategyStartState, XComGameState TacticalSt
 		`Redscreen("GetMissionDataForSourceReward() failed to generate a mission with: \n"
 						$ " Source: " $ MissionSource.DataName $ "\n RewardType: " $ RewardState.GetMyTemplate().DisplayName);
 	}
+
+	if(Biome == "" && MPMission.GeneratedMission.Plot.ValidBiomes.Length > 0)
+	{
+		// This plot uses biomes but the user didn't select one, so pick one here
+		Biome = MPMission.GeneratedMission.Plot.ValidBiomes[`SYNC_RAND(MPMission.GeneratedMission.Plot.ValidBiomes.Length)];
+	}
+	if(Biome != "")
+	{
+		MPMission.GeneratedMission.Biome = ParcelMgr.GetBiomeDefinition(Biome);
+	}
+	`assert(Biome == "" || MPMission.GeneratedMission.Plot.ValidBiomes.Find(Biome) != INDEX_NONE);
 
 	// Add the mission to the start states
 	StrategyStartState.AddStateObject(MPMission);

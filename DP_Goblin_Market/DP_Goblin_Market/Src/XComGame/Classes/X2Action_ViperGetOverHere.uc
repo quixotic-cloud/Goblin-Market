@@ -24,7 +24,7 @@ function Init(const out VisualizationTrack InTrack)
 
 function bool CheckInterrupted()
 {
-	return false;
+	return VisualizationBlockContext.InterruptionStatus == eInterruptionStatus_Interrupt;
 }
 
 function NotifyTargetsAbilityApplied()
@@ -78,6 +78,11 @@ Begin:
 	UnitPawn.SetCurrentWeapon(PreviousWeapon);
 
 	CompleteAction();
+}
+
+event bool BlocksAbilityActivation()
+{
+	return true;
 }
 
 DefaultProperties

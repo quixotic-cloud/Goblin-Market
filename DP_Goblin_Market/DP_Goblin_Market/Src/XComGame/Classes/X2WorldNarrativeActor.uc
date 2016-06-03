@@ -37,6 +37,7 @@ function CreateState(XComGameState StartGameState)
 {
 	local XComGameStateHistory History;
 	local XComGameState_WorldNarrativeActor ObjectState;
+	local TTile TileLocation;
 
 	// if it doesn't exist, then we need to create it
 	History = `XCOMHISTORY;
@@ -44,6 +45,19 @@ function CreateState(XComGameState StartGameState)
 	// make sure this is the start state. These should only ever be created at start state!
 	`assert(StartGameState == History.GetStartState());
 	if(StartGameState == none)
+	{
+		return;
+	}
+
+	// ignore things that are outside the bounds of the level
+	TileLocation = `XWORLD.GetTileCoordinatesFromPosition( Location );
+	if (`XWORLD.IsTileOutOfRange( TileLocation ))
+	{
+		return;
+	}
+
+	// don't include these when building challenge mode maps.
+	if (History.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) != none)
 	{
 		return;
 	}

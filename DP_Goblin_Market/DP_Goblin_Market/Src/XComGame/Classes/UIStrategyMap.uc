@@ -138,6 +138,7 @@ simulated function SetUIState(EStrategyMapState eNewUIState)
 
 		if(bToggleFlight)
 		{
+			m_bResNetForcedOn = false; // If the resnet was forced on, turn it off when going into Flight Mode
 			OnFlightModeToggled();
 		}
 
@@ -148,20 +149,22 @@ simulated function SetUIState(EStrategyMapState eNewUIState)
 
 simulated function OnFlightModeToggled()
 {
-	UpdateButtonHelp();
-	UpdateDarkEvents();
-	UpdateToDoWidget();
-	UpdateResourceBar();
-	UpdateObjectiveList();
+	if (bIsFocused)
+	{
+		UpdateButtonHelp();
+		UpdateDarkEvents();
+		UpdateToDoWidget();
+		UpdateResourceBar();
+		UpdateObjectiveList();
 
-	if(m_eUIState == eSMS_Flight)
-	{
-		m_bResNetForcedOn = false; // If the resnet was forced on, turn it off when going into Flight Mode
-		HideMissionButtons();
-	}
-	else
-	{
-		UpdateMissions();
+		if (m_eUIState == eSMS_Flight)
+		{
+			HideMissionButtons();
+		}
+		else
+		{
+			UpdateMissions();
+		}
 	}
 }
 

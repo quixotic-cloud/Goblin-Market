@@ -193,7 +193,7 @@ cpptext
 	bool ChallengeModePostValidateResult(unsigned __int64 verifyID, bool success);
 
 private:
-	const char *GetLangauge();
+	FString GetLangauge();
 };
 
 event Init()
@@ -557,7 +557,7 @@ native function bool PerformChallengeModeGetIntervals();
  * Received when the Challenge Mode data has been read.
  * 
  */
-delegate OnReceivedChallengeModeIntervals(qword IntervalSeedID, int ExpirationDate, int TimeLength, EChallengeStateType IntervalState);
+delegate OnReceivedChallengeModeIntervals(qword IntervalSeedID, int ExpirationDate, int TimeLength, EChallengeStateType IntervalState, string IntervalName, array<byte> StartState);
 `AddClearDelegates(ReceivedChallengeModeIntervals);
 
 

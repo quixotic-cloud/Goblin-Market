@@ -83,7 +83,8 @@ function string ToString()
 /// <summary>
 /// Returns an XComGameState that is used to launch the X-Com 2 campaign.
 /// </summary>
-static function XComGameState CreateStrategyGameStart(optional XComGameState StartState, optional bool bSetRandomSeed=true, optional bool bTutorialEnabled=false, optional int SelectedDifficulty=1, optional bool bSuppressFirstTimeVO=false)
+static function XComGameState CreateStrategyGameStart(optional XComGameState StartState, optional bool bSetRandomSeed=true, optional bool bTutorialEnabled=false, 
+													  optional int SelectedDifficulty=1, optional bool bSuppressFirstTimeVO=false, optional array<name> EnabledOptionalNarrativeDLC)
 {	
 	local XComGameStateHistory History;
 	local XComGameStateContext_StrategyGameRule StrategyStartContext;
@@ -114,7 +115,7 @@ static function XComGameState CreateStrategyGameStart(optional XComGameState Sta
 	class'XComGameState_GameTime'.static.CreateGameStartTime(StartState);
 
 	//Create campaign settings
-	class'XComGameState_CampaignSettings'.static.CreateCampaignSettings(StartState, bTutorialEnabled, SelectedDifficulty, bSuppressFirstTimeVO);
+	class'XComGameState_CampaignSettings'.static.CreateCampaignSettings(StartState, bTutorialEnabled, SelectedDifficulty, bSuppressFirstTimeVO, EnabledOptionalNarrativeDLC);
 
 	//Create analytics object
 	class'XComGameState_Analytics'.static.CreateAnalytics(StartState, SelectedDifficulty);
@@ -283,10 +284,21 @@ static function XComGameState CreateStrategyGameStartFromTactical()
 /// </summary>
 static function CompleteStrategyFromTacticalTransfer()
 {
+	local XComOnlineEventMgr EventManager;
+	local array<X2DownloadableContentInfo> DLCInfos;
+	local int i;
+	
 	UpdateSkyranger();
 	CleanupProxyVips();
 	ProcessMissionResults();
 	SquadTacticalToStrategyTransfer();
+	
+	EventManager = `ONLINEEVENTMGR;
+	DLCInfos = EventManager.GetDLCInfos(false);
+	for (i = 0; i < DLCInfos.Length; ++i)
+	{
+		DLCInfos[i].OnPostMission();
+	}
 }
 
 /// <summary>
@@ -446,7 +458,7 @@ static function SquadTacticalToStrategyTransfer()
 	local XComGameState_FacilityXCom FacilityState;
 	local XComGameState_StaffSlot SlotState;
 	local array<StateObjectReference> SoldiersToTransfer;
-	local int idx, SlotIndex;
+	local int idx, SlotIndex, NewBlocksRemaining, NewProjectPointsRemaining;
 	local bool bRemoveItemStatus;
 	local StaffUnitInfo UnitInfo;
 	local XComGameStateHistory History;
@@ -488,23 +500,23 @@ static function SquadTacticalToStrategyTransfer()
 			UnitState.iNumMissions++;
 
 			// Bleeding out soldiers die if not rescued
-			if(UnitState.bBleedingOut)
+			if (UnitState.bBleedingOut)
 			{
 				UnitState.SetCurrentStat(eStat_HP, 0);
 			}
 
 			//  Dead soldiers get moved to the DeadCrew list
-			if(UnitState.IsDead())
+			if (UnitState.IsDead())
 			{
 				DeadUnitRef = UnitState.GetReference();
 				XComHQ.RemoveFromCrew(DeadUnitRef);
 				XComHQ.DeadCrew.AddItem(DeadUnitRef);
 				// Removed from squad in UIAfterAction
 			}
-			else if(UnitState.bCaptured)
+			else if (UnitState.bCaptured)
 			{
 				//  Captured soldiers get moved to the AI HQ capture list
-				if(AlienHeadquarters == none)
+				if (AlienHeadquarters == none)
 				{
 					AlienHeadquarters = XComGameState_HeadquartersAlien(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersAlien'));
 					AlienHeadquarters = XComGameState_HeadquartersAlien(NewGameState.CreateStateObject(class'XComGameState_HeadquartersAlien', AlienHeadquarters.ObjectID));
@@ -516,11 +528,11 @@ static function SquadTacticalToStrategyTransfer()
 			}
 
 			// If dead or captured remove healing project
-			if((UnitState.IsDead() || UnitState.bCaptured) && UnitState.HasHealingProject())
+			if ((UnitState.IsDead() || UnitState.bCaptured) && UnitState.HasHealingProject())
 			{
 				foreach History.IterateByClassType(class'XComGameState_HeadquartersProjectHealSoldier', ProjectState)
 				{
-					if(ProjectState.ProjectFocus == UnitState.GetReference())
+					if (ProjectState.ProjectFocus == UnitState.GetReference())
 					{
 						XComHQ.Projects.RemoveItem(ProjectState.GetReference());
 						NewGameState.RemoveStateObject(ProjectState.ObjectID);
@@ -533,7 +545,7 @@ static function SquadTacticalToStrategyTransfer()
 			EventManager.TriggerEvent('SoldierTacticalToStrategy', UnitState, , NewGameState);
 
 			//  Unload backpack (loot) items from any live or recovered soldiers
-			if(!UnitState.IsDead() || UnitState.bBodyRecovered)
+			if (!UnitState.IsDead() || UnitState.bBodyRecovered)
 			{
 				Items = UnitState.GetAllItemsInSlot(eInvSlot_Backpack, NewGameState);
 				foreach Items(ItemState)
@@ -545,13 +557,13 @@ static function SquadTacticalToStrategyTransfer()
 					`assert(bRemoveItemStatus);
 
 					ItemState.OwnerStateObject = XComHQ.GetReference();
-					XComHQ.PutItemInInventory(NewGameState, ItemState, true);	
+					XComHQ.PutItemInInventory(NewGameState, ItemState, true);
 
 					BattleData.CarriedOutLootBucket.AddItem(ItemState.GetMyTemplateName());
 				}
 			}
 			//  Recover regular inventory from dead but recovered units.
-			if(UnitState.IsDead() && UnitState.bBodyRecovered)
+			if (UnitState.IsDead() && UnitState.bBodyRecovered)
 			{
 				Items = UnitState.GetAllInventoryItems(NewGameState, true);
 				foreach Items(ItemState)
@@ -559,7 +571,7 @@ static function SquadTacticalToStrategyTransfer()
 					ItemState = XComGameState_Item(NewGameState.CreateStateObject(class'XComGameState_Item', ItemState.ObjectID));
 					NewGameState.AddStateObject(ItemState);
 
-					if(UnitState.RemoveItemFromInventory(ItemState, NewGameState))           //  possible we'll have some items that cannot be removed, so don't recover them
+					if (UnitState.RemoveItemFromInventory(ItemState, NewGameState))           //  possible we'll have some items that cannot be removed, so don't recover them
 					{
 						ItemState.OwnerStateObject = XComHQ.GetReference();
 						XComHQ.PutItemInInventory(NewGameState, ItemState, false); // Recovered items from recovered units goes directly into inventory, doesn't show on loot screen
@@ -569,116 +581,130 @@ static function SquadTacticalToStrategyTransfer()
 				}
 			}
 
-			// Start healing injured soldiers
-			if(!UnitState.IsDead() && !UnitState.bCaptured && UnitState.IsInjured() && UnitState.GetStatus() != eStatus_Healing)
+			// Tactical to Strategy transfer code which may be unique on a per-class basis
+			if (!UnitState.GetSoldierClassTemplate().bUniqueTacticalToStrategyTransfer)
 			{
-				UnitState.SetStatus(eStatus_Healing);
+				// Start healing injured soldiers
+				if (!UnitState.IsDead() && !UnitState.bCaptured && UnitState.IsInjured() && UnitState.GetStatus() != eStatus_Healing)
+				{
+					UnitState.SetStatus(eStatus_Healing);
 
-				if(!UnitState.HasHealingProject())
-				{
-					ProjectState = XComGameState_HeadquartersProjectHealSoldier(NewGameState.CreateStateObject(class'XComGameState_HeadquartersProjectHealSoldier'));
-					NewGameState.AddStateObject(ProjectState);
-					ProjectState.SetProjectFocus(UnitState.GetReference(), NewGameState);
-					XComHQ.Projects.AddItem(ProjectState.GetReference());
-				}
-				else
-				{
-					foreach History.IterateByClassType(class'XComGameState_HeadquartersProjectHealSoldier', ProjectState)
+					if (!UnitState.HasHealingProject())
 					{
-						if(ProjectState.ProjectFocus == UnitState.GetReference())
+						ProjectState = XComGameState_HeadquartersProjectHealSoldier(NewGameState.CreateStateObject(class'XComGameState_HeadquartersProjectHealSoldier'));
+						NewGameState.AddStateObject(ProjectState);
+						ProjectState.SetProjectFocus(UnitState.GetReference(), NewGameState);
+						XComHQ.Projects.AddItem(ProjectState.GetReference());
+					}
+					else
+					{
+						foreach History.IterateByClassType(class'XComGameState_HeadquartersProjectHealSoldier', ProjectState)
 						{
-							ProjectState = XComGameState_HeadquartersProjectHealSoldier(NewGameState.CreateStateObject(class'XComGameState_HeadquartersProjectHealSoldier', ProjectState.ObjectID));
-							NewGameState.AddStateObject(ProjectState);
-							ProjectState.BlocksRemaining = UnitState.GetBaseStat(eStat_HP) - UnitState.GetCurrentStat(eStat_HP);
-							ProjectState.BlockPointsRemaining = ProjectState.PointsPerBlock;
-							ProjectState.ProjectPointsRemaining = ProjectState.BlocksRemaining * ProjectState.BlockPointsRemaining;
-							ProjectState.UpdateWorkPerHour();
-							ProjectState.StartDateTime = `STRATEGYRULES.GameTime;
-							ProjectState.SetProjectedCompletionDateTime(ProjectState.StartDateTime);
-							break;
-						}
-					}
-				}
-				
-				// If a soldier is gravely wounded, roll to see if they are shaken
-				if (UnitState.IsGravelyInjured(ProjectState.GetCurrentNumHoursRemaining()) && !UnitState.bIsShaken && !UnitState.bIsShakenRecovered)
-				{
-					if (class'X2StrategyGameRulesetDataStructures'.static.Roll(XComHQ.GetShakenChance()))
-					{
-						UnitState.bIsShaken = true;
-						UnitState.bSeenShakenPopup = false;
-
-						//Give this unit a random scar if they don't have one already
-						if(UnitState.kAppearance.nmScars == '')
-						{
-							UnitState.GainRandomScar();
-						}
-
-						UnitState.SavedWillValue = UnitState.GetBaseStat(eStat_Will);
-						UnitState.SetBaseMaxStat(eStat_Will, 0);
-					}
-				}
-			}
-			
-			if (!UnitState.IsDead() && !UnitState.bCaptured && UnitState.bIsShaken)
-			{
-				if (!UnitState.IsInjured()) // This unit was shaken but survived the mission unscathed. Check to see if they have recovered.
-				{
-					UnitState.MissionsCompletedWhileShaken++;
-					if ((UnitState.UnitsKilledWhileShaken > 0) || (UnitState.MissionsCompletedWhileShaken >= XComHQ.GetShakenRecoveryMissions()))
-					{
-						//This unit has stayed healthy and killed some bad dudes, or stayed healthy for multiple missions in a row --> no longer shaken
-						UnitState.bIsShaken = false;
-						UnitState.bIsShakenRecovered = true;
-						UnitState.bNeedsShakenRecoveredPopup = true;
-						
-						// Give a bonus to will (free stat progression roll) for recovering
-						UnitState.SetBaseMaxStat(eStat_Will, UnitState.SavedWillValue + XComHQ.XComHeadquarters_ShakenRecoverWillBonus + `SYNC_RAND_STATIC(XComHQ.XComHeadquarters_ShakenRecoverWillRandBonus));
-					}
-				}
-				else // The unit was injured on a mission while they were shaken. Reset counters. (This will also be called to init the values after shaken is set)
-				{
-					UnitState.MissionsCompletedWhileShaken = 0;
-					UnitState.UnitsKilledWhileShaken = 0;
-				}
-			}
-
-			// If the Psi Operative was training an ability before the mission continue the training automatically, or delete the project if they died
-			if (UnitState.GetSoldierClassTemplateName() == 'PsiOperative')
-			{
-				PsiProjectState = XComHQ.GetPsiTrainingProject(UnitState.GetReference());
-				if (PsiProjectState != none) // A paused Psi Training project was found for the unit
-				{
-					if (UnitState.IsDead() || UnitState.bCaptured) // The unit died or was captured, so remove the project
-					{
-						XComHQ.Projects.RemoveItem(PsiProjectState.GetReference());
-						NewGameState.RemoveStateObject(PsiProjectState.ObjectID);
-					}
-					else if (!UnitState.IsInjured()) // If the unit is uninjured, restart the training project automatically
-					{
-						// Get the Psi Chamber facility and staff the unit in it if there is an open slot
-						FacilityState = XComHQ.GetFacilityByName('PsiChamber'); // Only one Psi Chamber allowed, so safe to do this
-
-						for (SlotIndex = 0; SlotIndex < FacilityState.StaffSlots.Length; ++SlotIndex)
-						{
-							//If this slot has not already been modified (filled) in this tactical transfer, check to see if it's valid
-							SlotState = XComGameState_StaffSlot(NewGameState.GetGameStateForObjectID(FacilityState.StaffSlots[SlotIndex].ObjectID));
-							if (SlotState == None)
-							{
-								SlotState = FacilityState.GetStaffSlot(SlotIndex);
-
-								// If this is a valid soldier slot in the Psi Lab, restaff the soldier and restart their training project
-								if (!SlotState.IsLocked() && SlotState.IsSlotEmpty() && SlotState.IsSoldierSlot())
+							if (ProjectState.ProjectFocus == UnitState.GetReference())
+							{								
+								NewBlocksRemaining = UnitState.GetBaseStat(eStat_HP) - UnitState.GetCurrentStat(eStat_HP);
+								if (NewBlocksRemaining > ProjectState.BlocksRemaining) // The unit was injured again, so update the time to heal
 								{
-									// Restart the paused training project
-									PsiProjectState = XComGameState_HeadquartersProjectPsiTraining(NewGameState.CreateStateObject(class'XComGameState_HeadquartersProjectPsiTraining', PsiProjectState.ObjectID));
-									NewGameState.AddStateObject(PsiProjectState);
-									PsiProjectState.bForcePaused = false;
+									ProjectState = XComGameState_HeadquartersProjectHealSoldier(NewGameState.CreateStateObject(class'XComGameState_HeadquartersProjectHealSoldier', ProjectState.ObjectID));
+									NewGameState.AddStateObject(ProjectState);
 
-									UnitInfo.UnitRef = UnitState.GetReference();
-									SlotState.FillSlot(NewGameState, UnitInfo);
+									// Calculate new wound length again, but ensure it is greater than the previous time, since the unit is more injured
+									NewProjectPointsRemaining = ProjectState.GetWoundPoints(UnitState, ProjectState.ProjectPointsRemaining);
 
-									break;
+									ProjectState.ProjectPointsRemaining = NewProjectPointsRemaining;
+									ProjectState.BlocksRemaining = NewBlocksRemaining;
+									ProjectState.PointsPerBlock = Round(float(NewProjectPointsRemaining) / float(NewBlocksRemaining));
+									ProjectState.BlockPointsRemaining = ProjectState.PointsPerBlock;
+									ProjectState.UpdateWorkPerHour();
+									ProjectState.StartDateTime = `STRATEGYRULES.GameTime;
+									ProjectState.SetProjectedCompletionDateTime(ProjectState.StartDateTime);
+								}
+
+								break;
+							}
+						}
+					}
+
+					// If a soldier is gravely wounded, roll to see if they are shaken
+					if (UnitState.IsGravelyInjured(ProjectState.GetCurrentNumHoursRemaining()) && !UnitState.bIsShaken && !UnitState.bIsShakenRecovered)
+					{
+						if (class'X2StrategyGameRulesetDataStructures'.static.Roll(XComHQ.GetShakenChance()))
+						{
+							UnitState.bIsShaken = true;
+							UnitState.bSeenShakenPopup = false;
+
+							//Give this unit a random scar if they don't have one already
+							if (UnitState.kAppearance.nmScars == '')
+							{
+								UnitState.GainRandomScar();
+							}
+
+							UnitState.SavedWillValue = UnitState.GetBaseStat(eStat_Will);
+							UnitState.SetBaseMaxStat(eStat_Will, 0);
+						}
+					}
+				}
+
+				if (!UnitState.IsDead() && !UnitState.bCaptured && UnitState.bIsShaken)
+				{
+					if (!UnitState.IsInjured()) // This unit was shaken but survived the mission unscathed. Check to see if they have recovered.
+					{
+						UnitState.MissionsCompletedWhileShaken++;
+						if ((UnitState.UnitsKilledWhileShaken > 0) || (UnitState.MissionsCompletedWhileShaken >= XComHQ.GetShakenRecoveryMissions()))
+						{
+							//This unit has stayed healthy and killed some bad dudes, or stayed healthy for multiple missions in a row --> no longer shaken
+							UnitState.bIsShaken = false;
+							UnitState.bIsShakenRecovered = true;
+							UnitState.bNeedsShakenRecoveredPopup = true;
+
+							// Give a bonus to will (free stat progression roll) for recovering
+							UnitState.SetBaseMaxStat(eStat_Will, UnitState.SavedWillValue + XComHQ.XComHeadquarters_ShakenRecoverWillBonus + `SYNC_RAND_STATIC(XComHQ.XComHeadquarters_ShakenRecoverWillRandBonus));
+						}
+					}
+					else // The unit was injured on a mission while they were shaken. Reset counters. (This will also be called to init the values after shaken is set)
+					{
+						UnitState.MissionsCompletedWhileShaken = 0;
+						UnitState.UnitsKilledWhileShaken = 0;
+					}
+				}
+
+				// If the Psi Operative was training an ability before the mission continue the training automatically, or delete the project if they died
+				if (UnitState.GetSoldierClassTemplateName() == 'PsiOperative')
+				{
+					PsiProjectState = XComHQ.GetPsiTrainingProject(UnitState.GetReference());
+					if (PsiProjectState != none) // A paused Psi Training project was found for the unit
+					{
+						if (UnitState.IsDead() || UnitState.bCaptured) // The unit died or was captured, so remove the project
+						{
+							XComHQ.Projects.RemoveItem(PsiProjectState.GetReference());
+							NewGameState.RemoveStateObject(PsiProjectState.ObjectID);
+						}
+						else if (!UnitState.IsInjured()) // If the unit is uninjured, restart the training project automatically
+						{
+							// Get the Psi Chamber facility and staff the unit in it if there is an open slot
+							FacilityState = XComHQ.GetFacilityByName('PsiChamber'); // Only one Psi Chamber allowed, so safe to do this
+
+							for (SlotIndex = 0; SlotIndex < FacilityState.StaffSlots.Length; ++SlotIndex)
+							{
+								//If this slot has not already been modified (filled) in this tactical transfer, check to see if it's valid
+								SlotState = XComGameState_StaffSlot(NewGameState.GetGameStateForObjectID(FacilityState.StaffSlots[SlotIndex].ObjectID));
+								if (SlotState == None)
+								{
+									SlotState = FacilityState.GetStaffSlot(SlotIndex);
+
+									// If this is a valid soldier slot in the Psi Lab, restaff the soldier and restart their training project
+									if (!SlotState.IsLocked() && SlotState.IsSlotEmpty() && SlotState.IsSoldierSlot())
+									{
+										// Restart the paused training project
+										PsiProjectState = XComGameState_HeadquartersProjectPsiTraining(NewGameState.CreateStateObject(class'XComGameState_HeadquartersProjectPsiTraining', PsiProjectState.ObjectID));
+										NewGameState.AddStateObject(PsiProjectState);
+										PsiProjectState.bForcePaused = false;
+
+										UnitInfo.UnitRef = UnitState.GetReference();
+										SlotState.FillSlot(NewGameState, UnitInfo);
+
+										break;
+									}
 								}
 							}
 						}
@@ -761,7 +787,11 @@ static function RemoveInvalidSoldiersFromSquad()
 	local XComGameState_HeadquartersXCom XComHQ;
 	local XComGameState_Unit UnitState;
 	local StateObjectReference DeadUnitRef, EmptyRef;
+	local GeneratedMissionData MissionData;
 	local int SquadIndex;
+	local array<name> SpecialSoldierNames;
+	local array<EInventorySlot> SpecialSoldierSlotsToClear, SlotsToClear, LockedSlots;
+	local EInventorySlot LockedSlot;
 
 	History = `XCOMHISTORY;
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("After Action");
@@ -769,6 +799,17 @@ static function RemoveInvalidSoldiersFromSquad()
 	XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
 	NewGameState.AddStateObject(XComHQ);
 
+	MissionData = XComHQ.GetGeneratedMissionData(XComHQ.MissionRef.ObjectID);
+	SpecialSoldierNames = MissionData.Mission.SpecialSoldiers;
+
+	SpecialSoldierSlotsToClear.AddItem(eInvSlot_Armor);
+	SpecialSoldierSlotsToClear.AddItem(eInvSlot_PrimaryWeapon);
+	SpecialSoldierSlotsToClear.AddItem(eInvSlot_SecondaryWeapon);
+	SpecialSoldierSlotsToClear.AddItem(eInvSlot_HeavyWeapon);
+	SpecialSoldierSlotsToClear.AddItem(eInvSlot_Utility);
+	SpecialSoldierSlotsToClear.AddItem(eInvSlot_GrenadePocket);
+	SpecialSoldierSlotsToClear.AddItem(eInvSlot_AmmoPocket);
+	
 	foreach History.IterateByClassType(class'XComGameState_Unit', UnitState)
 	{
 		DeadUnitRef = UnitState.GetReference();
@@ -783,10 +824,31 @@ static function RemoveInvalidSoldiersFromSquad()
 			UnitState.bBleedingOut = false;
 			UnitState.bSpawnedFromAvenger = false;
 
-			if(SquadIndex != INDEX_NONE && (UnitState.IsDead() || UnitState.IsInjured() || UnitState.bCaptured))
+			if(SquadIndex != INDEX_NONE && (UnitState.IsDead() || (UnitState.IsInjured() && !UnitState.IgnoresInjuries()) || UnitState.bCaptured || SpecialSoldierNames.Find(UnitState.GetMyTemplateName()) != INDEX_NONE))
 			{
 				// Remove them from the squad
 				XComHQ.Squad[SquadIndex] = EmptyRef;
+
+				// Have any special soldiers drop unique items they were given before the mission
+				if (SpecialSoldierNames.Find(UnitState.GetMyTemplateName()) != INDEX_NONE)
+				{
+					// Reset SlotsToClear
+					SlotsToClear.Length = 0;
+					SlotsToClear = SpecialSoldierSlotsToClear;
+
+					// Find the slots which are uneditable for this soldier, and remove those from the list of slots to clear
+					LockedSlots = UnitState.GetSoldierClassTemplate().CannotEditSlots;
+					foreach LockedSlots(LockedSlot)
+					{
+						if (SlotsToClear.Find(LockedSlot) != INDEX_NONE)
+						{
+							SlotsToClear.RemoveItem(LockedSlot);
+						}
+					}
+
+					UnitState.MakeItemsAvailable(NewGameState, false, SlotsToClear);
+					UnitState.bIsShaken = false;
+				}
 			}
 		}
 	}

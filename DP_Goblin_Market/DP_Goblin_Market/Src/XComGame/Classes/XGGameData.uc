@@ -80,9 +80,31 @@ struct native ConfigurableEncounter
 	}
 };
 
-struct native PrePlacedEncounterPair
+struct native ConditionalEncounter
 {
 	// The name of an ConfigurableEncounter.
+	var Name				EncounterID;
+
+	// If specified, this group will only attempt to spawn if the specified Tag is present in the TacticalGameplayTags list on the XComHQ.
+	var Name				IncludeTacticalTag;
+
+	// If specified, this group will only attempt to spawn if the specified Tag is NOT present in the TacticalGameplayTags list on the XComHQ.
+	var Name				ExcludeTacticalTag;
+};
+
+struct native EncounterBucket
+{
+	// The name of this bucket.
+	var Name EncounterBucketID;
+
+	// The list of possible encounters and the conditions under which they are permissible. 
+	// When evaluated, the first eligible encounter in this list will be selected.
+	var array<ConditionalEncounter> EncounterIDs;
+};
+
+struct native PrePlacedEncounterPair
+{
+	// The name of an ConfigurableEncounter or an EncounterBucket.
 	var Name				EncounterID;
 
 	// How wide should this encounter band be?
@@ -258,6 +280,8 @@ struct native MissionDefinition
 	
 	var bool				AllowDeployWoundedUnits;   // if true, wounded soldiers can be included in the squad for this mission
 
+	var array<name>			SpecialSoldiers; // if a special soldier character is required for this mission
+
 	var array<string>       RequiredPlotObjectiveTags;
 	var array<string>       ExcludedPlotObjectiveTags;
 
@@ -326,7 +350,8 @@ enum MultiplayerPlotIndex
 	MPI_Shanty,
 	MPI_Slums,
 	MPI_Wilderness,
-	MPI_CityCenter
+	MPI_CityCenter,
+	MPI_Rooftops
 };
 
 enum MultiplayerBiomeIndex
@@ -348,12 +373,14 @@ struct native PlotDefinition
 	var float InitialCameraFacingDegrees;
 	var bool ExcludeFromRetailBuilds;
 	var MultiplayerPlotIndex FriendlyNameIndex;
+	var int FloorCount; // number of floors on this plot
 
 	structdefaultproperties
 	{
 		InitialCameraFacingDegrees=1 // use 1 as a sentinel for unset, as it's unlikely anybody would ever shift the camera just one degree
 		Weight=1.0
 		ExcludeFromRetailBuilds=false
+		FloorCount=3
 	}
 };
 

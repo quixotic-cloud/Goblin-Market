@@ -32,9 +32,9 @@ simulated function UpdateList()
 	for(i = 0; i < m_kList.itemCount; ++i)
 	{
 		UnitItem = UIPersonnel_ListItem(m_kList.GetItem(i));
-		Unit = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(UnitItem.UnitRef.ObjectID));	
+		Unit = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(UnitItem.UnitRef.ObjectID));
 
-		if(HQState.IsUnitInSquad(UnitItem.UnitRef) || (Unit.IsInjured() && !bAllowWoundedSoldiers) || Unit.IsTraining() || Unit.IsPsiTraining())
+		if(HQState.IsUnitInSquad(UnitItem.UnitRef) || (Unit.IsInjured() && !bAllowWoundedSoldiers && !Unit.IgnoresInjuries()) || Unit.IsTraining() || Unit.IsPsiTraining())
 			UnitItem.SetDisabled(true);
 	}
 }

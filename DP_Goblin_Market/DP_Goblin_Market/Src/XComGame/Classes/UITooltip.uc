@@ -151,4 +151,5 @@ defaultproperties
 
 	bIsNavigable = false;
 	bIsVisible = false;
+	bAlwaysTick = true
 }

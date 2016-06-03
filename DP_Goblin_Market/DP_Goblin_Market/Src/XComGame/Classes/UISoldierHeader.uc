@@ -168,7 +168,9 @@ public function PopulateData(optional XComGameState_Unit Unit, optional StateObj
 		else
 			TmpItem = XComGameState_Item(History.GetGameStateForObjectID(NewItem.ObjectID));
 		EquipmentTemplate = X2EquipmentTemplate(TmpItem.GetMyTemplate());
-		if (EquipmentTemplate != none)
+		
+		// Don't include sword boosts or any other equipment in the EquipmentExcludedFromStatBoosts array
+		if (EquipmentTemplate != none && EquipmentExcludedFromStatBoosts.Find(EquipmentTemplate.DataName) == INDEX_NONE)
 		{
 			WillBonus += EquipmentTemplate.GetUIStatMarkup(eStat_Will, TmpItem);
 			AimBonus += EquipmentTemplate.GetUIStatMarkup(eStat_Offense, TmpItem);
@@ -191,7 +193,9 @@ public function PopulateData(optional XComGameState_Unit Unit, optional StateObj
 		else
 			TmpItem = XComGameState_Item(History.GetGameStateForObjectID(ReplacedItem.ObjectID));
 		EquipmentTemplate = X2EquipmentTemplate(TmpItem.GetMyTemplate());
-		if (EquipmentTemplate != none)
+		
+		// Don't include sword boosts or any other equipment in the EquipmentExcludedFromStatBoosts array
+		if (EquipmentTemplate != none && EquipmentExcludedFromStatBoosts.Find(EquipmentTemplate.DataName) == INDEX_NONE)
 		{
 			WillBonus -= EquipmentTemplate.GetUIStatMarkup(eStat_Will, TmpItem);
 			AimBonus -= EquipmentTemplate.GetUIStatMarkup(eStat_Offense, TmpItem);

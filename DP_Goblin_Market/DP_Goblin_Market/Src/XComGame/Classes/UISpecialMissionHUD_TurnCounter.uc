@@ -299,7 +299,7 @@ simulated function AddPauseTime(float DeltaTime)
 {
 	local XComGameState_TimerData Timer;
 	Timer = XComGameState_TimerData(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
-	if (Timer != none)
+	if ((Timer != none) && !Timer.bIsChallengeModeTimer)
 	{
 		if (class'XComGameStateVisualizationMgr'.static.VisualizerBusy() && !`Pres.UIIsBusy())
 		{
@@ -330,7 +330,7 @@ simulated function UpdateCache()
 		return;
 	
 	Timer = XComGameState_TimerData(m_kHistory.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
-	if (Timer != none)
+	if ((Timer != none) && !Timer.bIsChallengeModeTimer)
 	{
 		SetupTimerEvents();
 		OnTurnChange(IsLocalPlayerTurn());
@@ -345,7 +345,7 @@ simulated function OnTurnChange(bool bLocalTurn)
 {
 	local XComGameState_TimerData Timer;
 	Timer = XComGameState_TimerData(m_kHistory.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
-	if (Timer != none)
+	if ((Timer != none) && !Timer.bIsChallengeModeTimer)
 	{
 		if(bLocalTurn)
 		{
@@ -368,7 +368,7 @@ simulated function RefreshCounter()
 	local XComGameState_TimerData Timer;
 
 	Timer = XComGameState_TimerData(m_kHistory.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
-	if( Timer != none )
+	if(( Timer != none ) && !Timer.bIsChallengeModeTimer)
 	{
 		if (!Timer.bStopTime && (m_iLastTime != Timer.GetCurrentTime()))
 		{
@@ -461,7 +461,7 @@ function OnRemoteCommand(string Command, array<byte> RawParams)
 {
 	local XComGameState_TimerData Timer;
 	Timer = XComGameState_TimerData(m_kHistory.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
-	if (Timer != none)
+	if ((Timer != none) && !Timer.bIsChallengeModeTimer)
 	{
 		if (Command ~= "UpdateTime")
 		{

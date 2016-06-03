@@ -17,6 +17,9 @@ var UIScrollingText SlotTypeText;
 var int SlotIndex;
 var EInventorySlot SlotType;
 
+// Disable functionality on the loadout screen when passed through to the Armory
+var array<EInventorySlot> CannotEditSlots;
+
 var localized string GrenadeSlot;
 var localized string AmmoSlot;
 
@@ -138,8 +141,12 @@ function OnButtonClicked(UIButton ButtonClicked)
 
 simulated function GoToUtilityItem()
 {
-	`HQPRES.UIArmory_Loadout(UISquadSelect_ListItem(GetParent(class'UISquadSelect_ListItem')).GetUnitRef());
-	UIArmory_Loadout(Movie.Stack.GetScreen(class'UIArmory_Loadout')).SelectItemSlot(SlotType, SlotIndex);
+	`HQPRES.UIArmory_Loadout(UISquadSelect_ListItem(GetParent(class'UISquadSelect_ListItem')).GetUnitRef(), CannotEditSlots);
+
+	if (CannotEditSlots.Find(eInvSlot_Utility) == INDEX_NONE)
+	{
+		UIArmory_Loadout(Movie.Stack.GetScreen(class'UIArmory_Loadout')).SelectItemSlot(SlotType, SlotIndex);
+	}
 }
 
 simulated function OnReceiveFocus()
@@ -163,4 +170,5 @@ simulated function OnLoseFocus()
 defaultproperties
 {
 	bIsNavigable = true;
+	bCascadeFocus = false;
 }

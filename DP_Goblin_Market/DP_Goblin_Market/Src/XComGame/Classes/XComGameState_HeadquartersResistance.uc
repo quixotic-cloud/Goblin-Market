@@ -110,8 +110,7 @@ static function SetUpHeadquarters(XComGameState StartState, optional bool bTutor
 
 	ResistanceHQ.SupplyDropPercentDecrease = 0.0f;
 
-	// Create the resistance recruits
-	ResistanceHQ.CreateRecruits(StartState);
+	// Used to create the resistance recruits here, moved to XComHQ setup so character pool characters fill staff first
 
 	// Create Resistance Activities List
 	ResistanceHQ.ResetActivities();
@@ -128,15 +127,16 @@ static function SetUpHeadquarters(XComGameState StartState, optional bool bTutor
 function CreateRecruits(XComGameState StartState)
 {
 	local XComGameState_Unit NewSoldierState;
+	local XComOnlineProfileSettings ProfileSettings;
 	local int Index;
 
 	assert(StartState != none);
+	ProfileSettings = `XPROFILESETTINGS;
 
 	for(Index = 0; Index < GetStartingNumRecruits(); ++Index)
 	{
-		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, eCPSM_Mixed);
+		NewSoldierState = `CHARACTERPOOLMGR.CreateCharacter(StartState, ProfileSettings.Data.m_eCharPoolUsage);
 		NewSoldierState.RandomizeStats();
-		NewSoldierState.GiveRandomPersonality();
 		if(!NewSoldierState.HasBackground())
 			NewSoldierState.GenerateBackground();
 		NewSoldierState.ApplyInventoryLoadout(StartState);
@@ -246,7 +246,7 @@ function bool Update(XComGameState NewGameState)
 	bUpdated = false;
 	
 	// Don't trigger end of month while the Avenger or Skyranger are flying, or if another popup is already being presented
-	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.IsCurrentClass(class'UIAlert'))
 	{
 		if (!bInactive && class'X2StrategyGameRulesetDataStructures'.static.LessThan(MonthIntervalEndTime, `STRATEGYRULES.GameTime))
 		{
@@ -299,13 +299,15 @@ function RefillRecruits(XComGameState NewGameState)
 {
 	local array<StateObjectReference> NewRecruitList;
 	local XComGameState_Unit SoldierState;
+	local XComOnlineProfileSettings ProfileSettings;
 	local int idx;
+
+	ProfileSettings = `XPROFILESETTINGS;
 
 	for(idx = 0; idx < GetRefillNumRecruits(); idx++)
 	{
-		SoldierState = `CHARACTERPOOLMGR.CreateCharacter(NewGameState, RecruitsCharacterPoolSelectionMode);
+		SoldierState = `CHARACTERPOOLMGR.CreateCharacter(NewGameState, ProfileSettings.Data.m_eCharPoolUsage);
 		SoldierState.RandomizeStats();
-		SoldierState.GiveRandomPersonality();
 		if(!SoldierState.HasBackground())
 			SoldierState.GenerateBackground();
 		SoldierState.ApplyInventoryLoadout(NewGameState);
@@ -1191,7 +1193,7 @@ function StateObjectReference ChoosePOI(XComGameState NewGameState, optional boo
 		POIState = XComGameState_PointOfInterest(NewGameState.CreateStateObject(class'XComGameState_PointOfInterest', POIState.ObjectID));
 		NewGameState.AddStateObject(POIState);
 		
-		ResHQ.ActivePOIs.AddItem(POIState.GetReference());
+		ActivatePOI(NewGameState, POIState.GetReference());
 
 		// If a staff POI was activated normally (not forced from the staff POI timer), then flag ResHQ
 		if (!bStaffPOISpawnedFromTimer && POIState.GetMyTemplate().bStaffPOI)
@@ -1276,6 +1278,27 @@ function XComGameState_PointOfInterest DrawFromPOIDeck(out array<XComGameState_P
 	POIEventState = POIEventDeck[`SYNC_RAND_STATIC(POIEventDeck.Length)];
 
 	return POIEventState;
+}
+
+//---------------------------------------------------------------------------------------
+static function ActivatePOI(XComGameState NewGameState, StateObjectReference POIRef)
+{
+	local XComGameState_HeadquartersResistance ResHQ;
+
+	foreach NewGameState.IterateByClassType(class'XComGameState_HeadquartersResistance', ResHQ)
+	{
+		break;
+	}
+
+	if (ResHQ == none)
+	{
+		ResHQ = XComGameState_HeadquartersResistance(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersResistance'));
+		ResHQ = XComGameState_HeadquartersResistance(NewGameState.CreateStateObject(class'XComGameState_HeadquartersResistance', ResHQ.ObjectID));
+		NewGameState.AddStateObject(ResHQ);
+	}
+
+	// Add the POI to the activated list
+	ResHQ.ActivePOIs.AddItem(POIRef);
 }
 
 //---------------------------------------------------------------------------------------

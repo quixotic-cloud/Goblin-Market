@@ -15,6 +15,8 @@ var private bool ImpactNotified;
 
 function Init(const out VisualizationTrack InTrack)
 {
+	local X2AbilityTemplate AbilityTemplate;
+
 	super.Init(InTrack);
 
 	StartingAbility = XComGameStateContext_Ability(StateChangeContext);
@@ -22,7 +24,8 @@ function Init(const out VisualizationTrack InTrack)
 
 	if (AppendAbilityPerks)
 	{
-		TrackUnit.GetPawn().AppendAbilityPerks(StartingAbility.InputContext.AbilityTemplateName, true);
+		AbilityTemplate = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager().FindAbilityTemplate(StartingAbility.InputContext.AbilityTemplateName);
+		TrackUnit.GetPawn().AppendAbilityPerks(AbilityTemplate.DataName, true, AbilityTemplate.GetPerkAssociationName());
 	}
 }
 

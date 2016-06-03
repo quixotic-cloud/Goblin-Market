@@ -48,8 +48,7 @@ function Activated(TPOV CurrentPOV, X2Camera PreviousActiveCamera, X2Camera_Look
 	}
 
 	// scroll to the currently active unit if it is offscreen and it's the human player's turn and the visualizer is idle
-	
-	if(LocalController != none && !class'XComGameStateVisualizationMgr'.static.VisualizerBusy())
+	if(!class'XComGameStateVisualizationMgr'.static.VisualizerBusy())
 	{
 		History = `XCOMHISTORY;
 		ActiveUnit = XComGameState_Unit(History.GetGameStateForObjectID(LocalController.GetActiveUnitStateRef().ObjectID));
@@ -95,19 +94,16 @@ function EventListenerReturn OnCameraFocusUnit(Object EventData, Object EventSou
 	local XComGameStateHistory History;
 	local XComGameState_Unit ActiveUnit;
 
-	if( !XComTacticalController(Outer).GetPres().GetTacticalHUD().IsMenuRaised() && !class'XComGameStateVisualizationMgr'.static.VisualizerBusy())
+	LocalController = XComTacticalController(`BATTLE.GetALocalPlayerController());
+	if(LocalController != none && !class'XComGameStateVisualizationMgr'.static.VisualizerBusy())
 	{
-		LocalController = XComTacticalController(`BATTLE.GetALocalPlayerController());
-		if(LocalController != none)
+		History = `XCOMHISTORY;
+		ActiveUnit = XComGameState_Unit(History.GetGameStateForObjectID(LocalController.GetActiveUnitStateRef().ObjectID));
+		if(ActiveUnit != none 
+			&& !ActiveUnit.ControllingPlayerIsAI() 
+			&& ActiveUnit.ControllingPlayer == GetActivePlayer())
 		{
-			History = `XCOMHISTORY;
-			ActiveUnit = XComGameState_Unit(History.GetGameStateForObjectID(LocalController.GetActiveUnitStateRef().ObjectID));
-			if(ActiveUnit != none 
-				&& !ActiveUnit.ControllingPlayerIsAI() 
-				&& ActiveUnit.ControllingPlayer == GetActivePlayer())
-			{
-				CenterOnUnitIfOffscreen(ActiveUnit);
-			}
+			CenterOnUnitIfOffscreen(ActiveUnit);
 		}
 	}
 
@@ -270,7 +266,9 @@ event OnActiveUnitChanged(XComGameState_Unit NewActiveUnit)
 {
 	super.OnActiveUnitChanged(NewActiveUnit);
 
-	if(  XGUnit(NewActiveUnit.GetVisualizer()).GetPlayer() == XComTacticalController(`BATTLE.GetALocalPlayerController()).m_XGPlayer )
+	MoveAbilitySubmitted = false;
+
+	if( NewActiveUnit.IsPlayerControlled() )
 	{
 		CenterOnUnitIfOffscreen(NewActiveUnit);
 	}
@@ -278,11 +276,23 @@ event OnActiveUnitChanged(XComGameState_Unit NewActiveUnit)
 
 private function CenterOnUnitIfOffscreen(XComGameState_Unit Unit)
 {
+	local XComPresentationLayer Pres;
 	local Vector UnitLocation;
 	local XCom3DCursor Cursor;
 	local int UnitFloor;
 
 	if(Unit == none) return;
+
+	Pres = `PRES;
+	if(Pres.GetTacticalHUD().IsMenuRaised())
+	{
+		return;
+	}
+
+	if(Pres.m_kTacticalHUD.m_kAbilityHUD.TargetingMethod != none)
+	{
+		return;
+	}
 
 	Cursor = `CURSOR;
 

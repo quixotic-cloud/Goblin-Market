@@ -68,6 +68,10 @@ event Activated()
 		{
 			`XEVENTMGR.TriggerEvent( 'MissionObjectiveMarkedCompleted', ObjectiveList, self, NewGameState );
 		}
+		if(DisplayInfo.ShowFailed)
+		{
+			`XEVENTMGR.TriggerEvent( 'MissionObjectiveMarkedFailed', ObjectiveList, self, NewGameState );
+		}
 	}
 
 	NewGameState.AddStateObject(ObjectiveList);

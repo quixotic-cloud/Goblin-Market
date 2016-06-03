@@ -42,7 +42,7 @@ function XComGameState ContextBuildGameState()
 	local XComGameState_HeadquartersXCom XComHQ;
 	local XComGameStateHistory History;
 	local X2CharacterTemplate CharacterTemplate;
-	local int Index;
+	local int Index, iEvents;
 	local int RevealedUnitObjectID;
 	local X2EventManager EventManager;
 
@@ -69,10 +69,11 @@ function XComGameState ContextBuildGameState()
 				GroupState = UnitState.GetGroupMembership();
 			}
 
+			CharacterTemplate = UnitState.GetMyTemplate();
+			
 			// try to find a unit that the player hasn't seen yet to play the reveal on
 			if (NewContext.FirstSightingMoment == none)
 			{
-				CharacterTemplate = UnitState.GetMyTemplate();
 				XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom', true));
 				if(XComHQ != none && !XComHQ.HasSeenCharacterTemplate(CharacterTemplate))
 				{
@@ -88,6 +89,12 @@ function XComGameState ContextBuildGameState()
 						NewContext.FirstEncounterCharacterTemplate = CharacterTemplate;
 					}
 				}
+			}
+
+			// Trigger any sighted events for this unit, this after EverSightedByEnemy is set to true they won't be triggered by sighting the unit
+			for (iEvents = 0; iEvents < CharacterTemplate.SightedEvents.Length; iEvents++)
+			{
+				`XEVENTMGR.TriggerEvent(CharacterTemplate.SightedEvents[iEvents], , , NewGameState);
 			}
 		}
 
@@ -135,6 +142,7 @@ protected function ContextBuildVisualization(out array<VisualizationTrack> Visua
 		BuildTrack.StateObject_NewState = BattleState;
 		BuildTrack.TrackActor = none;
 		class'X2Action_RevealAIBegin'.static.AddToVisualizationTrack(BuildTrack, self);
+
 		VisualizationTracks.AddItem(BuildTrack);
 
 		//Add an empty track for each unit that is scampering so that the visualization blocks are sequenced

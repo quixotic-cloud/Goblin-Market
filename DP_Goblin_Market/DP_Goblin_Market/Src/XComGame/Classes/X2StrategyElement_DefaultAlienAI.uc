@@ -211,15 +211,25 @@ static function StartLoseTimerAction()
 	AlienHQ.AIMode = "Lose";
 	AlienHQ.AIModeIntervalStartTime = `STRATEGYRULES.GameTime;
 	AlienHQ.AIModeIntervalEndTime = AlienHQ.AIModeIntervalStartTime;
-	LoseModeDuration = AlienHQ.GetLoseModeDuration();
-	if(class'X2StrategyGameRulesetDataStructures'.static.Roll(50))
+
+	if(AlienHQ.LoseTimerTimeRemaining == 0)
 	{
-		LoseModeDuration += `SYNC_RAND_STATIC(AlienHQ.GetLoseModeVariance());
+		LoseModeDuration = AlienHQ.GetLoseModeDuration();
+		if(class'X2StrategyGameRulesetDataStructures'.static.Roll(50))
+		{
+			LoseModeDuration += `SYNC_RAND_STATIC(AlienHQ.GetLoseModeVariance());
+		}
+		else
+		{
+			LoseModeDuration -= `SYNC_RAND_STATIC(AlienHQ.GetLoseModeVariance());
+		}
 	}
 	else
 	{
-		LoseModeDuration -= `SYNC_RAND_STATIC(AlienHQ.GetLoseModeVariance());
+		LoseModeDuration = (AlienHQ.LoseTimerTimeRemaining/3600.0f);
+		LoseModeDuration = Clamp(LoseModeDuration, AlienHQ.GetMinLoseModeDuration(), (AlienHQ.GetLoseModeDuration() + AlienHQ.GetLoseModeVariance()));
 	}
+	
 	class'X2StrategyGameRulesetDataStructures'.static.AddHours(AlienHQ.AIModeIntervalEndTime, LoseModeDuration);
 
 	AlienHQ.PauseDoomTimers();
@@ -255,6 +265,7 @@ static function RevertToStartPhase()
 	AlienHQ = XComGameState_HeadquartersAlien(NewGameState.CreateStateObject(class'XComGameState_HeadquartersAlien', AlienHQ.ObjectID));
 	NewGameState.AddStateObject(AlienHQ);
 
+	AlienHQ.LoseTimerTimeRemaining = class'X2StrategyGameRulesetDataStructures'.static.DifferenceInSeconds(AlienHQ.AIModeIntervalEndTime, `STRATEGYRULES.GameTime);
 	AlienHQ.AIMode = "StartPhase";
 	AlienHQ.ResumeDoomTimers(true);
 	AlienHQ.ResumeFacilityTimer(true);

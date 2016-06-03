@@ -550,10 +550,46 @@ begin:
 	`assert(bCompleted);
 }
 
+function float GetDelayModifier()
+{
+	if( ShouldPlayZipMode() )
+		return class'X2TacticalGameRuleset'.default.ZipModeDelayModifier;
+	else
+		return 1.0;
+}
+
+function float GetNonCriticalAnimationSpeed()
+{
+	if( ShouldPlayZipMode() )
+		return class'X2TacticalGameRuleset'.default.ZipModeTrivialAnimSpeed;
+	else
+		return 1.0;
+}
+
+function float GetMoveAnimationSpeed()
+{
+	if( ShouldPlayZipMode() )
+		return class'X2TacticalGameRuleset'.default.ZipModeMoveSpeed;
+	else
+		return 1.0;
+}
+
+function bool ShouldPlayZipMode()
+{
+	return `XPROFILESETTINGS.Data.bEnableZipMode;
+}
+
+function bool IsWaitingOnActionTrigger()
+{
+	return false;
+}
+
+function TriggerWaitCondition();
+
 DefaultProperties
 {
 	ExecutingTime = 0.0	
 	TimeoutSeconds = 10.0
 	bNotifiedTargets=false
-	bCauseTimeDilationWhenInterrupting=true
+	bCauseTimeDilationWhenInterrupting=false
 }

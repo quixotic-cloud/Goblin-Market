@@ -465,7 +465,15 @@ protected function int GetHitChance(XComGameState_Ability kAbility, AvailableTar
 				}
 			}
 
-			AddModifier(TargetState.GetCurrentStat(eStat_Dodge), class'XLocalizedData'.default.DodgeStat, eHit_Graze);
+			if (UnitState.IsConcealed())
+			{
+				`log("Shooter is concealed, target cannot dodge.", bDebugLog, 'XCom_HitRolls');
+			}
+			else
+			{
+				if (SourceWeapon == none || SourceWeapon.CanWeaponBeDodged())
+					AddModifier(TargetState.GetCurrentStat(eStat_Dodge), class'XLocalizedData'.default.DodgeStat, eHit_Graze);
+			}
 		}					
 
 		//  Now check for critical chances.

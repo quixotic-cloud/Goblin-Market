@@ -96,6 +96,7 @@ var array<int> ValidTargetsBasedOnLastResortEffects; // Updated prior to each be
 
 var array<int> AggressiveUnitTracker; // List of units that have taken an aggressive action this turn.
 
+var bool bWaitOnVisUpdates; 
 native function AddTwoTurnData(X2AbilityMultiTargetStyle MultiTargetStyle, XComGameState_Ability AbilityState, array<vector> TargetLocations);
 native function bool IsInTwoTurnAttackTiles(TTile Tile);
 function AddTwoTurnAttackTargets(array<vector> TargetLocations, XComGameState_Ability AbilityState)
@@ -261,10 +262,50 @@ simulated function OnUnitActionPhase_ActionsAvailable(XComGameState_Unit UnitSta
 	TryBeginNextUnitTurn();
 }
 
+function bool WaitingOnVisUpdates()
+{
+	if( bWaitOnVisUpdates )
+	{
+		if( `XWORLD.HasPendingVisibilityUpdates() )
+		{
+			// If the wait timer hasn't been started yet, start it now.
+			if( !IsTimerActive(nameof(WaitOnVisUpdateTimer)) )
+			{
+				SetTimer(3.0f, false, nameof(WaitOnVisUpdateTimer));
+			}
+			else
+			{
+				// Otherwise ensure timer is running.
+				PauseTimer(false, nameof(WaitOnVisUpdateTimer));
+			}
+			return true;
+		}
+		else
+		{
+			// If the wait timer is active, stop it.
+			if( IsTimerActive(nameof(WaitOnVisUpdateTimer)) )
+			{
+				PauseTimer(true, nameof(WaitOnVisUpdateTimer));
+			}
+		}
+	}
+	return false;
+}
+
+// If it enters this function, then 3 seconds have elapsed waiting on the pending visibility updates.  Time to stop waiting.
+function WaitOnVisUpdateTimer()
+{
+	bWaitOnVisUpdates = false; // Gets reset next AI turn.
+}
+
 function bool IsReadyForNextUnit()
 {
 	local XGAIBehavior kBehavior;
-	if( IsScampering() && !WaitingForScamperSetup() )
+	if( WaitingOnVisUpdates() )
+	{
+		return false;
+	}
+	if( (IsScampering() && !WaitingForScamperSetup()) )
 	{
 		return false;
 	}
@@ -763,7 +804,7 @@ simulated function GatherUnitsToMove()
 
 			// Check if this unit has already moved this turn.  (Compare init history index to last turn start) 
 			// Also skip units that have currently no action points available.   They shouldn't be added to any lists.
-			if(bDead || UnitState.NumAllActionPoints() == 0 || (kBehavior != None && kBehavior.DecisionStartHistoryIndex > kAIPlayerData.m_iLastEndTurnHistoryIndex) )
+			if(bDead || UnitState.bRemovedFromPlay || UnitState.NumAllActionPoints() == 0 || (kBehavior != None && kBehavior.DecisionStartHistoryIndex > kAIPlayerData.m_iLastEndTurnHistoryIndex) )
 			{
 				continue;
 			}
@@ -889,6 +930,7 @@ function Init( bool bLoading=false )
 			m_kNav = Spawn( class'XGAIPlayerNavigator' );
 			m_kNav.Init(self);
 		}
+		`BEHAVIORTREEMGR.ClearQueue();
 	}
 }
 
@@ -1255,6 +1297,9 @@ simulated function InitTurn()
 	// Reset units that have taken an aggressive action.
 	AggressiveUnitTracker.Length = 0;
 
+	ClearTimer(nameof(WaitOnVisUpdateTimer)); // Clear if already running.
+	bWaitOnVisUpdates = true; // Reset every turn.
+
 	if( m_arrCachedSquad.Length == 0 ) // game over?  or waiting on chryssalid egg.
 		return;
 }
@@ -1611,6 +1656,8 @@ simulated function XGUnit GetCloserUnit(XGUnit kActiveUnit, XGUnit kUnitA, XGUni
 // Store all logs from the last turn here.  Clears each turn begin.
 static function LogAI(string strLog, name strLabel)
 {
+`if(`notdefined(FINAL_RELEASE))
+
 	local XGAIPlayer kPlayer;
 	kPlayer = XGAIPlayer(`BATTLE.GetAIPlayer());
 	if( kPlayer != None )
@@ -1618,13 +1665,17 @@ static function LogAI(string strLog, name strLabel)
 		kPlayer.TurnLog.AddItem(strLog);
 	}
 	`Log(strLog,, strLabel);
+
+`endif
 }
 
 // Add to AI log
 static function LogAIBT(string strLog)
 {
+`if(`notdefined(FINAL_RELEASE))
 	`BEHAVIORTREEMGR.LogNodeDetailText(strLog);
 	LogAI(strLog, 'AI');
+`endif
 }
 
 function ResetLogCache()

@@ -214,6 +214,9 @@ struct native StrategyRequirement
 	var array<Name>         AlternateRequiredItems;
 	var array<ArtifactCost> RequiredItemQuantities;
 	var bool				bVisibleIfItemsNotMet;
+	var array<Name>			RequiredEquipment;
+	var bool				bDontRequireAllEquipment;
+	var bool				bVisibleIfRequiredEquipmentNotMet;
 	var array<Name>			RequiredFacilities;
 	var bool				bVisibleIfFacilitiesNotMet;
 	var array<Name>			RequiredUpgrades;

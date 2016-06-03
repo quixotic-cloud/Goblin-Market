@@ -7,7 +7,7 @@ var PlayerController        CursorController;
 var PlayerController 	    PlayerController;
 var protected XGStrategy    m_kGameCore;
 var string                  m_strSaveFile;
-var XGCharacterGenerator    CharacterGenerator;
+var deprecated XGCharacterGenerator    CharacterGenerator;
 
 var bool                    m_bLoadDemoFromShell;
 var bool                    m_bDebugStrategyFromShell;
@@ -52,8 +52,6 @@ function StartMatch()
 	super.StartMatch();
 
 	InitEarth();
-
-	CharacterGenerator = spawn(class'XGCharacterGenerator');
 
 	// Ensure that the player has the correct rich presence
 	PlayerController.ClientSetOnlineStatus();
@@ -278,8 +276,12 @@ function string GetSavedGameDescription()
 	local string GeoTimeDesc;
 	local int GeoHour, GeoMinute;
 	local TDateTime GeoTime;
+	local XComGameState_HeadquartersXCom XComHQ;
 
-	GeoTime = class'XComGameState_GeoscapeEntity'.static.GetCurrentTime();
+	XComHQ = XComGameState_HeadquartersXCom(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+	GeoTime = `STRATEGYRULES.GameTime;
+	class'X2StrategyGameRulesetDataStructures'.static.GetLocalizedTime(XComHQ.Get2DLocation(), GeoTime);
+
 	GeoHour = class'X2StrategyGameRulesetDataStructures'.static.GetHour(GeoTime);
 	GeoMinute = class'X2StrategyGameRulesetDataStructures'.static.GetMinute(GeoTime);
 	`ONLINEEVENTMGR.FormatTimeStamp(GeoTimeDesc, GeoTime.m_iYear, GeoTime.m_iMonth, GeoTime.m_iDay, GeoHour, GeoMinute);

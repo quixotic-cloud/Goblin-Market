@@ -82,7 +82,6 @@ function Init(XComPlayerController controller)
 	m_kControllerRef = controller;
 	m_kShellPres = XComShellPresentationLayer(Owner);
 	m_kHistory = `XCOMHISTORY;
-	m_kCharacterGenerator = class'Engine'.static.GetCurrentWorldInfo().Spawn(class 'XGCharacterGenerator');
 
 	InitMaxSquadCostData();
 	InitTurnTimerData();
@@ -185,7 +184,8 @@ function Cleanup()
 	m_dOnLeaderboardFetchCompleteDelegates.Remove(0, m_dOnLeaderboardFetchCompleteDelegates.Length); // Clear
 	m_dOnSearchGamesCompleteDelegates.Remove(0, m_dOnSearchGamesCompleteDelegates.Length); // Clear
 
-	m_kCharacterGenerator.Destroy();
+	if (m_kCharacterGenerator != none)
+		m_kCharacterGenerator.Destroy();
 
 	super.OnCleanupWorld();
 }
@@ -457,6 +457,12 @@ function InitMapTypeData()
 	m_arrMapTypeData.Length = 0;
 	foreach arrValidPlots(kPlotDef)
 	{
+`if(`isdefined(FINAL_RELEASE))
+		if( kPlotDef.ExcludeFromRetailBuilds )
+		{
+			continue; // Skip this plot!
+		}
+`endif
 		foundIdx = -1;
 		for(i = 0; i < m_arrMapTypeData.Length; i++)
 		{
@@ -550,10 +556,12 @@ function XComGameState_Unit AddRandomSoldierToLoadout(out XComGameState kLoadout
 	local XGCharacterGenerator          CharacterGenerator;
 	local XComGameState_Unit			NewSoldierState;
 
-	CharacterGenerator = class'Engine'.static.GetCurrentWorldInfo().Spawn(class 'XGCharacterGenerator');
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('Soldier');
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = class'Engine'.static.GetCurrentWorldInfo().Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	NewSoldierState = CharacterTemplate.CreateInstanceFromTemplate(kLoadoutState);
 	NewSoldierState.RandomizeStats();
@@ -619,6 +627,7 @@ function XComGameState_Unit CreateMPUnitState(X2MPCharacterTemplate MPCharacterT
 			NewUnitState.SetCurrentStat(eStat_PsiOffense, 95);
 		}
 
+		m_kCharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
 		CharacterGeneratorResult = m_kCharacterGenerator.CreateTSoldier();
 		NewUnitState.SetTAppearance(CharacterGeneratorResult.kAppearance);
 		NewUnitState.SetCharacterName(CharacterGeneratorResult.strFirstName, CharacterGeneratorResult.strLastName, CharacterGeneratorResult.strNickName);
@@ -723,14 +732,14 @@ static function XComGameState CreateSquadSelectState(int iLoadoutId, string strN
 	return kSquadState;
 }
 
-function XComGameState CloneSquadLoadoutGameState(XComGameState FromState, optional bool bGenerateNewId=false)
+function XComGameState CloneSquadLoadoutGameState(XComGameState FromGameState, optional bool bGenerateNewId=false)
 {
 	local XComGameState_Unit Unit;
 	local XComGameState NewGameState;
 	local XComGameStateContext_SquadSelect LoadoutStateContext;
 	local int iLoadoutId;
 
-	LoadoutStateContext = XComGameStateContext_SquadSelect(FromState.GetContext());
+	LoadoutStateContext = XComGameStateContext_SquadSelect(FromGameState.GetContext());
 	`assert(LoadoutStateContext != none);
 
 	if(LoadoutStateContext != none)
@@ -741,14 +750,14 @@ function XComGameState CloneSquadLoadoutGameState(XComGameState FromState, optio
 			iLoadoutId = LoadoutStateContext.iLoadoutId;
 
 		NewGameState = CreateSquadSelectState(iLoadoutId, LoadoutStateContext.strLoadoutName, LoadoutStateContext.strLanguageCreatedWith);
-		foreach FromState.IterateByClassType(class'XComGameState_Unit', Unit)
+		foreach FromGameState.IterateByClassType(class'XComGameState_Unit', Unit)
 		{
-			CreateUnitLoadoutGameState(Unit, NewGameState, FromState);
+			CreateUnitLoadoutGameState(Unit, NewGameState, FromGameState);
 		}
 	}
 	else
 	{
-		`warn("X2MPShellManager::" $ GetFuncName() @ `ShowVar(FromState) @ "does not have a context of type XComGameStateContext_SquadSelect");
+		`warn("X2MPShellManager::" $ GetFuncName() @ `ShowVar(FromGameState) @ "does not have a context of type XComGameStateContext_SquadSelect");
 	}
 
 	return NewGameState;
@@ -756,157 +765,130 @@ function XComGameState CloneSquadLoadoutGameState(XComGameState FromState, optio
 
 // creates a basic XComGameState_Unit that can be used to read/write to/from profle settings and loadouts in the ui.
 // can also be used in seeding a tactical start state for singleplayer and multiplayer games.
-static function XComGameState_Unit CreateUnitLoadoutGameState(XComGameState_Unit FromUnit, XComGameState NewState, XComGameState FromState)
+static function XComGameState_Unit CreateUnitLoadoutGameState(XComGameState_Unit FromUnit, XComGameState NewGameState, XComGameState FromGameState)
 {
 	local XComGameState_Unit NewUnit;
-	local TX2UnitLoadoutTemplateData TemplateData;
-	//local array<XComGameState_Item> InvItems;
+	local X2CharacterTemplate CharacterTemplate;
+	local name CharacterTemplateName;
+	local X2MPCharacterTemplateManager MPCharacterTemplateManager;
 
-	//InvItems = FromUnit.GetAllInventoryItems(FromState, true);
-	TemplateData = GetUnitTemplateData(FromUnit, FromState);
-	NewUnit = AddUnitToGameState(TemplateData, NewState, FromState);
+	MPCharacterTemplateManager = class'X2MPCharacterTemplateManager'.static.GetMPCharacterTemplateManager();
+	CharacterTemplateName = FromUnit.GetMyTemplateName();
+	CharacterTemplateName = MPCharacterTemplateManager.FindCharacterTemplateMapOldToNew(FromUnit.GetMyTemplateName());
+	CharacterTemplate = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager().FindCharacterTemplate(CharacterTemplateName);
+	if(CharacterTemplate == none)
+	{
+		`warn("CreateTemplatesFromCharacter: '" $ CharacterTemplateName $ "' is not a valid template.");
+		return none;
+	}
+
+	NewUnit = CharacterTemplate.CreateInstanceFromTemplate(NewGameState);
+
+	// Add Unit
+	NewGameState.AddStateObject(NewUnit);
+	UpdateUnit(FromUnit, NewUnit, FromGameState); //needs to be before adding to inventory or 2nd util item gets thrown out
+
+	// Add Inventory
+	CopyFullInventory(FromUnit, FromGameState, NewUnit, NewGameState);
+
 	NewUnit.MPSquadLoadoutIndex = FromUnit.MPSquadLoadoutIndex;
-	
 
 	return NewUnit;
 }
 
-static function TX2UnitLoadoutTemplateData GetUnitTemplateData(XComGameState_Unit Unit, XComGameState FromGameState)
+static function UpdateUnit(XComGameState_Unit FromUnit, XComGameState_Unit NewUnit, XComGameState UseGameState)
 {
-	local array<XComGameState_Item> Items;
-	local XComGameState_Item Item;
-	local bool bExcludeHistory;
-	local TX2UnitLoadoutTemplateData TemplateData;
+	local int Index, SoldierRank;
+	local name SoldierClassTemplateName;
+	local X2MPCharacterTemplate MPCharacterTemplate;
+	local CharacterPoolManager CharacterPoolMgr;
 
-	`assert(Unit != none);
+	NewUnit.SetMPCharacterTemplate(FromUnit.GetMPCharacterTemplateName());
+	MPCharacterTemplate = NewUnit.GetMPCharacterTemplate();
 
-	TemplateData.nMPCharacterTemplate = Unit.GetMPCharacterTemplateName();
-	TemplateData.nCharacterTemplate = Unit.GetMyTemplateName();
-	TemplateData.nSoldierClassTemplate = Unit.GetSoldierClassTemplate() != none ? Unit.GetSoldierClassTemplate().DataName : class'X2SoldierClassTemplateManager'.default.DefaultSoldierClass;
-	TemplateData.iSoldierRank = Unit.GetRank();
-	TemplateData.kAppearance = Unit.kAppearance;
-
-	bExcludeHistory = FromGameState != none;
-
-	Item = Unit.GetItemInSlot(eInvSlot_PrimaryWeapon, FromGameState, bExcludeHistory);
-	TemplateData.nPrimaryWeaponTemplate = (Item == none) ? '' : Item.GetMyTemplateName();
-
-	Item = Unit.GetItemInSlot(eInvSlot_SecondaryWeapon, FromGameState, bExcludeHistory);
-	TemplateData.nSecondaryWeaponTemplate = (Item == none) ? '' : Item.GetMyTemplateName();
-
-	Item = Unit.GetItemInSlot(eInvSlot_HeavyWeapon, FromGameState, bExcludeHistory);
-	TemplateData.nHeavyWeaponTemplate = (Item == none) ? '' : Item.GetMyTemplateName();
-
-	Item = Unit.GetItemInSlot(eInvSlot_Armor, FromGameState, bExcludeHistory);
-	TemplateData.nArmorTemplate = (Item == none) ? '' : Item.GetMyTemplateName();
-
-	TemplateData.arrSoldierProgression = Unit.m_SoldierProgressionAbilties;
-
-	Items = Unit.GetAllItemsInSlot(eInvSlot_Utility, FromGameState, true /*bExcludeHistory*/);
-	if(Items.Length > 0)
+	if (NewUnit.IsSoldier())
 	{
-		TemplateData.nUtilityItem1Template = Items[0].GetMyTemplateName();
-		if(Items.Length > 1)
+		SoldierClassTemplateName = FromUnit.GetSoldierClassTemplate() != none ? FromUnit.GetSoldierClassTemplate().DataName : class'X2SoldierClassTemplateManager'.default.DefaultSoldierClass;		
+		NewUnit.SetTAppearance(FromUnit.kAppearance);
+		NewUnit.SetSoldierClassTemplate(SoldierClassTemplateName); //Inventory needs this to work
+		NewUnit.ResetSoldierRank();
+		SoldierRank = FromUnit.GetRank();
+		for(Index = 0; Index < SoldierRank; ++Index)
 		{
-			TemplateData.nUtilityItem2Template = Items[1].GetMyTemplateName();
-			if(Items.Length > 2)
-			{
-				TemplateData.nUtilityItem3Template = Items[2].GetMyTemplateName();
-			}
+			NewUnit.RankUpSoldier(UseGameState, SoldierClassTemplateName);
 		}
-	}
-	
-	TemplateData.strFirstName = Unit.GetFirstName();
-	TemplateData.strLastName = Unit.GetLastName();
-	TemplateData.strNickName = Unit.GetNickName();
 
-	return TemplateData;
-}
+		class'X2MPData_Common'.static.GiveSoldierAbilities(NewUnit, MPCharacterTemplate.Abilities);
+		NewUnit.SetBaseMaxStat(eStat_UtilityItems, float(MPCharacterTemplate.NumUtilitySlots));
+		NewUnit.SetCurrentStat(eStat_UtilityItems, float(MPCharacterTemplate.NumUtilitySlots));
+		NewUnit.SetBaseMaxStat(eStat_CombatSims, 0);
+		NewUnit.SetCurrentStat(eStat_CombatSims, 0);
+		NewUnit.SetBaseMaxStat(eStat_Will, 80);
+		NewUnit.SetCurrentStat(eStat_Will, 80);
 
-static function XComGameState_Unit AddUnitToGameState(const out TX2UnitLoadoutTemplateData TemplateData, XComGameState NewGameState, XComGameState FromGameState)
-{
-	local XComGameState_Unit Unit;
-	local X2CharacterTemplate CharacterTemplate;
-
-	CharacterTemplate = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager().FindCharacterTemplate(TemplateData.nCharacterTemplate);
-	if(CharacterTemplate == none)
-	{
-		`warn("CreateTemplatesFromCharacter: '" $ CharacterTemplate $ "' is not a valid template.");
-		return none;
-	}
-
-	Unit = CharacterTemplate.CreateInstanceFromTemplate(NewGameState);
-
-	// Add Unit
-	NewGameState.AddStateObject(Unit);
-	// Add Inventory
-	Unit.SetSoldierClassTemplate(TemplateData.nSoldierClassTemplate); //Inventory needs this to work
-	Unit.SetMPCharacterTemplate(TemplateData.nMPCharacterTemplate);
-	UpdateUnit(TemplateData, Unit, FromGameState); //needs to be before adding to inventory or 2nd util item gets thrown out
-	AddFullInventory(TemplateData, NewGameState, Unit);
-
-	return Unit;
-}
-
-static function UpdateUnit(const out TX2UnitLoadoutTemplateData TemplateData, XComGameState_Unit Unit, XComGameState UseGameState)
-{
-	local TSoldier Soldier;    
-	local XGCharacterGenerator CharacterGenerator;
-	local int Index;
-
-	Unit.SetMPCharacterTemplate(TemplateData.nMPCharacterTemplate);
-
-	if (Unit.IsSoldier())
-	{
-		CharacterGenerator = class'Engine'.static.GetCurrentWorldInfo().Spawn(class'XGCharacterGenerator');          
-		Soldier = CharacterGenerator.CreateTSoldierFromUnit(Unit, UseGameState);            
-		CharacterGenerator.Destroy();
-		
-		Unit.SetTAppearance(TemplateData.kAppearance);
-		Unit.SetCharacterName(Soldier.strFirstName, Soldier.strLastName, Soldier.strNickName);
-		Unit.SetCountry(Soldier.nmCountry);
-		Unit.SetSoldierClassTemplate(TemplateData.nSoldierClassTemplate);
-		Unit.ResetSoldierRank();
-		for(Index = 0; Index < TemplateData.iSoldierRank; ++Index)
+		if(MPCharacterTemplate.DataName == 'PsiOperative')
 		{
-			Unit.RankUpSoldier(UseGameState, TemplateData.nSoldierClassTemplate);
+			NewUnit.SetBaseMaxStat(eStat_PsiOffense, 95);
+			NewUnit.SetCurrentStat(eStat_PsiOffense, 95);
 		}
-		Unit.SetSoldierProgression(TemplateData.arrSoldierProgression);
+
+		// TODO: Check that the inventory is correct. -ttalley
+		//NewUnit.ApplyInventoryLoadout(UseGameState, MPCharacterTemplate.Loadout);
+		//NewUnit.MPBaseLoadoutItems = NewUnit.InventoryItems;
+
+		// Make sure that the appearance is valid.
+		CharacterPoolMgr = CharacterPoolManager(`XENGINE.GetCharacterPoolManager());
+		CharacterPoolMgr.FixAppearanceOfInvalidAttributes(NewUnit.kAppearance);
 	}
 	else
 	{
-		Unit.ClearSoldierClassTemplate();
+		NewUnit.ClearSoldierClassTemplate();
 	}
 	
-	Unit.SetCharacterName(TemplateData.strFirstName, TemplateData.strLastName, TemplateData.strNickName);
+	NewUnit.m_RecruitDate = FromUnit.m_RecruitDate;
+	NewUnit.SetCharacterName(FromUnit.GetFirstName(), FromUnit.GetLastName(), FromUnit.GetNickName());
+	NewUnit.SetBackground(FromUnit.GetBackground());
+	NewUnit.SetCountry(FromUnit.GetCountry());
+	NewUnit.UpdatePersonalityTemplate();
 }
 
-static function AddFullInventory(const out TX2UnitLoadoutTemplateData TemplateData, XComGameState GameState, XComGameState_Unit Unit)
+static function CopyFullInventory(XComGameState_Unit FromUnit, XComGameState FromGameState, XComGameState_Unit NewUnit, XComGameState NewGameState)
 {
-	// Add inventory
-	AddItemToUnit(GameState, Unit, TemplateData.nPrimaryWeaponTemplate);
-	AddItemToUnit(GameState, Unit, TemplateData.nSecondaryWeaponTemplate);
-	AddItemToUnit(GameState, Unit, TemplateData.nArmorTemplate);
-	AddItemToUnit(GameState, Unit, TemplateData.nHeavyWeaponTemplate);
-	AddItemToUnit(GameState, Unit, TemplateData.nUtilityItem1Template);
-	AddItemToUnit(GameState, Unit, TemplateData.nUtilityItem2Template);
-	AddItemToUnit(GameState, Unit, TemplateData.nUtilityItem3Template);
+	CopyItemsToUnit(eInvSlot_PrimaryWeapon, FromUnit, FromGameState, NewUnit, NewGameState);
+	CopyItemsToUnit(eInvSlot_SecondaryWeapon, FromUnit, FromGameState, NewUnit, NewGameState);
+	CopyItemsToUnit(eInvSlot_HeavyWeapon, FromUnit, FromGameState, NewUnit, NewGameState);
+	CopyItemsToUnit(eInvSlot_Armor, FromUnit, FromGameState, NewUnit, NewGameState);
+	CopyItemsToUnit(eInvSlot_Utility, FromUnit, FromGameState, NewUnit, NewGameState);
 }
 
-static function AddItemToUnit(XComGameState NewGameState, XComGameState_Unit Unit, name EquipmentTemplateName)
+static function CopyItemsToUnit(EInventorySlot ItemSlot, XComGameState_Unit FromUnit, XComGameState FromGameState, XComGameState_Unit NewUnit, XComGameState NewGameState)
 {
-	local XComGameState_Item ItemInstance;
+	local array<XComGameState_Item> Items;
+	local XComGameState_Item NewItem, FromItem;
 	local X2EquipmentTemplate EquipmentTemplate;
 	local X2ItemTemplateManager ItemTemplateManager;
 
 	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
-	EquipmentTemplate = X2EquipmentTemplate(ItemTemplateManager.FindItemTemplate(EquipmentTemplateName));
 
-	if(EquipmentTemplate != none)
+	if( ItemSlot == eInvSlot_Backpack || ItemSlot == eInvSlot_Utility || ItemSlot == eInvSlot_CombatSim )
 	{
-		ItemInstance = EquipmentTemplate.CreateInstanceFromTemplate(NewGameState);
-		Unit.AddItemToInventory(ItemInstance, EquipmentTemplate.InventorySlot, NewGameState);
-		NewGameState.AddStateObject(ItemInstance);
+		Items = FromUnit.GetAllItemsInSlot(ItemSlot, FromGameState, true /*bExcludeHistory*/);
+	}
+	else
+	{
+		Items.AddItem(FromUnit.GetItemInSlot(ItemSlot, FromGameState, true));
+	}
+	foreach Items(FromItem)
+	{
+		EquipmentTemplate = X2EquipmentTemplate(ItemTemplateManager.FindItemTemplate((FromItem == none) ? '' : FromItem.GetMyTemplateName()));
+
+		if(EquipmentTemplate != none)
+		{
+			NewItem = EquipmentTemplate.CreateInstanceFromTemplate(NewGameState);
+			NewItem.WeaponAppearance = FromItem.WeaponAppearance;
+			NewUnit.AddItemToInventory(NewItem, EquipmentTemplate.InventorySlot, NewGameState);
+			NewGameState.AddStateObject(NewItem);
+		}
 	}
 }
 

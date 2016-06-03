@@ -56,7 +56,8 @@ var bool            m_bConcealed;
 var bool            m_bSpotted; 
 var bool			m_bShowMissionItem; 
 var bool			m_bShowObjectiveItem; 
-var public bool				m_bShowDuringTargeting; 
+var public bool				m_bShowDuringTargeting;
+var bool			m_bIsSpecial;
 
 var bool m_bLockToReticle; 
 var UITargetingReticle m_kReticle; 
@@ -74,27 +75,13 @@ var int VisualizedHistoryIndex;
 // kUnit, the unit this flag is associated with.
 simulated function InitFlag(StateObjectReference ObjectRef)
 {
-	local XGUnit UnitVisualizer;
-	local XComGameState_Player LocalPlayerObject;
-	local XComGameState_Destructible DestructibleObject;
-
 	InitPanel();
 
 	History = `XCOMHISTORY;
 	
 	StoredObjectID = ObjectRef.ObjectID; 
 
-	UnitVisualizer = XGUnit(History.GetVisualizer(StoredObjectID));
-	if(UnitVisualizer != none)
-	{
-		m_bIsFriendly = UnitVisualizer != none ? UnitVisualizer.IsFriendly(PC) : false;
-	}
-	else
-	{
-		LocalPlayerObject = XComGameState_Player(History.GetGameStateForObjectID(`TACTICALRULES.GetLocalClientPlayerObjectID()));
-		DestructibleObject = XComGameState_Destructible(History.GetGameStateForObjectID(StoredObjectID));
-		m_bIsFriendly = DestructibleObject != none ? !DestructibleObject.IsTargetable(LocalPlayerObject.GetTeam()) : false;
-	}
+	UpdateFriendlyStatus();
 
 	m_bIsDead = false;
 	m_iMovePipsTouched = 0;
@@ -115,10 +102,35 @@ simulated function OnInit()
 }
 
 // TODO: @dkaplan: make unit flag visualization updates event based
+simulated function UpdateFriendlyStatus()
+{
+	local XGUnit UnitVisualizer;
+	local XComGameState_Player LocalPlayerObject;
+	local XComGameState_Destructible DestructibleObject;
+	
+	UnitVisualizer = XGUnit(History.GetVisualizer(StoredObjectID));
 
+	if(UnitVisualizer != none)
+	{
+		m_bIsFriendly = UnitVisualizer != none ? UnitVisualizer.IsFriendly(PC) : false;
+	}
+	else
+	{
+		LocalPlayerObject = XComGameState_Player(History.GetGameStateForObjectID(`TACTICALRULES.GetLocalClientPlayerObjectID()));
+		DestructibleObject = XComGameState_Destructible(History.GetGameStateForObjectID(StoredObjectID));
+		m_bIsFriendly = DestructibleObject != none ? !DestructibleObject.IsTargetable(LocalPlayerObject.GetTeam()) : false;
+	}
+}
 simulated function RespondToNewGameState( XComGameState NewState, bool bForceUpdate=false )
 {
 	local XComGameState_BaseObject ObjectState;	
+	
+	//the manager responds to a game state before on init is called on this flag in a replay or a tutorial.
+	//do not allow calls too early, because unit flag uses direct invoke which results in bad calls pre-init 
+	if( !bIsInited )
+	{
+		return;
+	}
 
 	if( bForceUpdate || bIsVisible )
 	{				
@@ -183,8 +195,14 @@ simulated function UpdateFromDestructibleState(XComGameState_Destructible NewDes
 simulated function UpdateFromUnitState(XComGameState_Unit NewUnitState, bool bInitialUpdate = false, bool bForceUpdate = false)
 {
 	// Initial update
+	if( bForceUpdate || bInitialUpdate )
+	{
+		RealizeFaction(NewUnitState);
+		RealizeSpecialFaction(NewUnitState);
+	}
+	
 	SetAim( NewUnitState.GetCurrentStat(eStat_Offense) );
-
+	
 	RealizeHitPoints(NewUnitState);
 
 	if( bInitialUpdate )
@@ -337,7 +355,7 @@ simulated function Update( XGUnit kNewActiveUnit )
 			if(m_kReticle != none || m_bIsSelected)
 				flagScale = 100;
 			else
-				flagScale = (unitScreenPos.Y / 15.0) + 52.0;
+				flagScale = (unitScreenPos.Y / 22.5) + 52.0;
 
 			SetFlagPosition( unitScreenPos.X , unitScreenPos.Y, flagScale );
 		}
@@ -436,6 +454,39 @@ simulated function SetDebugText( string strDisplayText )
 
 	Invoke("SetDebugText", myArray);
 }
+
+simulated function RealizeSpecialFaction(XComGameState_BaseObject NewState)
+{
+	local XComGameState_Unit UnitState;
+	local array<ASValue> myArray;
+
+	UnitState = XComGameState_Unit(NewState);
+	if( UnitState != none 
+	   && UnitState.bIsSpecial
+	   && !m_bIsSpecial )
+	{
+		m_bIsSpecial = true;
+		myArray.length = 0;
+		Invoke("SetFactionSpecial", myArray);
+	}	
+}
+
+simulated function RealizeFaction(XComGameState_BaseObject NewState)
+{
+	local array<ASValue> myArray;
+	local ASValue myValue;
+	
+	UpdateFriendlyStatus();
+
+	myArray.length = 0;
+	myValue.Type = AS_Boolean;
+
+	myValue.b = m_bIsFriendly;
+	myArray.AddItem( myValue );
+
+	Invoke("SetFaction", myArray);	
+}
+
 
 simulated function RealizeAim() 
 {

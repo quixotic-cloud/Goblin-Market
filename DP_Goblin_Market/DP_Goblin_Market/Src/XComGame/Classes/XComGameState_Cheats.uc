@@ -37,6 +37,9 @@ var bool AlwaysDoCinescriptCut;
 
 var EConcealmentShaderOverride ConcealmentShaderOverride;
 
+// if set, will play this music set instead of the normal set
+var name TacticalMusicSetOverride;
+
 native function bool Validate(XComGameState HistoryGameState, INT GameStateIndex) const;
 
 static event XComGameState_Cheats GetVisualizedCheatsObject()
@@ -105,11 +108,11 @@ function SyncVisualizer(optional XComGameState GameState = none)
 	local int HistoryIndex;
 
 	History = `XCOMHISTORY;
-	HistoryIndex = GetParentGameState().HistoryIndex - 1;
-	PreviousCheatState = XComGameState_Cheats(History.GetGameStateForObjectID(ObjectID, , HistoryIndex));
+	PreviousCheatState = XComGameState_Cheats(History.GetPreviousGameStateForObject(self));
 	if(PreviousCheatState == none)
 	{
-		return;
+		// if no previous state, just create a default to compare against
+		PreviousCheatState = new class'XComGameState_Cheats';
 	}
 
 	// do any visualization of cheat changes here
@@ -122,6 +125,7 @@ function SyncVisualizer(optional XComGameState GameState = none)
 	if(PreviousCheatState.DisableLooting != DisableLooting)
 	{
 		// update the visuals of all lootables to react to the change
+		HistoryIndex = History.GetCurrentHistoryIndex();
 		foreach History.IterateByClassType(class'XComGameState_Unit', UnitState, , , HistoryIndex)
 		{
 			UnitState.UpdateLootSparklesEnabled(false);
@@ -131,6 +135,12 @@ function SyncVisualizer(optional XComGameState GameState = none)
 		{
 			InteractiveObjectState.UpdateLootSparklesEnabled(false);
 		}
+	}
+
+	// update the music set
+	if(PreviousCheatState.TacticalMusicSetOverride != TacticalMusicSetOverride)
+	{
+		`XTACTICALSOUNDMGR.SelectRandomTacticalMusicSet();
 	}
 }
 

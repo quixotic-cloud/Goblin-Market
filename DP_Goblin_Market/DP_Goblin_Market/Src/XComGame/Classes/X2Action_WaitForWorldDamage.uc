@@ -45,6 +45,16 @@ event bool BlocksAbilityActivation()
 	return false;
 }
 
+function bool IsWaitingOnActionTrigger()
+{
+	return true;
+}
+
+function TriggerWaitCondition()
+{
+	bTriggered = true;
+}
+
 /// <summary>
 /// X2Actions call this at the conclusion of their behavior to signal to the visualization mgr that they are done
 /// </summary>

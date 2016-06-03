@@ -595,6 +595,21 @@ exec function Y_Button_Release()
 {
 	XComInputBase(PlayerInput).InputEvent( class'UIUtilities_Input'.const.FXS_BUTTON_Y, class'UIUtilities_Input'.const.FXS_ACTION_RELEASE  );
 }
+
+exec function A_Button_Steam_Press()
+{
+	if( bBlockingInputAfterMovie ) return;
+
+	XComInputBase(PlayerInput).InputEvent(class'UIUtilities_Input'.const.FXS_BUTTON_A_STEAM);
+}
+exec function A_Button_Steam_Release()
+{
+	if( bBlockingInputAfterMovie ) return;
+
+	XComInputBase(PlayerInput).InputEvent(class'UIUtilities_Input'.const.FXS_BUTTON_A_STEAM, class'UIUtilities_Input'.const.FXS_ACTION_RELEASE);
+}
+
+
 //---------------------------------------------------------------------------------------
 exec function DPad_Right_Press()
 {
@@ -961,6 +976,9 @@ exec function E_Key_Release()   {   if( !WorldInfo.IsConsoleBuild() ) XComInputB
 //---------------------------------------------------------------------------------------
 exec function F_Key_Press()     {   if( !WorldInfo.IsConsoleBuild() ) XComInputBase(PlayerInput).InputEvent( class'UIUtilities_Input'.const.FXS_KEY_F );}
 exec function F_Key_Release()   {   if( !WorldInfo.IsConsoleBuild() ) XComInputBase(PlayerInput).InputEvent( class'UIUtilities_Input'.const.FXS_KEY_F, class'UIUtilities_Input'.const.FXS_ACTION_RELEASE  );}
+//---------------------------------------------------------------------------------------
+exec function I_Key_Press()     {   if( !WorldInfo.IsConsoleBuild() ) XComInputBase(PlayerInput).InputEvent( class'UIUtilities_Input'.const.FXS_KEY_I );}
+exec function I_Key_Release()   {   if( !WorldInfo.IsConsoleBuild() ) XComInputBase(PlayerInput).InputEvent( class'UIUtilities_Input'.const.FXS_KEY_I, class'UIUtilities_Input'.const.FXS_ACTION_RELEASE  );}
 //---------------------------------------------------------------------------------------
 exec function J_Key_Press()     {   if( !WorldInfo.IsConsoleBuild() ) XComInputBase(PlayerInput).InputEvent( class'UIUtilities_Input'.const.FXS_KEY_J );}
 exec function J_Key_Release()   {   if( !WorldInfo.IsConsoleBuild() ) XComInputBase(PlayerInput).InputEvent( class'UIUtilities_Input'.const.FXS_KEY_J, class'UIUtilities_Input'.const.FXS_ACTION_RELEASE  );}
@@ -1585,6 +1603,189 @@ function bool IsInLobby()
 // override of the built in Epic restart level command. Since we need far more information than just the initial map in tactical,
 // the command will basically load the start state, effectively restarting the level
 exec native function RestartLevel();
+
+// Helper function for TransferToNewMission, it was getting kinda bit and hairy
+private function TransferUnitToNewMission(XComGameState_Unit UnitState, 
+										  XComGameState NewStartState,
+										  XComGameState_HeadquartersXCom XComHQ, 
+										  XComGameState_BattleData BattleData,
+										  int LocalPlayerObjectID)
+{
+	local XComGameStateHistory History;
+	local DirectTransferInformation_UnitStats TransferredUnitStats;
+	local XComGameState_Effect EffectState;
+	local StateObjectReference StateRef;
+
+	History = `XCOMHISTORY;
+	if(UnitState.ControllingPlayer.ObjectID == LocalPlayerObjectID && !UnitState.GetMyTemplate().bIsCosmetic)
+	{
+		if(UnitState.IsDead())
+		{
+			// remove this unit from the headquarters squad. This will need to be carried along in some way at
+			// some point so they show up in the after action report
+			XComHQ.Squad.RemoveItem(UnitState.GetReference());
+		}
+		else
+		{
+			UnitState = XComGameState_Unit(NewStartState.CreateStateObject(class'XComGameState_Unit', UnitState.ObjectID));
+			NewStartState.AddStateObject(UnitState);
+
+			// clear their evac state. Most multi-part missions have unit's evac at the end of each section,
+			// and we need them to be not evac'd again for the next map
+			UnitState.ClearRemovedFromPlayFlag();
+
+			// copy their stats to the transfer info. This needs to happen before we remove abilities and effects, as
+			// they could change the stat values
+			TransferredUnitStats.UnitStateRef = UnitState.GetReference();
+			TransferredUnitStats.HP = UnitState.GetCurrentStat(eStat_HP);
+			TransferredUnitStats.ArmorShred = UnitState.Shredded;
+			BattleData.DirectTransferInfo.TransferredUnitStats.AddItem(TransferredUnitStats);
+
+			// copy over the unit's abilities
+			foreach UnitState.Abilities(StateRef)
+			{
+				NewStartState.AddStateObject(NewStartState.CreateStateObject(class'XComGameState_Ability', StateRef.ObjectID));
+			}
+
+			// and their weapons
+			foreach UnitState.InventoryItems(StateRef)
+			{
+				NewStartState.AddStateObject(NewStartState.CreateStateObject(class'XComGameState_Item', StateRef.ObjectID));
+			}
+
+			// and clear any effects they are under
+			while (UnitState.AppliedEffects.Length > 0)
+			{
+				StateRef = UnitState.AppliedEffects[UnitState.AppliedEffects.Length - 1];
+				EffectState = XComGameState_Effect(History.GetGameStateForObjectID(StateRef.ObjectID));
+				UnitState.RemoveAppliedEffect(EffectState);
+				UnitState.UnApplyEffectFromStats(EffectState);
+			}
+
+			while (UnitState.AffectedByEffects.Length > 0)
+			{
+				StateRef = UnitState.AffectedByEffects[UnitState.AffectedByEffects.Length - 1];
+				EffectState = XComGameState_Effect(History.GetGameStateForObjectID(StateRef.ObjectID));
+				UnitState.RemoveAffectingEffect(EffectState);
+				UnitState.UnApplyEffectFromStats(EffectState);
+			}
+		}
+	}
+}
+
+// Loads into a new map of the specified mission type, transferring all XCom soldiers
+exec function TransferToNewMission(string MissionType)
+{
+	local XComGameStateHistory History;
+	local XComParcelManager ParcelManager;
+	local XComTacticalMissionManager MissionManager;
+	local X2TacticalGameRuleset Rules;
+	local array<PlotDefinition> ValidPlots;
+	local PlotDefinition NewPlot;
+	local MissionDefinition MissionDef;
+	local XComGameState_BattleData BattleData;
+	local XComGameStateContext_TacticalGameRule TacticalStartContext;
+	local XComGameState StartState;
+	local int LocalPlayerObjectID;
+	local XComGameState_Player PlayerState;
+	local XComGameState_Player NewPlayerState;
+	local XComGameState_Unit UnitState;
+	local XComGameState_Cheats CheatState;
+	local XComGameState_HeadquartersXCom XComHQ;
+	local XComGameState_HeadquartersAlien AlienHQ;
+
+	History = `XCOMHISTORY;
+	ParcelManager = `PARCELMGR;
+	MissionManager = `TACTICALMISSIONMGR;
+	Rules = `TACTICALRULES;
+
+	BattleData = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
+
+	// pick our new map
+	if(!MissionManager.GetMissionDefinitionForType(MissionType, MissionDef))
+	{
+		`Redscreen("TransferToNewMission(): Mission Type " $ MissionType $ " has no definition!");
+		return;
+	}
+
+	MissionManager.ForceMission = MissionDef;
+
+	ParcelManager.GetValidPlotsForMission(ValidPlots, MissionDef, BattleData.MapData.Biome);
+	if(ValidPlots.Length == 0)
+	{
+		`Redscreen("TransferToNewMission(): Could not find a plot to transfer to for mission type " $ MissionType $ "!");
+		return;
+	}
+	
+	NewPlot = ValidPlots[0];
+
+	// generate a new start state
+	//StartState = class'XComGameStateContext_TacticalGameRule'.static.CreateDefaultTacticalStartState_Singleplayer(BattleData);
+	
+	TacticalStartContext = XComGameStateContext_TacticalGameRule(class'XComGameStateContext_TacticalGameRule'.static.CreateXComGameStateContext());
+	TacticalStartContext.GameRuleType = eGameRule_TacticalGameStart;
+	StartState = History.CreateNewGameState(false, TacticalStartContext);
+
+	BattleData = XComGameState_BattleData(StartState.CreateStateObject(class'XComGameState_BattleData', BattleData.ObjectID));
+	BattleData.DirectTransferInfo.IsDirectMissionTransfer = true;
+	BattleData.DirectTransferInfo.TransferredUnitStats.Length = 0; // empty this in case this was also a direct transfer battle
+	BattleData.MapData.PlotMapName = NewPlot.MapName;
+	BattleData.MapData.ActiveMission = MissionDef;
+	BattleData.MapData.EntranceData.Length = 0;
+	BattleData.MapData.ParcelData.Length = 0;
+	BattleData.MapData.PlotCoverParcelData.Length = 0;
+	BattleData.MapData.ObjectiveParcelIndex = -1;
+	StartState.AddStateObject(BattleData);
+
+	// copy over the headquarters objects
+	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+	XComHQ = XComGameState_HeadquartersXCom(StartState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+	StartState.AddStateObject(XComHQ);
+
+	AlienHQ = XComGameState_HeadquartersAlien(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersAlien'));
+	AlienHQ = XComGameState_HeadquartersAlien(StartState.CreateStateObject(class'XComGameState_HeadquartersAlien', AlienHQ.ObjectID));
+	StartState.AddStateObject(AlienHQ);
+
+	// Copy over the XCOM player state and create new states for the alien and civilian players
+	LocalPlayerObjectID = Rules.GetLocalClientPlayerObjectID();
+
+	foreach History.IterateByClassType(class'XComGameState_Player', PlayerState)
+	{
+		if(PlayerState.ObjectID == LocalPlayerObjectID) // this is the local human team, need to keep track of it
+		{
+			PlayerState = XComGameState_Player(StartState.CreateStateObject(class'XComGameState_Player', LocalPlayerObjectID));
+			StartState.AddStateObject(PlayerState);
+		}
+		else
+		{
+			// create a new player and remove the old one. This will clear out any old data about
+			// units and AI
+			NewPlayerState = class'XComGameState_Player'.static.CreatePlayer(StartState, PlayerState.GetTeam());
+			NewPlayerState.bPlayerReady = true; // Single Player game, this will be synchronized out of the gate!
+			BattleData.PlayerTurnOrder.AddItem(NewPlayerState.GetReference());
+			StartState.AddStateObject(NewPlayerState);
+
+			BattleData.PlayerTurnOrder.RemoveItem(PlayerState.GetReference());
+			StartState.RemoveStateObject(PlayerState.ObjectID);
+		}
+	}
+
+	// copy over the XCom units
+	foreach History.IterateByClassType(class'XComGameState_Unit', UnitState)
+	{
+		TransferUnitToNewMission(UnitState, StartState, XComHQ, BattleData, LocalPlayerObjectID);
+	}
+
+	// copy over the cheat state
+	CheatState = XComGameState_Cheats(History.GetSingleGameStateObjectForClass(class'XComGameState_Cheats'));
+	CheatState = XComGameState_Cheats(StartState.CreateStateObject(class'XComGameState_Cheats', CheatState.ObjectID));
+	StartState.AddStateObject(CheatState);
+
+	History.AddGameStateToHistory(StartState);
+
+	// and do the client transfer to the new map!
+	ClientTravel(NewPlot.MapName, TRAVEL_Relative);
+}
 
 simulated event NotifyMatineeStartedAkEvent(AkEvent Event, float EventDuration)
 {

@@ -115,15 +115,18 @@ var config float NewCivlian_UpperFacePropChance;
 var config float NewCivlian_LowerFacePropChance;
 var config float NewCivlian_BeardChance;
 
+var config float DLCPartPackDefaultChance;
+
 // Temporary variable for uniquely randomized hair so artists
 // can see potentially all hair types in a squad.
 var int m_iHairType;
 
 // temporary variable for solidier creation, used by TemplateMgr filter functions
-var private TSoldier kSoldier;
-var private X2BodyPartTemplate kTorsoTemplate;
-var private name MatchCharacterTemplateForTorso;
-var private name MatchArmorTemplateForTorso;
+var protected TSoldier kSoldier;
+var protected X2BodyPartTemplate kTorsoTemplate;
+var protected name MatchCharacterTemplateForTorso;
+var protected name MatchArmorTemplateForTorso;
+var protected array<name> DLCNames; //List of DLC packs to pull parts from for the currently generating soldier.
 
 function GenerateName( int iGender, name CountryName, out string strFirst, out string strLast, optional int iRace = -1 )
 {
@@ -294,12 +297,63 @@ function X2BodyPartTemplate SetBodyPartToFirstInArray(X2BodyPartTemplateManager 
 	DataName = (listPartTemplate.length > 0) ? listPartTemplate[0].DataName : DefaultGetRandomUberTemplate_WarnAboutFilter(PartTypeName);
 	return (listPartTemplate.length > 0) ? listPartTemplate[0] : none;
 }
-function X2BodyPartTemplate RandomizeSetBodyPart(X2BodyPartTemplateManager PartTemplateManager, out name DataName, string PartTypeName, delegate<FilterCallback> CallbackFn)
+function X2BodyPartTemplate RandomizeSetBodyPart(X2BodyPartTemplateManager PartTemplateManager, out name DataName, string PartTypeName, delegate<FilterCallback> CallbackFn, optional bool bCanBeEmpty = false)
 {
 	local X2BodyPartTemplate RandomPart;
+
+	//Clear the template name if it is allowed to be empty
+	if(bCanBeEmpty)
+	{
+		DataName = '';
+	}
+
 	RandomPart = PartTemplateManager.GetRandomUberTemplate(PartTypeName, `XCOMGAME.SharedBodyPartFilter, CallbackFn);
-	DataName = (RandomPart != none) ? RandomPart.DataName : DefaultGetRandomUberTemplate_WarnAboutFilter(PartTypeName);
+	if(!bCanBeEmpty || (RandomPart != none))
+	{
+		DataName = (RandomPart != none) ? RandomPart.DataName : DefaultGetRandomUberTemplate_WarnAboutFilter(PartTypeName);
+	}
 	return RandomPart;
+}
+
+function UpdateDLCPackFilters()
+{
+	local int Index;
+	local XComOnlineProfileSettings ProfileSettings;
+	local X2BodyPartTemplateManager PartTemplateManager;
+	local int PartPackIndex;
+	local array<name> PartPackNames;
+	local bool bHasSetting;
+
+	ProfileSettings = `XPROFILESETTINGS;
+
+	PartTemplateManager = class'X2BodyPartTemplateManager'.static.GetBodyPartTemplateManager();
+	PartPackNames = PartTemplateManager.GetPartPackNames();
+		
+	DLCNames.Length = 0;
+	DLCNames.AddItem('');
+	for(PartPackIndex = 0; PartPackIndex < PartPackNames.Length; ++PartPackIndex)
+	{
+		bHasSetting = false;
+		for(Index = 0; Index < ProfileSettings.Data.PartPackPresets.Length; ++Index)
+		{
+			if(ProfileSettings.Data.PartPackPresets[Index].PartPackName == PartPackNames[PartPackIndex])
+			{
+				bHasSetting = true;
+				if(`SYNC_FRAND() <= ProfileSettings.Data.PartPackPresets[Index].ChanceToSelect &&
+					ProfileSettings.Data.PartPackPresets[Index].ChanceToSelect > 0.01f )
+				{
+					DLCNames.AddItem(ProfileSettings.Data.PartPackPresets[Index].PartPackName);
+					break;
+				}
+			}
+		}
+
+		//Handle the case where a setting has not been specified in the options menu
+		if(!bHasSetting && `SYNC_FRAND() <= DLCPartPackDefaultChance)
+		{
+			DLCNames.AddItem(PartPackNames[PartPackIndex]);			
+		}
+	}
 }
 
 function TSoldier CreateTSoldier( optional name CharacterTemplateName, optional EGender eForceGender, optional name nmCountry = '', optional int iRace = -1, optional name ArmorName )
@@ -312,6 +366,8 @@ function TSoldier CreateTSoldier( optional name CharacterTemplateName, optional 
 	local TAppearance DefaultAppearance;
 	local int SkipColors;
 	local int DefaultColors;
+
+	kSoldier.kAppearance = DefaultAppearance;
 		
 	if( CharacterTemplateName == 'Soldier' || CharacterTemplateName == '' )
 	{	
@@ -353,21 +409,46 @@ function TSoldier CreateTSoldier( optional name CharacterTemplateName, optional 
 	PartTemplateManager = class'X2BodyPartTemplateManager'.static.GetBodyPartTemplateManager();
 
 	BodyPartFilter = `XCOMGAME.SharedBodyPartFilter;
-	
+	//When generating new characters, consider the DLC pack filters.
+
+	//Use the player's settings from Options->Game Options to pick which DLC / Mod packs this generated soldier should draw from
+	UpdateDLCPackFilters();
+
 	//Set up for the torso selection
-	BodyPartFilter.Set(EGender(kSoldier.kAppearance.iGender), ECharacterRace(kSoldier.kAppearance.iRace), ''); //Don't have a torso yet
-	BodyPartFilter.SetTorsoSelection(MatchCharacterTemplateForTorso, MatchArmorTemplateForTorso);
+	BodyPartFilter.Set(EGender(kSoldier.kAppearance.iGender), ECharacterRace(kSoldier.kAppearance.iRace), '', , , DLCNames); //Don't have a torso yet	
+	BodyPartFilter.SetTorsoSelection(MatchCharacterTemplateForTorso, MatchArmorTemplateForTorso);	
+	
 	kTorsoTemplate = RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmTorso, "Torso", BodyPartFilter.FilterTorso);
 	
 	//Set again now that we have picked our torso
-	BodyPartFilter.Set(EGender(kSoldier.kAppearance.iGender), ECharacterRace(kSoldier.kAppearance.iRace), kSoldier.kAppearance.nmTorso, !(CharacterTemplateName == 'Soldier' || CharacterTemplateName == ''));
-	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHaircut, "Hair", BodyPartFilter.FilterByGenderAndNonSpecialized);
-	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHead, "Head", BodyPartFilter.FilterByGenderAndRace);
+	BodyPartFilter.Set(EGender(kSoldier.kAppearance.iGender), ECharacterRace(kSoldier.kAppearance.iRace), kSoldier.kAppearance.nmTorso, !(CharacterTemplateName == 'Soldier' || CharacterTemplateName == ''), , DLCNames);
+	
+
 	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmLegs, "Legs", BodyPartFilter.FilterByTorsoAndArmorMatch);
-	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmArms, "Arms", BodyPartFilter.FilterByTorsoAndArmorMatch);	
+	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmArms, "Arms", BodyPartFilter.FilterByTorsoAndArmorMatch, true);
+
+	//If no arm selection, check the left / right arms
+	if(kSoldier.kAppearance.nmArms == '')
+	{
+		RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmLeftArm, "LeftArm", BodyPartFilter.FilterByTorsoAndArmorMatch);
+		RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmRightArm, "RightArm", BodyPartFilter.FilterByTorsoAndArmorMatch);
+		RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmLeftArmDeco, "LeftArmDeco", BodyPartFilter.FilterByTorsoAndArmorMatch);
+		RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmRightArmDeco, "RightArmDeco", BodyPartFilter.FilterByTorsoAndArmorMatch);
+	}
+
+	if(CharacterTemplateName == 'Soldier' || CharacterTemplateName == '')
+	{
+		RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHaircut, "Hair", BodyPartFilter.FilterByGenderAndNonSpecialized);
+	}
+	else
+	{
+		RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHaircut, "Hair", BodyPartFilter.FilterByGenderAndNonSpecializedCivilian);
+	}
+
+	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHead, "Head", BodyPartFilter.FilterByGenderAndRaceAndArmor);
 	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmEye, "Eyes", BodyPartFilter.FilterAny);
 	RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmTeeth, "Teeth", BodyPartFilter.FilterAny);
-
+	
 	//Custom settings depending on whether the unit is a soldier or not
 	SetBodyPartToFirstInArray(PartTemplateManager, kSoldier.kAppearance.nmPatterns, "Patterns", BodyPartFilter.FilterAny);
 	SetBodyPartToFirstInArray(PartTemplateManager, kSoldier.kAppearance.nmTattoo_LeftArm, "Tattoos", BodyPartFilter.FilterAny);
@@ -386,7 +467,7 @@ function TSoldier CreateTSoldier( optional name CharacterTemplateName, optional 
 
 		if( `SYNC_FRAND() < NewSoldier_HatChance )
 		{
-			RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHelmet, "Helmets", BodyPartFilter.FilterByGenderAndNonSpecializedAndTech);
+			RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHelmet, "Helmets", BodyPartFilter.FilterByGenderAndNonSpecializedAndTechAndArmor);
 		}
 		else
 		{
@@ -424,7 +505,7 @@ function TSoldier CreateTSoldier( optional name CharacterTemplateName, optional 
 
 		if(`SYNC_FRAND() < NewCivlian_HatChance )
 		{
-			RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHelmet, "Helmets", BodyPartFilter.FilterByGenderAndNonSpecializedAndTech);
+			RandomizeSetBodyPart(PartTemplateManager, kSoldier.kAppearance.nmHelmet, "Helmets", BodyPartFilter.FilterByGenderAndNonSpecializedAndTechAndArmor);
 		}
 		else
 		{

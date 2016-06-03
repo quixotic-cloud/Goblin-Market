@@ -300,31 +300,42 @@ function SelectRandomTacticalMusicSet()
 {
 	local XComGameState_HeadquartersXCom XComHQ;
 	local XComGameState_MissionSite MissionState;
+	local XComGameState_Cheats CheatState;
 	local int RandomIndex;
 	local name SelectSet;
 
-	XComHQ = XComGameState_HeadquartersXCom(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
-	MissionState = XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(XComHQ.MissionRef.ObjectID));
-
-	if(MissionState == none || MissionState.GetMissionSource().CustomMusicSet == '')
+	// first check if a specific music set has been selected from kismet
+	CheatState = class'XComGameState_Cheats'.static.GetVisualizedCheatsObject();
+	if(CheatState != none && CheatState.TacticalMusicSetOverride != '')
 	{
-		if(TacticalCombatMusicSets.Length > 0)
-		{
-			RandomIndex = `SYNC_RAND(TacticalCombatMusicSets.Length);
-			SelectSet = name(TacticalCombatMusicSets[RandomIndex]);
-			if(`REPLAY.bInTutorial)
-			{
-				SetSwitch('TacticalCombatMusicSet', 'Tutorial');
-			}
-			else
-			{
-				SetSwitch('TacticalCombatMusicSet', SelectSet);
-			}
-		}
+		SetSwitch('TacticalCombatMusicSet', CheatState.TacticalMusicSetOverride);
 	}
 	else
-	{		
-		SetSwitch('TacticalCombatMusicSet', MissionState.GetMissionSource().CustomMusicSet);
+	{
+		// check if this mission requests specific music, otherwise play a random set
+		XComHQ = XComGameState_HeadquartersXCom(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+		MissionState = XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(XComHQ.MissionRef.ObjectID));
+
+		if(MissionState == none || MissionState.GetMissionSource().CustomMusicSet == '')
+		{
+			if(TacticalCombatMusicSets.Length > 0)
+			{
+				RandomIndex = `SYNC_RAND(TacticalCombatMusicSets.Length);
+				SelectSet = name(TacticalCombatMusicSets[RandomIndex]);
+				if(`REPLAY.bInTutorial)
+				{
+					SetSwitch('TacticalCombatMusicSet', 'Tutorial');
+				}
+				else
+				{
+					SetSwitch('TacticalCombatMusicSet', SelectSet);
+				}
+			}
+		}
+		else
+		{		
+			SetSwitch('TacticalCombatMusicSet', MissionState.GetMissionSource().CustomMusicSet);
+		}
 	}
 }
 

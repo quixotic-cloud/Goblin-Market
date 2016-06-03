@@ -14,6 +14,10 @@ var const config array<name> EffectUpdatesOnMove;               //  names of eff
 
 var protected array<name> StandardMoveAbilityActionTypes;
 
+var config array<name> AbilityUnlocksHeavyWeapon;               //  having any of these abilities will allow a unit to have a heavy weapon (regardless of armor)
+var config array<name> AbilityUnlocksGrenadePocket;             //  having any of these abilities will allow a unit to have the grenade slot
+var config array<name> AbilityUnlocksAmmoPocket;                //  having any of these abilities will allow a unit to have the ammo slot
+
 //  Names for various abilities & effects that need to be accessed in native code.
 var name BeingCarriedEffectName;
 var name ConfusedName;
@@ -79,6 +83,26 @@ function X2AbilityTemplate FindAbilityTemplate(name DataName)
 	if (kTemplate != none)
 		return X2AbilityTemplate(kTemplate);
 	return none;
+}
+
+function FindAbilityTemplateAllDifficulties(name DataName, out array<X2AbilityTemplate> AbilityTemplates)
+{
+	local array<X2DataTemplate> DataTemplates;
+	local X2DataTemplate DataTemplate;
+	local X2AbilityTemplate AbilityTemplate;
+
+	FindDataTemplateAllDifficulties(DataName, DataTemplates);
+	
+	AbilityTemplates.Length = 0;
+	
+	foreach DataTemplates(DataTemplate)
+	{
+		AbilityTemplate = X2AbilityTemplate(DataTemplate);
+		if( AbilityTemplate != none )
+		{
+			AbilityTemplates.AddItem(AbilityTemplate);
+		}
+	}
 }
 
 DefaultProperties

@@ -88,6 +88,7 @@ var EConcealmentRule            ConcealmentRule;
 var bool                        bSilentAbility;                     //  Don't trigger sound when this ability is activated, regardless of ammo/damage rules.
 var bool                        bCannotTeleport;                    // For pathing abilities, prevents ability to use teleport traversals.
 var bool						bPreventsTargetTeleport;			// If set, this ability prevents the target from teleporting away.
+var bool                        bTickPerActionEffects;              // If true, this ability will tick per action effects when activated
 
 var class<X2Action_Fire>        ActionFireClass;
 
@@ -114,6 +115,7 @@ var localized string            LocHitMessage;
 var localized string            LocFriendlyNameWhenConcealed;       // used by the shot HUD when the ability owner is concealed
 var localized string            LocLongDescriptionWhenConcealed;    // long description used when ability owner is concealed (ability tooltip)
 var localized string			LocDefaultPrimaryWeapon;			// used in passive effects to indicate the primary weapon for AWC abilities
+var localized string			LocDefaultSecondaryWeapon;			// used in passive effects to indicate the secondary weapon for AWC abilities
 var EAbilityIconBehavior        eAbilityIconBehaviorHUD;            // when should this ability appear in the HUD?
 var array<name>                 HideIfAvailable;                    // if icon behavior is eAbilityIconBehavior_HideIfOtherAvailable, these are the abilities that makes it hide
 var array<name>                 HideErrors;                         // if icon behavior is eAbilityIconBehavior_HideSpecificErrors, these are the ones to hide
@@ -146,6 +148,7 @@ var bool                        bShowPostActivation;                // If true, 
 var bool                        bSkipFireAction;                    // If true, ability will not exit cover/fire/enter cover when activated.
 var bool						bSkipExitCoverWhenFiring;			// If true, ability will not exit cover when firing is activated.
 var bool						bSkipPerkActivationActions;			// If true, ability will not automatically include perk actions when activated (but will still do the perk duration ending action).
+var bool						bSkipPerkActivationActionsSync;		// If true, ability will not automatically activate perks when loading/synching.
 var bool                        bSkipMoveStop;                      // If true, typical abilities with embedded moves will not play a stop anim before the fire anim. This should be used for custom moving attacks et cetera
 var bool						bDisplayInUITooltip;				// Will only appear in UI info tooltips if this is true 
 var bool						bDisplayInUITacticalText;			// Will only appear in UI tactical text tooltip if this is true 
@@ -154,7 +157,15 @@ var name                        SourceHitSpeech;				    //  TypicalAbility_Build
 var name                        TargetHitSpeech;					//  TypicalAbility_BuildVisualization will automatically use these
 var name                        SourceMissSpeech;					//  TypicalAbility_BuildVisualization will automatically use these
 var name                        TargetMissSpeech;					//  TypicalAbility_BuildVisualization will automatically use these
+var name                        TargetKilledByAlienSpeech;          //  X2Action_EnterCover:RespondToShotSpeak uses this if the activating unit is on the alien team and killed a single unit
+var name                        TargetKilledByXComSpeech;           //  X2Action_EnterCover:RespondToShotSpeak uses this if the activating unit is on the xcom team and killed a single unit
+var name                        MultiTargetsKilledByAlienSpeech;    //  X2Action_EnterCover:RespondToShotSpeak uses this if the activating unit is on the alien team and killed multiple units
+var name                        MultiTargetsKilledByXComSpeech;     //  X2Action_EnterCover:RespondToShotSpeak uses this if the activating unit is on the xcom team and killed multiple units
+var name                        TargetWingedSpeech;                 //  X2Action_EnterCover:RespondToShotSpeak uses this when the target is grazed
+var name                        TargetArmorHitSpeech;               //  X2Action_EnterCover:RespondToShotSpeak uses this when the target has armor that mitigated some of the damage
+var name                        TargetMissedSpeech;                 //  X2Action_EnterCover:RespondToShotSpeak uses this when the target is missed
 
+//  Targeting stuff
 var class<X2TargetingMethod>    TargetingMethod;                    // UI interaction class. Specifies how the target is actually selected by the user
 var bool						SkipRenderOfAOETargetingTiles;		// Modifier to UI interaction class
 var bool						SkipRenderOfTargetingTemplate;		// Modifier to UI interaction class
@@ -188,6 +199,8 @@ var delegate<OnSoldierAbilityPurchased> SoldierAbilityPurchasedFn;
 var delegate<OnVisualizationTrackInserted> VisualizationTrackInsertedFn;			// This method allows a visualization track that has been brought forward to modify existing tracks after being inserted into the visualization array.
 var delegate<ModifyActivatedAbilityContext> ModifyNewContextFn;
 var delegate<DamagePreviewDelegate> DamagePreviewFn;
+
+var name						MP_PerkOverride;					// The name of the SP ability this MP ability overrides and should use the perks from
 
 delegate XComGameState BuildNewGameStateDelegate(XComGameStateContext Context);
 delegate XComGameState BuildInterruptGameStateDelegate(XComGameStateContext Context, int InterruptStep, EInterruptionStatus InterruptionStatus);
@@ -440,9 +453,16 @@ simulated function ApplyCost(XComGameStateContext_Ability AbilityContext, XComGa
 		}
 	}
 
-	if (bHadActionPoints && UnitState.NumAllActionPoints() == 0)
+	if (UnitState.NumAllActionPoints() == 0)
 	{
-		`XEVENTMGR.TriggerEvent('ExhaustedActionPoints', UnitState, UnitState, NewGameState);
+		if (bHadActionPoints)
+		{
+			`XEVENTMGR.TriggerEvent('ExhaustedActionPoints', UnitState, UnitState, NewGameState);
+		}
+		else
+		{
+			`XEVENTMGR.TriggerEvent('NoActionPointsAvailable', UnitState, UnitState, NewGameState);
+		}
 	}
 
 	if (bHadAbilityCharges && kAbility.GetCharges() <= 0)
@@ -572,10 +592,12 @@ function bool ValidateTemplate(out string strError)
 
 function bool ValidateEffectList(const out array<X2Effect> Effects, out string strError)
 {
-	local X2Effect EffectIter;
+	local X2Effect EffectIter, LoopTestEffect;
 	local name DamageType;
 	local X2DamageTypeTemplate DamageTypeTemplate;
 	local X2ItemTemplateManager ItemTemplateManager;
+	local array<int> EffectsIndices;
+	local int EffectIndex;
 
 	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
 	foreach Effects(EffectIter)
@@ -587,6 +609,27 @@ function bool ValidateEffectList(const out array<X2Effect> Effects, out string s
 			{
 				strError = "Effect" @ EffectIter @ "has unknown damage type" @ DamageType;
 				return false;
+			}
+		}
+
+		// Loop over the Effects, checking that MultiTargetStatContestInfo does not introduce a loop
+		EffectsIndices.Length = 0;
+		LoopTestEffect = EffectIter;
+		EffectIndex = Effects.Find(LoopTestEffect);
+		while ((EffectIndex != INDEX_NONE) &&
+			   (LoopTestEffect.MultiTargetStatContestInfo.MaxNumberAllowed > 0))
+		{
+			if (EffectsIndices.Find(EffectIndex) != INDEX_NONE)
+			{
+				strError = "Effect" @ EffectIter @ "introduces a loop through its MultiTargetStatContestInfo";
+				return false;
+			}
+
+			EffectsIndices.AddItem(EffectIndex);
+			EffectIndex = LoopTestEffect.MultiTargetStatContestInfo.EffectIdxToApplyOnMaxExceeded;
+			if (EffectIndex != INDEX_NONE)
+			{
+				LoopTestEffect = Effects[EffectIndex];
 			}
 		}
 	}
@@ -743,6 +786,16 @@ function int GetUIStatMarkup(ECharStatType Stat)
 	return 0;
 }
 
+function name GetPerkAssociationName( )
+{
+	if (MP_PerkOverride != '')
+	{
+		return MP_PerkOverride;
+	}
+
+	return DataName;
+}
+
 DefaultProperties
 {
 	ShotHUDPriority = -1;	
@@ -762,4 +815,14 @@ DefaultProperties
 
 	ActionFireClass=class'X2Action_Fire'
 	bCausesCheckFirstSightingOfEnemyGroup=false
+
+	TargetKilledByAlienSpeech="EngagingHostiles"
+	TargetKilledByXComSpeech="TargetKilled" 
+	MultiTargetsKilledByAlienSpeech="EngagingHostiles"
+	MultiTargetsKilledByXComSpeech="MultipleTargetsKilled"
+	TargetWingedSpeech="TargetWinged"
+	TargetArmorHitSpeech="TargetArmorHit"
+	TargetMissedSpeech="TargetMissed"
+
+	bSkipPerkActivationActionsSync=true
 }

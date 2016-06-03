@@ -45,6 +45,11 @@ enum EInventorySlot
 	eInvSlot_GrenadePocket,
 	eInvSlot_CombatSim,
 	eInvSlot_AmmoPocket,
+	eInvSlot_TertiaryWeapon,
+	eInvSlot_QuaternaryWeapon,
+	eInvSlot_QuinaryWeapon,
+	eInvSlot_SenaryWeapon,
+	eInvSlot_SeptenaryWeapon,
 };
 
 enum EffectTemplateLookupType
@@ -244,6 +249,18 @@ struct native EffectResults
 	var array<name> ApplyResults;
 };
 
+struct native OverriddenEffectsInfo
+{
+	var name OverrideType;
+	var array<X2Effect> OverriddenEffects;
+	var array<X2Effect> OverriddingEffects;
+};
+
+struct native OverriddenEffectsByType
+{
+	var array<OverriddenEffectsInfo> OverrideInfo;
+};
+
 struct native PathingResultData
 {
 	var init array<GameplayTileData> PathTileData;
@@ -256,12 +273,14 @@ struct native AbilityResultContext
 	var EAbilityHitResult HitResult; //Abilities that have a ToHitCalc set will fill this with the result during their initial ContextBuildGameState
 	var ArmorMitigationResults ArmorMitigation;  //Set along with HitResult, can modify damage when effects are applied
 	var int StatContestResult;  //Potentially set along with HitResult, to show the outcome of a stat contest (e.g. Psi attacks, Tech attacks)
+	var OverriddenEffectsByType TargetEffectsOverrides;  // CURRENTLY USED PURELY TO PASS INFORMATION WHEN APPLYING THE EFFECT
 	var EffectResults ShooterEffectResults;
 	var EffectResults TargetEffectResults;
 	var array<EAbilityHitResult> MultiTargetHitResults;
 	var array<EffectResults> MultiTargetEffectResults;
 	var array<ArmorMitigationResults> MultiTargetArmorMitigation;
 	var array<int> MultiTargetStatContestResult;
+	var array<OverriddenEffectsByType> MultiTargetEffectsOverrides;
 
 	var int InterruptionStep; //If this ability was interrupted, this defines what 'step' of the ability was interrupted.
 	var class ObserverClass;  //Observer class that handled the interruption
@@ -448,10 +467,12 @@ struct native CharacterStat
 	}
 };
 
+// Current order of opperations - MODOP_Multiplication, MODOP_Addition, MODOP_PostMultiplication
 enum EStatModOp
 {
 	MODOP_Addition,
-	MODOP_Multiplication,
+	MODOP_Multiplication,   // Pre-multiplication - This is in the base game and so stays the same name.
+	MODOP_PostMultiplication,
 };
 
 struct native StatChange
@@ -776,7 +797,11 @@ struct native X2PartInfo
 	var name CharacterTemplate;
 	var name Tech;
 
-	var string PartType;	
+	//Allows body parts to belong to 'set' of parts keyed off of the torso selection
+	var array<name> SetNames;
+
+	var string PartType;
+	var string DLCName; //Name of the DLC / Mod this part is a part of
 };
 
 //End - Body part template info

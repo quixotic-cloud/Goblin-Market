@@ -334,7 +334,7 @@ function string SelectMPMapImage(string MapName, string Biome)
 //Equivalent to the parcel manager map generation process, but for strategy
 event NativeGenerateStrategyMap()
 {	
-	AddStreamingMap(class'XGBase'.default.BaseMapName, , , false, false, true, GenerateStrategyMapPhase1); //This map will load and direct the loading of additional maps
+	AddStreamingMap(class'XGBase'.default.BaseMapName, , , true, false, true, GenerateStrategyMapPhase1); //This map will load and direct the loading of additional maps
 	bSeamlessTravelBeginLoadAdditionalMaps = true;	
 }
 
@@ -366,10 +366,10 @@ function GenerateStrategyMapPhase1(name LevelPackageName, optional LevelStreamin
 
 	//Biome map
 	LoadMapName = class'XGBase'.static.GetBiomeTerrainMap();
-	AddStreamingMap(LoadMapName, vLoc, , false, false);
+	AddStreamingMap(LoadMapName, vLoc, , true, false);
 
 	//Avenger cap map
-	AddStreamingMap(class'XGBase'.default.BaseCapMapName, vLoc, , false, false);
+	AddStreamingMap(class'XGBase'.default.BaseCapMapName, vLoc, , true, false);
 		
 	//Per room maps
 	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
@@ -381,13 +381,13 @@ function GenerateStrategyMapPhase1(name LevelPackageName, optional LevelStreamin
 
 		//Basic room map
 		LoadMapName = class'XGBase'.static.GetMapname(Room);
-		AddStreamingMap(LoadMapName, vLoc, , false, true, true);
+		AddStreamingMap(LoadMapName, vLoc, , true, true, true);
 			
 		//Room animations ( personnel walking around, matinee scenes, etc. )
 		LoadMapName = class'XGBase'.static.GetAnimMapname(Room);
 		if(LoadMapName != "")
 		{
-			AddStreamingMap(LoadMapName, vLoc, , false, true, true);
+			AddStreamingMap(LoadMapName, vLoc, , true, true, true);
 		}
 
 		//See if there is a facility built in the room, and add additional maps for that
@@ -398,7 +398,7 @@ function GenerateStrategyMapPhase1(name LevelPackageName, optional LevelStreamin
 			LoadMapName = class'XGBase'.static.GetFlyInMapName(Facility);	
 			if(LoadMapName != "")
 			{
-				AddStreamingMap(LoadMapName, vLoc, , false, true, true);
+				AddStreamingMap(LoadMapName, vLoc, , true, true, true);
 			}				
 
 			//Any other maps that may be needed for unique / special cases
@@ -406,7 +406,7 @@ function GenerateStrategyMapPhase1(name LevelPackageName, optional LevelStreamin
 			{
 				if(MapInfo.MapName != "")
 				{
-					AddStreamingMap(MapInfo.MapName, vLoc, , false, true, MapInfo.InitiallyVisible);
+					AddStreamingMap(MapInfo.MapName, vLoc, , true, true, MapInfo.InitiallyVisible);
 				}
 			}
 		}
@@ -414,8 +414,8 @@ function GenerateStrategyMapPhase1(name LevelPackageName, optional LevelStreamin
 
 	//Special cinematic maps
 	vLoc = ZeroVector;
-	AddStreamingMap("CIN_PostMission1", vLoc, , false, false, , );
-	AddStreamingMap("CIN_PreMission", vLoc, , false, false, , );
+	AddStreamingMap("CIN_PostMission1", vLoc, , true, false, , );
+	AddStreamingMap("CIN_PreMission", vLoc, , true, false, , );
 
 	class'Engine'.static.GetEngine().SeamlessTravelSignalStageComplete();	
 }

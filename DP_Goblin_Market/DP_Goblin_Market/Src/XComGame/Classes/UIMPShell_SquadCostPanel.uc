@@ -94,11 +94,11 @@ function SetPlayerLoadout(XComGameState playerLoadout)
 	local XComGameState_Unit kUnit;
 	local int cost;
 
-	m_strLoadoutName = XComGameStateContext_SquadSelect(playerLoadout.GetContext()).strLoadoutName;
-	
 	cost = 0;
 	if(playerLoadout != none)
 	{
+		m_strLoadoutName = XComGameStateContext_SquadSelect(playerLoadout.GetContext()).strLoadoutName;
+		
 		foreach playerLoadout.IterateByClassType(class'XComGameState_Unit', kUnit)
 		{
 			cost += kUnit.GetUnitPointValue();

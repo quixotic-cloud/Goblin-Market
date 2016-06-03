@@ -42,10 +42,16 @@ var int m_iNumberOfHiddenCutoutActors;
 var float m_fPrimaryTraceExtents;
 var float m_fSecondaryTraceExtents;
 
+/*************** Periphery Hiding Variables ***************/
+
+var bool m_bPeripheryInitialized;
+var array<XComPeripheryHidingVolume> m_aPeripheryVolumes;
+
 /*************** Enable Flags ***************/
 
 var bool m_bEnableBuildingVisibility;
 var bool m_bEnableCutoutBox;
+var bool m_bEnablePeripheryHiding;
 
 var vector m_vCameraLocation;
 var vector m_vCutoutBoxLocation;
@@ -96,6 +102,7 @@ event bool GetDataFromScript(float DeltaTime)
 
 	m_bEnableBuildingVisibility = false;
 	m_bEnableCutoutBox = false;
+	m_bEnablePeripheryHiding = false;
 
 	// Throws accessed nones!
 	TacticalController = XComTacticalController(class'WorldInfo'.static.GetWorldInfo().GetALocalPlayerController());
@@ -114,11 +121,13 @@ event bool GetDataFromScript(float DeltaTime)
 	{
 		m_bEnableBuildingVisibility = TCM.m_bEnableBuildingVisibility_Cheat && CameraAllowsCutdown;
 		m_bEnableCutoutBox = TCM.m_bEnableCutoutBox_Cheat && CameraAllowsCutdown;
+		m_bEnablePeripheryHiding = TCM.m_bEnablePeripheryHiding_Cheat && CameraAllowsCutdown;
 	}
 	else
 	{
 		m_bEnableBuildingVisibility = CameraAllowsCutdown;
 		m_bEnableCutoutBox = CameraAllowsCutdown;
+		m_bEnablePeripheryHiding = CameraAllowsCutdown;
 	}	
 
 	CameraPOV = CameraStack.GetCameraLocationAndOrientation();
@@ -232,6 +241,9 @@ defaultproperties
 
 	m_bEnableBuildingVisibility=true
 	m_bEnableCutoutBox=true
+	m_bEnablePeripheryHiding=true
 
 	m_bIsHidingCinematicLayer=false
+
+	m_bPeripheryInitialized=false
 }

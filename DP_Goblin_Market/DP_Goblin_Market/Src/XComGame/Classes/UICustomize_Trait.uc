@@ -42,7 +42,7 @@ simulated function UpdateTrait( string _Title,
 							  optional delegate<OnItemSelectedCallback> _onConfirmButtonClicked )
 {
 	local int i;
-	local UIListItemString ListItemString;
+	local UIMechaListItem ListItem;
 	local int currentSel;
 	currentSel = _startingIndex != -1 ? _startingIndex : List.SelectedIndex;
 
@@ -52,7 +52,7 @@ simulated function UpdateTrait( string _Title,
 	List.OnSelectionChanged = _onSelectionChanged;
 	List.OnItemClicked = OnClickLocal;
 	List.OnItemDoubleClicked = OnDoubleClickLocal;
-	List.ItemPadding = 0; // List item height already accounts for padding
+	//List.ItemPadding = 0; // List item height already accounts for padding
 	OnItemClicked = _onItemClicked;
 	IsSoldierEligible = _checkSoldierEligibility;
 	StartingIndex = _startingIndex;
@@ -61,17 +61,25 @@ simulated function UpdateTrait( string _Title,
 	if(List.itemCount > Data.length)
 		List.ClearItems();
 
-	while(List.itemCount < Data.length)
-		Spawn(class'UIListItemString', List.itemContainer).InitListItem();
+	//while(List.itemCount < Data.length)
+	//	Spawn(class'UIListItemString', List.itemContainer).InitListItem();
 	
 	for( i = 0; i < Data.Length; i++ )
 	{
-		ListItemString = UIListItemString(List.GetItem(i));
-		if(ListItemString != none)
+		ListItem = GetListItem(i);
+		ListItem.SetWidth(List.Width);
+		if( ListItem != none )
 		{
-			ListItemString.SetText(Data[i]);
-			if(_ConfirmButtonLabel != "")
-				ListItemString.SetConfirmButtonStyle(eUIConfirmButtonStyle_Default, _ConfirmButtonLabel,,, ConfirmButtonClicked);
+			if( _ConfirmButtonLabel != "" )
+			{
+				ListItem.UpdateDataButton(Data[i], _ConfirmButtonLabel, ConfirmButtonClicked);
+				//ListItemString.SetConfirmButtonStyle(eUIConfirmButtonStyle_Default, _ConfirmButtonLabel, , , ConfirmButtonClicked);
+			}
+			else
+			{
+				ListItem.UpdateDataDescription(Data[i]);
+
+			}
 		}
 	}
 

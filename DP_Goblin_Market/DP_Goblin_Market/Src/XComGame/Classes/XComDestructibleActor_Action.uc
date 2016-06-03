@@ -11,7 +11,11 @@ var transient bool bActivated;
 var transient bool bNeedsTick;
 
 // Called when it is time for this event to fire
-event PreActivate()
+event PreActivate() // actions for changes to self/tile data
+{
+}
+
+event PreActivateResponse() // actions for submitting any new gamestates
 {
 }
 

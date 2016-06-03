@@ -715,22 +715,6 @@ simulated event OnConversationLoaded(SoundCue LoadedSoundCue)
 simulated function OnStreamedLevelLoaded(name LevelName, optional LevelStreaming LevelStreamedIn = new class'LevelStreaming')
 {
 	local int iIndex;
-	local CameraActor C;
-	local PlayerController Controller;	
-
-	// THIS IS A HACK. -SAB
-	if( string(LevelName) == "CIN_TP12_EtherealReveal" )
-	{
-		Controller = XComPresentationLayerBase(Outer).GetALocalPlayerController();
-
-		foreach Controller.AllActors(class'CameraActor', C)
-		{
-			if( C != none && string(C.Name) == "CameraActor_2" )
-			{
-				C.FOVAngle = 88;
-			}
-		}
-	}
 
 	if (PendingConversations.Length <= 0)
 	{
@@ -1178,7 +1162,7 @@ simulated function BeginConversation(optional bool bMuffleVOOnly = true)
 	else
 	{
 		// start audio if there is not associated dialog anim. Otherwise let the anim cue the audio ( also passes through DialogTriggerAudio
-		if(!m_arrConversations[0].bNoAudio)//  && name(m_arrConversations[0].ResolvedCue.AkEventOverride.AnimName) == '') //RAM - temp disabling of the lip sync anims
+		if(!m_arrConversations[0].bNoAudio/*  && name(m_arrConversations[0].ResolvedCue.AkEventOverride.AnimName) == ''*/)
 		{
 			DialogTriggerAudio();
 		}
@@ -1201,7 +1185,7 @@ simulated function BeginConversation(optional bool bMuffleVOOnly = true)
 			UpdateConversationDialogueBox();
 		}
 
-		//PlayAnimForConversation(); //RAM - temp disabling of the lip sync anims
+		//PlayAnimForConversation();
 
 		// If there are no audio devices,the audio component will never "finish".
 		// Because of that, we need to set a timer that goes off a little before the length of the audio

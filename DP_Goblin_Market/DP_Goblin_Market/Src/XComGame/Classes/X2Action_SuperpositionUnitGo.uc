@@ -92,7 +92,7 @@ Begin:
 	if( !bNewUnitSelected )
 	{
 		RequestLookAtCamera();
-		while( LookAtCam != None && !LookAtCam.HasArrived )
+		while( LookAtCam != None && !LookAtCam.HasArrived && LookAtCam.IsLookAtValid() )
 		{
 			Sleep(0.0);
 		}

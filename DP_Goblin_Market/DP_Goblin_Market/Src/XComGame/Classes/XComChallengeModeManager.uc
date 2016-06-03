@@ -13,6 +13,7 @@ class XComChallengeModeManager extends Object
 struct native ChallengeData
 {
 	var int TimeLimit;
+	var int PlayerSeed;
 	var array<byte> StartData;
 };
 
@@ -27,7 +28,7 @@ native final function ClearChallengeData();
 cpptext
 {
 	void Init();
-	void AddChallengeData(void* Data, int DataLenth, int TimeLimit);
+	void AddChallengeData(void* Data, int DataLenth, int TimeLimit, int PlayerSeed);
 	TArrayNoInit<BYTE>& GetChallengeStartData(int ChallengeIndex);
 }
 
@@ -141,6 +142,21 @@ function int GetSelectedChallengeTimeLimit()
 		return -1;
 `endif
 	}
+}
+
+function int FindChallengeIndex(int PlayerSeedId)
+{
+	local int Idx;
+	`log(`location @ `ShowVar(PlayerSeedId),,'FiraxisLive');
+	for( Idx = 0; Idx < Challenges.Length; ++Idx )
+	{
+		`log(`location @ `ShowVar(Challenges[Idx].PlayerSeed) @ "==" @ `ShowVar(PlayerSeedId),,'FiraxisLive');
+		if( Challenges[Idx].PlayerSeed == PlayerSeedId )
+		{
+			return Idx;
+		}
+	}
+	return -1;
 }
 
 defaultproperties

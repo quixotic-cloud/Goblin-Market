@@ -83,6 +83,13 @@ static function ParsePath(const out XComGameStateContext_Ability AbilityContext,
 			MoveSpeedModifier = 1.0f;
 		}
 
+		// gremlin flies much faster in zip mode
+		if( UnitState.GetMyTemplate().bIsCosmetic && `XPROFILESETTINGS.Data.bEnableZipMode )
+		{
+			MoveSpeedModifier *= class'X2TacticalGameRuleset'.default.ZipModeTrivialAnimSpeed;
+		}
+
+
 		//Truncate the path if the unit did not make it to their destination but is still alive. In this situation the unit should still play
 		//move end animation and generally behave as if that is what they meant to do. For other cases such as where the unit dies, the death
 		//action takes care of animations at the end of the interrupted move...
@@ -222,7 +229,6 @@ static function ParsePath(const out XComGameStateContext_Ability AbilityContext,
 			TempPoint = VisualizerHelper.InputData.MovementData[0];
 			//This unit was not seen at any point during its move, teleport to keep turn times down
 			VisualizerHelper.AddTrackAction_Teleport(LastTraversalType, TempPoint.Position, VisualizerHelper.InputData.MovementData[VisualizerHelper.InputData.MovementData.Length - 1].Position, NewDirection, 0, 0, AbilityContext, BuildTrack);
-
 		}
 		else
 		{			
@@ -230,7 +236,7 @@ static function ParsePath(const out XComGameStateContext_Ability AbilityContext,
 				MovementPathIndex == 0 &&  //For group moves, follow the first mover
 				UnitState.ReflexActionState != eReflexActionState_AIScamper && //The scamper action sequence has its own camera
 				!Unit.bNextMoveIsFollow && //A unit following another will not get a follow cam
-				class'X2TacticalVisibilityHelpers'.static.IsUnitVisibleToLocalPlayer(UnitState.ObjectID, AbilityContext.AssociatedState.HistoryIndex)) //A unit that isn't visible to the local player shouldn't frame
+				bMoveVisible) //A unit that isn't visible to the local player shouldn't frame
 			{
 				// Movement is unique in that we spawn our own frame ability camera
 				if(class'X2Camera_FollowMovingUnit'.default.UseFollowUnitCamera)
@@ -256,7 +262,7 @@ static function ParsePath(const out XComGameStateContext_Ability AbilityContext,
 			}
 
 			VisualizerHelper.AddTrackAction_BeginMove(AbilityContext, BuildTrack, MoveSpeedModifier);
-			VisualizerHelper.AddTrackActions_MoveOverPath(LastTraversalType, Point, NextPoint, NewDirection, DistanceBetweenPoints, 0, VisualizerHelper.InputData.MovementData, AbilityContext, BuildTrack, InShouldSkipStop, MoveSpeedModifier);
+			VisualizerHelper.AddTrackActions_MoveOverPath(LastTraversalType, Point, NextPoint, NewDirection, DistanceBetweenPoints, 0, VisualizerHelper.InputData.MovementData, AbilityContext, BuildTrack, InShouldSkipStop,, MoveSpeedModifier);
 
 			// MHU - Set the total path length distance into the pawn.
 			Unit.GetPawn().m_fTotalDistanceAlongPath = DistanceBetweenPoints;

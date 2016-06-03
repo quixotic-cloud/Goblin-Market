@@ -104,13 +104,16 @@ simulated state Executing
 			if( WeaponUsed != None )
 			{
 				//Use delay speech since we just called out whether we hit / missed / killed the target
-				if( WeaponUsed.Ammo == 1 )
+				if (WeaponUsed.GetItemClipSize() > 1)
 				{
-					Unit.SetTimer(2 * FRand() + 0.5f, false, 'DelayLowAmmo');
-				}
-				else if ( WeaponUsed.Ammo == 0 )
-				{
-					Unit.SetTimer(2 * FRand() + 0.5f, false, 'DelayNoAmmo');
+					if( WeaponUsed.Ammo == 1  )
+					{
+						Unit.SetTimer(2 * FRand() + 0.5f, false, 'DelayLowAmmo');
+					}
+					else if ( WeaponUsed.Ammo == 0 )
+					{
+						Unit.SetTimer(2 * FRand() + 0.5f, false, 'DelayNoAmmo');
+					}
 				}
 			}
 		}		
@@ -214,10 +217,11 @@ simulated state Executing
 		local int iNumTargetsKilled;
 		
 		local XComGameState_Unit TargetUnit;
-
+		local X2AbilityTemplate AbilityTemplate;
 
 		if (Unit.IsAlive())
 		{
+			AbilityTemplate = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager().FindAbilityTemplate(AbilityContext.InputContext.AbilityTemplateName);
 			iNumTargetsKilled = GetNumTargetsKilledInThisHistoryFrame();
 
 			// If there is a primary target, speak to that.  ELSE if multiple targets were killed, speak to that.
@@ -228,19 +232,42 @@ simulated state Executing
 				{
 					if ( Unit.GetTeam() == eTeam_Alien )
 					{
-						// Scott W. said this cue should be played when the target is killed by an alien,
-						// despite the misleading name.  mdomowicz 2015_06_29
-						Unit.UnitSpeak('EngagingHostiles');
+						if ( iNumTargetsKilled > 1 )
+						{
+							if (AbilityTemplate.MultiTargetsKilledByAlienSpeech != '')
+							{
+								Unit.UnitSpeak(AbilityTemplate.MultiTargetsKilledByAlienSpeech);
+								bSpoke = true;
+							}
+						}
+						else
+						{
+							if (AbilityTemplate.TargetKilledByAlienSpeech != '')
+							{
+								Unit.UnitSpeak(AbilityTemplate.TargetKilledByAlienSpeech);
+								bSpoke = true;
+							}
+						}
 					}
 					else if ( Unit.GetTeam() == eTeam_XCom )
 					{
 						if ( iNumTargetsKilled > 1 )
-							Unit.UnitSpeak('MultipleTargetsKilled');
+						{
+							if (AbilityTemplate.MultiTargetsKilledByXComSpeech != '')
+							{
+								Unit.UnitSpeak(AbilityTemplate.MultiTargetsKilledByXComSpeech);
+								bSpoke = true;
+							}
+						}
 						else
-							Unit.UnitSpeak('TargetKilled');
+						{
+							if (AbilityTemplate.TargetKilledByXComSpeech != '')
+							{
+								Unit.UnitSpeak(AbilityTemplate.TargetKilledByXComSpeech);
+								bSpoke = true;
+							}
+						}
 					}
-
-					bSpoke = true;
 				}
 
 				// Call out if we hit, but didn't kill
@@ -250,8 +277,11 @@ simulated state Executing
 
 					if ( ResultContext.HitResult == eHit_Graze )
 					{
-						Unit.UnitSpeak('TargetWinged');
-						bSpoke = true;
+						if (AbilityTemplate.TargetWingedSpeech != '')
+						{
+							Unit.UnitSpeak(AbilityTemplate.TargetWingedSpeech);
+							bSpoke = true;
+						}
 					}
 					else if (IsTargetDamageMitigated(AbilityContext.InputContext.PrimaryTarget.ObjectID))
 					{
@@ -259,8 +289,11 @@ simulated state Executing
 						TargetUnit = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(AbilityContext.InputContext.PrimaryTarget.ObjectID));
 						if (TargetUnit.GetArmorMitigationForUnitFlag() > 0)
 						{
-							Unit.UnitSpeak('TargetArmorHit');
-							bSpoke = true;
+							if (AbilityTemplate.TargetArmorHitSpeech != '')
+							{
+								Unit.UnitSpeak(AbilityTemplate.TargetArmorHitSpeech);
+								bSpoke = true;
+							}
 						}
 					}
 				}
@@ -268,14 +301,31 @@ simulated state Executing
 				//Call out a miss
 				else if( AbilityContext.IsResultContextMiss() )
 				{
-					Unit.UnitSpeak('TargetMissed');
-					bSpoke = true;
+					if (AbilityTemplate.TargetMissedSpeech != '')
+					{
+						Unit.UnitSpeak(AbilityTemplate.TargetMissedSpeech);
+						bSpoke = true;
+					}
 				}
 			}
 			else if( iNumTargetsKilled > 1 )
 			{
-				Unit.UnitSpeak('MultipleTargetsKilled');
-				bSpoke = true;
+				if ( Unit.GetTeam() == eTeam_Alien )
+				{
+					if (AbilityTemplate.MultiTargetsKilledByAlienSpeech != '')
+					{
+						Unit.UnitSpeak(AbilityTemplate.MultiTargetsKilledByAlienSpeech);
+						bSpoke = true;
+					}
+				}
+				else if ( Unit.GetTeam() == eTeam_XCom )
+				{
+					if (AbilityTemplate.MultiTargetsKilledByXComSpeech != '')
+					{
+						Unit.UnitSpeak(AbilityTemplate.MultiTargetsKilledByXComSpeech);
+						bSpoke = true;
+					}
+				}
 			}
 		}
 
@@ -339,6 +389,8 @@ Begin:
 	{	
 		Unit.bShouldStepOut = false;
 		AnimParams = default.AnimParams;
+		AnimParams.PlayRate = GetNonCriticalAnimationSpeed();
+
 		AnimParams.HasDesiredEndingAtom = true;
 		AnimParams.DesiredEndingAtom.Translation = Unit.RestoreLocation;
 		AnimParams.DesiredEndingAtom.Rotation = QuatFromRotator(Rotator(Unit.RestoreHeading));
@@ -372,6 +424,8 @@ Begin:
 	else
 	{
 		AnimParams = default.AnimParams;
+		AnimParams.PlayRate = GetNonCriticalAnimationSpeed();
+
 		AnimParams.HasDesiredEndingAtom = true;
 		AnimParams.DesiredEndingAtom.Translation = Unit.RestoreLocation;
 		AnimParams.DesiredEndingAtom.Rotation = QuatFromRotator(Rotator(Unit.RestoreHeading));
@@ -461,7 +515,7 @@ Begin:
 	Unit.IdleStateMachine.PlayIdleAnim();
 	if (!bInstantEnterCover)
 	{
-		Sleep(1.5f); // From Jake: Keep the focus on what we're looking at
+		Sleep(1.5f * GetDelayModifier()); // From Jake: Keep the focus on what we're looking at
 	}
 
 	if (!bInstantEnterCover)
@@ -471,7 +525,7 @@ Begin:
 			//Don't linger in the targeting camera if the character is going to start talking.
 			`CAMERASTACK.OnCinescriptAnimNotify("EnterCoverCut");
 
-			Sleep(1.25f); // let the audio finish playing. 
+			Sleep(1.25f * GetDelayModifier()); // let the audio finish playing. 
 		}
 	}
 

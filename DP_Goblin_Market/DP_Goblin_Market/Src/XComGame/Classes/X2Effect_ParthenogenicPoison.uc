@@ -4,6 +4,7 @@ var localized string ParthenogenicPoisonText;
 
 var name ParthenogenicPoisonType;
 var name ParthenogenicPoisonCocoonSpawnedName;
+var name AltUnitToSpawnName;
 
 var private name DiedWithParthenogenicPoisonTriggerName;
 
@@ -21,7 +22,7 @@ simulated protected function OnEffectAdded(const out EffectAppliedData ApplyEffe
 	HumanPawn = XComHumanPawn(XGUnit(History.GetVisualizer(TargetUnit.ObjectID)).GetPawn());
 	if( HumanPawn != None )
 	{
-		UnitToSpawnName = 'ChryssalidCocoonHuman';
+		UnitToSpawnName = AltUnitToSpawnName;
 	}
 
 	if (TargetUnit != none && !TargetUnit.IsAlive())
@@ -172,6 +173,7 @@ defaultproperties
 {
 	EffectName="ParthenogenicPoisonEffect"
 	UnitToSpawnName="ChryssalidCocoon"
+	AltUnitToSpawnName="ChryssalidCocoonHuman"
 	bClearTileBlockedByTargetUnitFlag=true
 	bCopyTargetAppearance=true
 

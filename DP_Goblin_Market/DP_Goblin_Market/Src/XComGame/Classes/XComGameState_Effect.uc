@@ -43,6 +43,71 @@ function X2Effect_Persistent GetX2Effect()
 
 function EventListenerReturn OnPlayerTurnTicked(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
 {
+	// only applicable at the end of the instigating player's turn, unless bIgnorePlayerCheckOnTick is true
+	if( GetX2Effect().FullTurnComplete(self) )
+	{			
+		InternalTickEffect(GameState);
+	}
+
+	return ELR_NoInterrupt;
+}
+
+function EventListenerReturn OnAbilityActivated(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
+{
+	local XComGameStateHistory History;
+	local XComGameStateContext_TickEffect TickContext;
+	local XComGameState_Ability AbilityState;
+	local XComGameState_Effect OriginalEffectState;
+	local int ChainStartIndex;
+
+	// only tick after the rest of the ability has resolved
+	if(GameState.GetContext().InterruptionStatus == eInterruptionStatus_Interrupt) 
+	{
+		return ELR_NoInterrupt;
+	}
+
+	// only tick if the activated ability should tick per action effects
+	AbilityState = XComGameState_Ability(EventData);
+	if(AbilityState == none || !AbilityState.GetMyTemplate().bTickPerActionEffects)
+	{
+		return ELR_NoInterrupt;
+	}
+	
+	History = `XCOMHISTORY;
+	ChainStartIndex = History.GetEventChainStartIndex();
+
+	// not if it was just applied in this chain
+	OriginalEffectState = XComGameState_Effect(History.GetOriginalGameStateRevision(ObjectID));
+	if(OriginalEffectState != none && OriginalEffectState.GetParentGameState().GetContext().EventChainStartIndex == ChainStartIndex)
+	{
+		return ELR_NoInterrupt;
+	}
+
+	// make sure we only tick the effect once per chain
+	foreach History.IterateContextsByClassType(class'XComGameStateContext_TickEffect', TickContext,, true)
+	{
+		if(TickContext.EventChainStartIndex < ChainStartIndex)
+		{
+			// we've iterated past the start of this chain, so we can stop looking.
+			// we haven't ticked yet in this chain
+			break;
+		}
+
+		if(TickContext.TickedEffect.ObjectID == self.ObjectID)
+		{
+			// this effect has already ticked once in this chain, don't do it again
+			return ELR_NoInterrupt;
+		}
+	}
+
+	InternalTickEffect(GameState);
+	return ELR_NoInterrupt;
+}
+
+// helper to prevent duplicated code between the on turn and on action tick callbacks
+// builds a new tick context and submits the results to the rules engine
+protected function InternalTickEffect(XComGameState CallbackGameState)
+{
 	local XComGameStateContext_TickEffect TickContext;
 	local XComGameState NewGameState;
 	local X2TacticalGameRuleset TacticalRules;
@@ -53,28 +118,23 @@ function EventListenerReturn OnPlayerTurnTicked(Object EventData, Object EventSo
 	// the tactical game has not ended (so poison/etc can't kill units after game end).
 	if( !bRemoved && !TacticalRules.HasTacticalGameEnded() )
 	{
-		// only applicable at the end of the instigating player's turn, unless bIgnorePlayerCheckOnTick is true
-		if( GetX2Effect().FullTurnComplete(self) )
-		{			
-			TickContext = class'XComGameStateContext_TickEffect'.static.CreateTickContext(self);
-			NewGameState = `XCOMHISTORY.CreateNewGameState(true, TickContext);
-			if( !TickEffect(NewGameState, false) )
-			{
-				RemoveEffect(NewGameState, GameState);
-			}
+		TickContext = class'XComGameStateContext_TickEffect'.static.CreateTickContext(self);
+		TickContext.SetVisualizationFence(true);
+		NewGameState = `XCOMHISTORY.CreateNewGameState(true, TickContext);
+		if( !TickEffect(NewGameState, false) )
+		{
+			RemoveEffect(NewGameState, CallbackGameState);
+		}
 
-			if( NewGameState.GetNumGameStateObjects() > 0 )
-			{
-				TacticalRules.SubmitGameState(NewGameState);
-			}
-			else
-			{
-				`XCOMHISTORY.CleanupPendingGameState(NewGameState);
-			}
+		if( NewGameState.GetNumGameStateObjects() > 0 )
+		{
+			TacticalRules.SubmitGameState(NewGameState);
+		}
+		else
+		{
+			`XCOMHISTORY.CleanupPendingGameState(NewGameState);
 		}
 	}
-
-	return ELR_NoInterrupt;
 }
 
 function EventListenerReturn OnUnitDiedOrBleedingOut(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
@@ -155,13 +215,13 @@ function EventListenerReturn OnUnitRemovedFromPlay(Object EventData, Object Even
 	return ELR_NoInterrupt;
 }
 
-
 function OnCreation(EffectAppliedData InApplyEffectParameters, GameRuleStateChange WatchRule, XComGameState NewGameState)
 {
 	local XComGameState_Effect ThisEffect;
 	local Object ThisObj;
 	local XComGameState_Player PlayerState;
 	local XComGameState_Unit SourceUnitState;
+	local XComGameState_Unit TargetUnitState;
 	local X2Effect_Persistent EffectTemplate;
 	local XComGameStateHistory History;
 	local X2EventManager EventMgr;
@@ -179,6 +239,7 @@ function OnCreation(EffectAppliedData InApplyEffectParameters, GameRuleStateChan
 
 	ApplyEffectParameters = InApplyEffectParameters;
 	iTurnsRemaining = EffectTemplate.GetStartingNumTurns(ApplyEffectParameters);
+
 	iShedChance = EffectTemplate.iInitialShedChance;
 
 	if (EffectTemplate.bStackOnRefresh)
@@ -212,13 +273,22 @@ function OnCreation(EffectAppliedData InApplyEffectParameters, GameRuleStateChan
 		}
 	}
 
-	if( WatchRule == eGameRule_PlayerTurnBegin )
+	// register for the appropriate tick events
+	TargetUnitState = XComGameState_Unit(History.GetGameStateForObjectID(ApplyEffectParameters.TargetStateObjectRef.ObjectID));
+	if(TargetUnitState != none && EffectTemplate.IsTickEveryAction(TargetUnitState))
 	{
-		EventMgr.RegisterForEvent( ThisObj, 'PlayerTurnBegun', OnPlayerTurnTicked, ELD_OnStateSubmitted,, EffectTemplate.bIgnorePlayerCheckOnTick ? none : PlayerState );
+		EventMgr.RegisterForEvent( ThisObj, 'AbilityActivated', OnAbilityActivated, ELD_OnStateSubmitted, 0, TargetUnitState );
 	}
-	else if( WatchRule == eGameRule_PlayerTurnEnd )
+	else
 	{
-		EventMgr.RegisterForEvent( ThisObj, 'PlayerTurnEnded', OnPlayerTurnTicked, ELD_OnStateSubmitted,, EffectTemplate.bIgnorePlayerCheckOnTick ? none : PlayerState );
+		if( WatchRule == eGameRule_PlayerTurnBegin )
+		{
+			EventMgr.RegisterForEvent( ThisObj, 'PlayerTurnBegun', OnPlayerTurnTicked, ELD_OnStateSubmitted,, EffectTemplate.bIgnorePlayerCheckOnTick ? none : PlayerState );
+		}
+		else if( WatchRule == eGameRule_PlayerTurnEnd )
+		{
+			EventMgr.RegisterForEvent( ThisObj, 'PlayerTurnEnded', OnPlayerTurnTicked, ELD_OnStateSubmitted,, EffectTemplate.bIgnorePlayerCheckOnTick ? none : PlayerState );
+		}
 	}
 
 	//The event manager can't handle having us registered for the same event with two different object filters.
@@ -386,7 +456,7 @@ function bool TickEffect(XComGameState NewGameState, bool FirstApplication)
 
 	EffectTemplate = GetX2Effect();
 
-	NewEffectState = XComGameState_Effect(NewGameState.CreateStateObject(class'XComGameState_Effect', ObjectID));
+	NewEffectState = XComGameState_Effect(NewGameState.CreateStateObject(Class, ObjectID));
 	NewEffectState.DamageTakenThisFullTurn = 0;
 	NewEffectState.GrantsThisTurn = 0;
 
@@ -489,10 +559,13 @@ function EventListenerReturn OnFireImmediateAbility(Object EventData, Object Eve
 					{
 						if (UnitCache.AvailableActions[i].AvailableCode == 'AA_Success')
 						{
-							EffectRemovedState = class'XComGameStateContext_EffectRemoved'.static.CreateEffectRemovedContext(self);
-							NewGameState = History.CreateNewGameState(true, EffectRemovedState);
-							RemoveEffect(NewGameState, GameState);
-							SubmitNewGameState(NewGameState);
+							if( !bRemoved )
+							{
+								EffectRemovedState = class'XComGameStateContext_EffectRemoved'.static.CreateEffectRemovedContext(self);
+								NewGameState = History.CreateNewGameState(true, EffectRemovedState);
+								RemoveEffect(NewGameState, GameState);
+								SubmitNewGameState(NewGameState);
+							}
 
 							class'XComGameStateContext_Ability'.static.ActivateAbility(UnitCache.AvailableActions[i], j);
 						}
@@ -534,7 +607,7 @@ function EventListenerReturn OnSourceUnitTookEffectDamage(Object EventData, Obje
 			SustainedEffectSourceUnit.GetUnitValue('LastEffectDamage', LastEffectDamage);
 
 			DamageTakenThisFullTurn += LastEffectDamage.fValue;
-			if (!(SustainedEffectTemplate.FragileAmount > 0 && (DamageTakenThisFullTurn > SustainedEffectTemplate.FragileAmount)))
+			if (!(SustainedEffectTemplate.FragileAmount > 0 && (DamageTakenThisFullTurn >= SustainedEffectTemplate.FragileAmount)))
 			{
 				// The sustained effect's source unit has not taken enough damge, the sustain is kept, we just break out
 				return ELR_NoInterrupt;
@@ -772,7 +845,7 @@ function EventListenerReturn CoveringFireCheck(Object EventData, Object EventSou
 			AbilityState = XComGameState_Ability(History.GetGameStateForObjectID(AbilityRef.ObjectID));
 			if (AbilityState != none)
 			{
-				if (CoveringFireEffect.GrantActionPoint != '' && CoveringFireEffect.MaxPointsPerTurn > GrantsThisTurn)
+				if (CoveringFireEffect.GrantActionPoint != '' && (CoveringFireEffect.MaxPointsPerTurn > GrantsThisTurn || CoveringFireEffect.MaxPointsPerTurn <= 0))
 				{
 					NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState(string(GetFuncName()));
 					NewEffectState = XComGameState_Effect(NewGameState.CreateStateObject(Class, ObjectID));
@@ -790,19 +863,34 @@ function EventListenerReturn CoveringFireCheck(Object EventData, Object EventSou
 					else
 					{
 						`TACTICALRULES.SubmitGameState(NewGameState);
-						AbilityContext = class'XComGameStateContext_Ability'.static.BuildContextFromAbility(AbilityState, AttackingUnit.ObjectID);
-						if( AbilityContext.Validate() )
+
+						if (CoveringFireEffect.bUseMultiTargets)
 						{
-							`TACTICALRULES.SubmitGameStateContext(AbilityContext);
+							AbilityState.AbilityTriggerAgainstSingleTarget(CoveringUnit.GetReference(), true);
+						}
+						else
+						{
+							AbilityContext = class'XComGameStateContext_Ability'.static.BuildContextFromAbility(AbilityState, AttackingUnit.ObjectID);
+							if( AbilityContext.Validate() )
+							{
+								`TACTICALRULES.SubmitGameStateContext(AbilityContext);
+							}
 						}
 					}
 				}
 				else if (AbilityState.CanActivateAbilityForObserverEvent(AttackingUnit) == 'AA_Success')
 				{
-					AbilityContext = class'XComGameStateContext_Ability'.static.BuildContextFromAbility(AbilityState, AttackingUnit.ObjectID);
-					if( AbilityContext.Validate() )
+					if (CoveringFireEffect.bUseMultiTargets)
 					{
-						`TACTICALRULES.SubmitGameStateContext(AbilityContext);
+						AbilityState.AbilityTriggerAgainstSingleTarget(CoveringUnit.GetReference(), true);
+					}
+					else
+					{
+						AbilityContext = class'XComGameStateContext_Ability'.static.BuildContextFromAbility(AbilityState, AttackingUnit.ObjectID);
+						if( AbilityContext.Validate() )
+						{
+							`TACTICALRULES.SubmitGameStateContext(AbilityContext);
+						}
 					}
 				}
 			}

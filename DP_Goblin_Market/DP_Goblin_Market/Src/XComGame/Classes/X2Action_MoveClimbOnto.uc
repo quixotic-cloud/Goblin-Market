@@ -41,6 +41,7 @@ Begin:
 	UnitPawn.EnableRMAInteractPhysics(true);
 	
 	AnimParams.AnimName = 'MV_ClimbLowObject_Up';
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
 	AnimParams.HasDesiredEndingAtom = true;
 	AnimParams.DesiredEndingAtom.Translation = Destination;
 	AnimParams.DesiredEndingAtom.Translation.Z = Unit.GetDesiredZForLocation(Destination);

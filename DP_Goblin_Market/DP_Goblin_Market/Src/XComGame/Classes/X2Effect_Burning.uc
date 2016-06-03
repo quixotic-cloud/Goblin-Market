@@ -51,6 +51,7 @@ DefaultProperties
 {
 	DamageTypes(0)="Fire"
 	DuplicateResponse=eDupe_Refresh
+	bCanTickEveryAction=true
 
 	Begin Object Class=X2Effect_ApplyWeaponDamage Name=BurnDamage
 	End Object

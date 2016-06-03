@@ -471,7 +471,17 @@ enum EAchievementType
 	AT_TripleKill,						// Kill 3 enemies in a single turn, with a single soldier, without explosives
 	AT_IronMan,							// Beat the game on Classic+ difficulty in Ironman mode	
 
-	AT_DLC0,							// START OF 1ST DLC ACHIEVEMENTS
+	// DLC 2 - Alien Hunters Achievements
+	AT_CompleteAlienNest,				// Complete the Alien Nest mission
+	AT_KillViperKing,					// Kill the Viper King
+	AT_KillBerserkerQueen,				// Kill the Berserker Queen
+	AT_KillArchonKing,					// Kill the Archon King
+	AT_KillAllRulers,				// Kill all three alien rulers in one game
+	AT_BuyAllHunterWeapons,				// Purchase the final tier Hunter Weapons
+	AT_UseAllRulerArmorAbilities,		// Use all three alien ruler armor abilities in a single mission
+	AT_UseRulerArmorAbilityOnRuler,		// Use an alien ruler armor ability against an alien ruler
+	AT_KillRulerFirstEncounter,	// Kill an alien ruler the first time you encounter it
+	AT_KillRulerDuringEscape,		// Kill an alien ruler during its reaction move as it tries to escape
 };
 
 // STYLING 

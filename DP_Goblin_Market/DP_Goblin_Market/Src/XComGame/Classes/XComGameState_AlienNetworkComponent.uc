@@ -122,7 +122,7 @@ function bool Update(XComGameState NewGameState)
 	bUpdated = false;
 	
 	// Do not modify doom while the Avenger or Skyranger are flying, or if another popup is already being presented
-	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.IsCurrentClass(class'UIAlert'))
 	{
 		if (class'X2StrategyGameRulesetDataStructures'.static.LessThan(DoomProjectIntervalEndTime, `STRATEGYRULES.GameTime))
 		{

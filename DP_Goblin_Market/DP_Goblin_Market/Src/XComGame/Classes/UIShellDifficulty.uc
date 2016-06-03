@@ -20,13 +20,13 @@ var localized string m_strDifficultyEnableTutorial;
 var localized string m_strDifficultyEnableProgeny;
 var localized string m_strDifficultyEnableSlingshot;
 var localized string m_strDifficultyEnableIronman;
-var localized string m_strDifficultySuppressFirstTimeNarrativeVO; 
+var localized string m_strDifficultySuppressFirstTimeNarrativeVO;
 
 var localized string m_strDifficultyTutorialDesc;
 var localized string m_strDifficultyProgenyDesc;
 var localized string m_strDifficultySlingshotDesc;
 var localized string m_strDifficultyIronmanDesc;
-var localized string m_strDifficultySuppressFirstTimeNarrativeVODesc; 
+var localized string m_strDifficultySuppressFirstTimeNarrativeVODesc;
 
 var localized string m_strDifficulty_Back;
 var localized string m_strDifficulty_ToggleAdvanced;
@@ -74,7 +74,7 @@ var UILargeButton    m_StartButton;
 var UIMechaListItem  m_TutorialMechaItem;
 var UIMechaListItem  m_FirstTimeVOMechaItem;
 var UIMechaListItem  m_SubtitlesMechaItem;
-var UIButton		 m_TutorialButton; 
+var UIButton		 m_TutorialButton;
 
 var int  m_iSelectedDifficulty;
 
@@ -86,17 +86,19 @@ var bool m_bShowedFirstTimeTutorialNotice;
 var bool m_bShowedFirstTimeChangeDifficultyWarning;
 var bool m_bCompletedControlledGame;
 var bool m_bReceivedIronmanWarning;
-		 
+
 var bool m_bSaveInProgress;
 
 var bool m_bIsPlayingGame;
 var bool m_bViewingAdvancedOptions;
 
-var int m_iOptIronMan; 
+var int m_iOptIronMan;
 var int m_iOptTutorial;
 var int m_iOptProgeny;
 var int m_iOptSlingshot;
 var int m_iOptFirstTimeNarrative;
+
+var array<name> EnabledOptionalNarrativeDLC;
 
 var UIShellStrategy DevStrategyShell;
 
@@ -143,11 +145,11 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	m_CancelButton.InitButton('difficultyCancelButton', m_strDifficulty_Back, OnButtonCancel);
 	m_Cancelbutton.DisableNavigation();
 
-	m_StartButton = Spawn(class'UILargeButton', self);	
+	m_StartButton = Spawn(class'UILargeButton', self);
 	strDifficultyAccept = (m_bIsPlayingGame) ? m_strChangeDifficulty : m_strDifficulty_Accept;
 	m_StartButton.InitLargeButton('difficultyLaunchButton', strDifficultyAccept, "", UIIronMan);
 	//m_StartButton.SetY(405);
-	
+
 	// These player profile flags will change what options are defaulted when this menu comes up
 	// SCOTT RAMSAY/RYAN BAKER: Has the player ever completed the strategy tutorial?
 	m_bCompletedControlledGame = true; // `BATTLE.STAT_GetProfileStat(eProfile_TutorialComplete) > 0; // Ryan Baker - Hook up when we are ready.
@@ -163,7 +165,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 		m_bControlledStart = false; // disable the tutorial
 		OnDifficultyConfirm(m_StartButton);
 	}
-	
+
 	Navigator.SetSelected(m_StartButton);
 	m_List.Navigator.SetSelected(m_List.GetItem(m_List.SelectedIndex));
 }
@@ -175,7 +177,7 @@ simulated function InitChecboxValues()
 
 	History = `XCOMHISTORY;
 
-	CampaignSettingsStateObject = XComGameState_CampaignSettings(History.GetSingleGameStateObjectForClass(class'XComGameState_CampaignSettings', true));
+		CampaignSettingsStateObject = XComGameState_CampaignSettings(History.GetSingleGameStateObjectForClass(class'XComGameState_CampaignSettings', true));
 
 	m_bShowedFirstTimeTutorialNotice = `XPROFILESETTINGS.Data.m_bPlayerHasUncheckedBoxTutorialSetting;
 
@@ -196,7 +198,7 @@ simulated function InitChecboxValues()
 //
 simulated function OnInit()
 {
-	super.OnInit();	
+	super.OnInit();
 
 	SetX(500);
 	BuildMenu();
@@ -207,24 +209,24 @@ simulated function OnInit()
 simulated function bool OnUnrealCommand(int cmd, int arg)
 {
 	local bool bHandled;
-	local UIPanel CurrentSelection; 
+	local UIPanel CurrentSelection;
 
-	if ( !CheckInputIsReleaseOrDirectionRepeat(cmd, arg) )
+	if(!CheckInputIsReleaseOrDirectionRepeat(cmd, arg))
 		return true;
 
-	if( m_bSaveInProgress ) 
+	if(m_bSaveInProgress)
 	{
 		Movie.Pres.PlayUISound(eSUISound_MenuClose);
 		return true;
 	}
-	
-	switch( cmd )
+
+	switch(cmd)
 	{
 	case class'UIUtilities_Input'.const.FXS_KEY_ENTER:
 	case class'UIUtilities_Input'.const.FXS_BUTTON_START:
 
 		CurrentSelection = Navigator.GetSelected();
-		if( CurrentSelection != None )
+		if(CurrentSelection != None)
 		{
 			bHandled = CurrentSelection.OnUnrealCommand(cmd, arg);
 		}
@@ -272,14 +274,14 @@ simulated function BuildMenu()
 	// Title
 	strDifficultyTitle = (m_bIsPlayingGame) ? m_strChangeDifficulty : m_strSelectDifficulty;
 	strDifficultyAccept = (m_bIsPlayingGame) ? m_strChangeDifficulty : m_strDifficulty_Accept;
-	AS_SetDifficultyMenu( strDifficultyTitle, m_strDifficulty_ToggleAdvanced, m_strDifficulty_SecondWaveButtonLabel, strDifficultyAccept, m_strDifficulty_Back );
+	AS_SetDifficultyMenu(strDifficultyTitle, m_strDifficulty_ToggleAdvanced, m_strDifficulty_SecondWaveButtonLabel, strDifficultyAccept, m_strDifficulty_Back);
 
-	if( Movie.Pres.m_eUIMode == eUIMode_Shell ) 
+	if(Movie.Pres.m_eUIMode == eUIMode_Shell)
 		m_iSelectedDifficulty = 1; //Default to normal 
 	else
 		m_iSelectedDifficulty = `DIFFICULTYSETTING;  //Get the difficulty from the game
 
-	while (m_List.itemCount < m_arrDifficultyTypeStrings.Length)
+	while(m_List.itemCount < m_arrDifficultyTypeStrings.Length)
 	{
 		SpawnedItem = Spawn(class'UIMechaListItem', m_List.ItemContainer);
 		SpawnedItem.bAnimateOnInit = false;
@@ -297,15 +299,15 @@ simulated function BuildMenu()
 
 	m_FirstTimeVOMechaItem.UpdateDataCheckbox(m_strDifficultySuppressFirstTimeNarrativeVO, "", m_bFirstTimeNarrative, UpdateFirstTimeNarrative, OnClickFirstTimeVO);
 	m_FirstTimeVOMechaItem.Checkbox.SetReadOnly(m_bIsPlayingGame);
-	m_FirstTimeVOMechaItem.BG.SetTooltipText(m_strDifficultySuppressFirstTimeNarrativeVODesc, , , 10, ,, , 0.0f);
+	m_FirstTimeVOMechaItem.BG.SetTooltipText(m_strDifficultySuppressFirstTimeNarrativeVODesc, , , 10, , , , 0.0f);
 	UpdateFirstTimeNarrative(m_FirstTimeVOMechaItem.Checkbox);
 
 	m_TutorialMechaItem.UpdateDataCheckbox(m_strDifficultyEnableTutorial, "", m_bControlledStart, ConfirmControlDialogue, OnClickedTutorial);
 	m_TutorialMechaItem.Checkbox.SetReadOnly(m_bIsPlayingGame);
-	m_TutorialMechaItem.BG.SetTooltipText(m_strDifficultyTutorialDesc,,, 10,,,, 0.0f);
+	m_TutorialMechaItem.BG.SetTooltipText(m_strDifficultyTutorialDesc, , , 10, , , , 0.0f);
 
-	m_SubtitlesMechaItem.UpdateDataCheckbox(class'UIOptionsPCScreen'.default.m_strInterfaceLabel_ShowSubtitles,"", `XPROFILESETTINGS.Data.m_bSubtitles, UpdateSubtitles, OnClickSubtitles);
-	m_SubtitlesMechaItem.BG.SetTooltipText(class'UIOptionsPCScreen'.default.m_strInterfaceLabel_ShowSubtitles_Desc,,, 10,,,, 0.0f);
+	m_SubtitlesMechaItem.UpdateDataCheckbox(class'UIOptionsPCScreen'.default.m_strInterfaceLabel_ShowSubtitles, "", `XPROFILESETTINGS.Data.m_bSubtitles, UpdateSubtitles, OnClickSubtitles);
+	m_SubtitlesMechaItem.BG.SetTooltipText(class'UIOptionsPCScreen'.default.m_strInterfaceLabel_ShowSubtitles_Desc, , , 10, , , , 0.0f);
 
 	if(m_bIsPlayingGame)
 	{
@@ -342,21 +344,21 @@ simulated function OnClickSubtitles()
 // Lower pause screen
 simulated public function OnUCancel()
 {
-	if( bIsInited && !IsTimerActive(nameof(StartIntroMovie)))
+	if(bIsInited && !IsTimerActive(nameof(StartIntroMovie)))
 	{
 		Movie.Pres.PlayUISound(eSUISound_MenuClose);
 		`XPROFILESETTINGS.Data.ClearGameplayOptions();  // These are set on the player profile, so we should clear them for next time...
-		Movie.Stack.Pop(self); 
+		Movie.Stack.Pop(self);
 	}
 }
 
 simulated public function OnButtonCancel(UIButton ButtonControl)
 {
-	if( bIsInited && !IsTimerActive(nameof(StartIntroMovie)))
+	if(bIsInited && !IsTimerActive(nameof(StartIntroMovie)))
 	{
 		Movie.Pres.PlayUISound(eSUISound_MenuClose);
 		`XPROFILESETTINGS.Data.ClearGameplayOptions();  // These are set on the player profile, so we should clear them for next time...
-		Movie.Stack.Pop(self); 
+		Movie.Stack.Pop(self);
 	}
 }
 
@@ -364,7 +366,7 @@ simulated function ConfirmTutorialDialogue(UIButton ButtonControl)
 {
 	if(m_iSelectedDifficulty >= eDifficulty_Classic)
 	{
-		if( ButtonControl.IsSelected && !m_bIsPlayingGame )
+		if(ButtonControl.IsSelected && !m_bIsPlayingGame)
 			ShowSimpleDialog(m_strInvalidTutorialClassicDifficulty);
 
 		ForceTutorialOff();
@@ -377,13 +379,13 @@ simulated function ConfirmTutorialDialogue(UIButton ButtonControl)
 
 	m_bControlledStart = !ButtonControl.IsSelected;
 	ButtonControl.SetSelected(m_bControlledStart);
-	if( m_bControlledStart )
+	if(m_bControlledStart)
 	{
-		`XPROFILESETTINGS.Data.SetGameplayOption( eGO_Marathon, false );    // Marathon and tutorial don't play nice
+		`XPROFILESETTINGS.Data.SetGameplayOption(eGO_Marathon, false);    // Marathon and tutorial don't play nice
 	}
 	else
 	{
-		if( `XPROFILESETTINGS.Data.m_bPlayerHasUncheckedBoxTutorialSetting == false )
+		if(`XPROFILESETTINGS.Data.m_bPlayerHasUncheckedBoxTutorialSetting == false)
 		{
 			`XPROFILESETTINGS.Data.m_bPlayerHasUncheckedBoxTutorialSetting = true; //Only allow this to be activate for this profile, never toggled back. 
 			SaveSettings();
@@ -399,13 +401,13 @@ simulated function ConfirmFirstTimeVODialogue(UIButton ButtonControl)
 
 /*simulated function OnShowGameplayToggles()
 {
-	XComPresentationLayerBase(Owner).UISecondWave();
+XComPresentationLayerBase(Owner).UISecondWave();
 }*/
 
 simulated function OnDifficultyDoubleClick(UIList ContainerList, int ItemIndex)
 {
 	local UICheckbox checkedBox;
-	if( `ONLINEEVENTMGR.bTutorial && ItemIndex >= eDifficulty_Classic) 
+	if(`ONLINEEVENTMGR.bTutorial && ItemIndex >= eDifficulty_Classic)
 	{
 		return;
 	}
@@ -425,10 +427,10 @@ simulated public function OnDifficultySelect(UICheckbox CheckboxControl)
 		//we just checked on a new difficulty
 		if(i != m_iSelectedDifficulty && CheckboxControl.bChecked)
 		{
-			if( `REPLAY.bInTutorial && i >= eDifficulty_Classic) 
+			if(`REPLAY.bInTutorial && i >= eDifficulty_Classic)
 			{
 				//Stop that! We don't let you switch to classic mode while the tutorial is in progress 				
-				UIMechaListItem(m_List.GetItem(m_iSelectedDifficulty)).Checkbox.SetChecked( true);
+				UIMechaListItem(m_List.GetItem(m_iSelectedDifficulty)).Checkbox.SetChecked(true);
 				UIMechaListItem(m_List.GetItem(i)).Checkbox.SetChecked(false);
 				Movie.Pres.PlayUISound(eSUISound_MenuClose);
 				return;
@@ -436,7 +438,7 @@ simulated public function OnDifficultySelect(UICheckbox CheckboxControl)
 			else
 			{
 				UIMechaListItem(m_List.GetItem(m_iSelectedDifficulty)).Checkbox.SetChecked(false);
-				
+
 				m_iSelectedDifficulty = i;
 				if(m_iSelectedDifficulty >= eDifficulty_Classic)
 					ForceTutorialOff();
@@ -457,22 +459,24 @@ simulated public function OnDifficultyConfirm(UIButton ButtonControl)
 	local XComGameStateHistory History;
 	local XComGameState StrategyStartState, NewGameState;
 	local XComGameState_CampaignSettings CampaignSettingsStateObject;
-	local XComGameState_Objective ObjectiveState;	
-	local bool EnableTutorial;		
-	
+	local XComGameState_Objective ObjectiveState;
+	local XComOnlineEventMgr EventManager;
+	local bool EnableTutorial;
+	local int idx;
+
 	//BAIL if the save is in progress. 
-	if( m_bSaveInProgress && Movie.Pres.m_kProgressDialogStatus == eProgressDialog_None ) 
+	if(m_bSaveInProgress && Movie.Pres.m_kProgressDialogStatus == eProgressDialog_None)
 	{
-		WaitingForSaveToCompletepProgressDialog(); 
+		WaitingForSaveToCompletepProgressDialog();
 		return;
 	}
 
 	History = `XCOMHISTORY;
 
-	//This popup should only be triggered when you are in the shell == not playing the game, and difficulty set to less than classic. 
-	if( !m_bIsPlayingGame && !m_bShowedFirstTimeTutorialNotice && !m_TutorialMechaItem.Checkbox.bChecked && !m_bIronmanFromShell  && m_iSelectedDifficulty < eDifficulty_Classic )
+		//This popup should only be triggered when you are in the shell == not playing the game, and difficulty set to less than classic. 
+	if(!m_bIsPlayingGame && !m_bShowedFirstTimeTutorialNotice && !m_TutorialMechaItem.Checkbox.bChecked && !m_bIronmanFromShell  && m_iSelectedDifficulty < eDifficulty_Classic)
 	{
-		if( DevStrategyShell == none || !DevStrategyShell.m_bCheatStart )
+		if(DevStrategyShell == none || !DevStrategyShell.m_bCheatStart)
 		{
 			PlaySound(SoundCue'SoundUI.HUDOnCue');
 
@@ -487,12 +491,12 @@ simulated public function OnDifficultyConfirm(UIButton ButtonControl)
 			return;
 		}
 	}
-	
+
 	CampaignSettingsStateObject = XComGameState_CampaignSettings(History.GetSingleGameStateObjectForClass(class'XComGameState_CampaignSettings', true));
-	
+
 	// Warn if the difficulty level is changing, that this could invalidate the ability to earn certain achievements.
-	if (CampaignSettingsStateObject != none && m_bIsPlayingGame && !m_bShowedFirstTimeChangeDifficultyWarning &&
-	    (CampaignSettingsStateObject.LowestDifficultySetting >= 2 || m_iSelectedDifficulty >= 2)) // is Classic or will become Classic or higher difficulty (where achievements based on difficulty kick-in)
+	if(CampaignSettingsStateObject != none && m_bIsPlayingGame && !m_bShowedFirstTimeChangeDifficultyWarning &&
+	   (CampaignSettingsStateObject.LowestDifficultySetting >= 2 || m_iSelectedDifficulty >= 2)) // is Classic or will become Classic or higher difficulty (where achievements based on difficulty kick-in)
 	{
 		PlaySound(SoundCue'SoundUI.HUDOnCue');
 
@@ -506,14 +510,14 @@ simulated public function OnDifficultyConfirm(UIButton ButtonControl)
 		Movie.Pres.UIRaiseDialog(kDialogData);
 		return;
 	}
-	
+
 	Movie.Pres.PlayUISound(eSUISound_MenuSelect);
-	
-	if( m_bIsPlayingGame )
+
+	if(m_bIsPlayingGame)
 	{
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Changing User-Selected Difficulty to " $ m_iSelectedDifficulty);
 
-		CampaignSettingsStateObject = XComGameState_CampaignSettings(History.GetSingleGameStateObjectForClass(class'XComGameState_CampaignSettings'));		
+		CampaignSettingsStateObject = XComGameState_CampaignSettings(History.GetSingleGameStateObjectForClass(class'XComGameState_CampaignSettings'));
 		CampaignSettingsStateObject = XComGameState_CampaignSettings(NewGameState.CreateStateObject(class'XComGameState_CampaignSettings', CampaignSettingsStateObject.ObjectID));
 		CampaignSettingsStateObject.SetDifficulty(m_iSelectedDifficulty, m_bIsPlayingGame);
 		NewGameState.AddStateObject(CampaignSettingsStateObject);
@@ -522,7 +526,7 @@ simulated public function OnDifficultyConfirm(UIButton ButtonControl)
 
 		Movie.Stack.Pop(self);
 	}
-	else 
+	else
 	{
 		EnableTutorial = m_iSelectedDifficulty < eDifficulty_Classic && m_bControlledStart;
 
@@ -531,7 +535,7 @@ simulated public function OnDifficultyConfirm(UIButton ButtonControl)
 		if(!EnableTutorial || (DevStrategyShell != none && DevStrategyShell.m_bSkipFirstTactical))
 		{
 			//We're starting a new campaign, set it up
-			StrategyStartState = class'XComGameStateContext_StrategyGameRule'.static.CreateStrategyGameStart(, , EnableTutorial, m_iSelectedDifficulty, m_bFirstTimeNarrative);
+			StrategyStartState = class'XComGameStateContext_StrategyGameRule'.static.CreateStrategyGameStart(, , EnableTutorial, m_iSelectedDifficulty, m_bFirstTimeNarrative, EnabledOptionalNarrativeDLC);
 
 			// The CampaignSettings are initialized in CreateStrategyGameStart, so we can pull it from the history here
 			CampaignSettingsStateObject = XComGameState_CampaignSettings(History.GetSingleGameStateObjectForClass(class'XComGameState_CampaignSettings'));
@@ -562,10 +566,10 @@ simulated public function OnDifficultyConfirm(UIButton ButtonControl)
 					}
 				}
 			}
-		}		
+		}
 
 		X2ImageCaptureManager(`XENGINE.GetImageCaptureManager()).ClearStore();
-		
+
 		//Let the screen fade into the intro
 		SetTimer(0.6f, false, nameof(StartIntroMovie));
 		class'WorldInfo'.static.GetWorldInfo().GetALocalPlayerController().ClientSetCameraFade(true, MakeColor(0, 0, 0), vect2d(0, 1), 0.5);
@@ -574,22 +578,29 @@ simulated public function OnDifficultyConfirm(UIButton ButtonControl)
 		{
 			//Controlled Start / Demo Direct
 			`XCOMHISTORY.ResetHistory();
-			`ONLINEEVENTMGR.bTutorial = true;
-			`ONLINEEVENTMGR.bInitiateReplayAfterLoad = true;
+			EventManager = `ONLINEEVENTMGR;
+				EventManager.bTutorial = true;
+			EventManager.bInitiateReplayAfterLoad = true;
 
 			// Save campaign settings			
-			`ONLINEEVENTMGR.CampaignDifficultySetting = m_iSelectedDifficulty;
-			`ONLINEEVENTMGR.CampaignLowestDifficultySetting = m_iSelectedDifficulty;
-			`ONLINEEVENTMGR.CampaignbIronmanEnabled = m_bIronmanFromShell;
-			`ONLINEEVENTMGR.CampaignbTutorialEnabled = true;
-			`ONLINEEVENTMGR.CampaignbSuppressFirstTimeNarrative = m_bFirstTimeNarrative;
-			
+			EventManager.CampaignDifficultySetting = m_iSelectedDifficulty;
+			EventManager.CampaignLowestDifficultySetting = m_iSelectedDifficulty;
+			EventManager.CampaignbIronmanEnabled = m_bIronmanFromShell;
+			EventManager.CampaignbTutorialEnabled = true;
+			EventManager.CampaignbSuppressFirstTimeNarrative = m_bFirstTimeNarrative;
+			EventManager.CampaignOptionalNarrativeDLC = EnabledOptionalNarrativeDLC;
+
+			for(idx = EventManager.GetNumDLC() - 1; idx >= 0; idx--)
+			{
+				EventManager.CampaignRequiredDLC.AddItem(EventManager.GetDLCNames(idx));
+			}
+
 
 			SetTimer(1.0f, false, nameof(LoadTutorialSave));
 		}
 		else
-		{			
-			SetTimer(1.0f, false, nameof(DeferredConsoleCommand));	
+		{
+			SetTimer(1.0f, false, nameof(DeferredConsoleCommand));
 		}
 	}
 }
@@ -599,7 +610,7 @@ function StartIntroMovie()
 	local XComEngine Engine;
 
 	Engine = `XENGINE;
-	Engine.PlaySpecificLoadingMovie("CIN_TP_Intro.bk2", "X2_001_Intro"); //Play the intro movie as a loading screen
+		Engine.PlaySpecificLoadingMovie("CIN_TP_Intro.bk2", "X2_001_Intro"); //Play the intro movie as a loading screen
 	Engine.PlayLoadMapMovie(-1);
 }
 
@@ -630,57 +641,64 @@ simulated function CloseSaveProgressDialog()
 
 
 //------------------------------------------------------
-function UIIronMan(UIButton ButtonControl) 
+function UIIronMan(UIButton ButtonControl)
 {
-	if(m_bIsPlayingGame || m_bControlledStart) // Ironman and tutorial do not mix
+	if( m_bIsPlayingGame )
 	{
 		OnDifficultyConfirm(ButtonControl);
 	}
-	else
+	else 
 	{
-		Movie.Pres.UIIronMan();
+		if( m_bControlledStart ) // Ironman and tutorial do not mix
+		{
+			Movie.Pres.UIShellNarrativeContent();
+		}
+		else
+		{
+			Movie.Pres.UIIronMan();
+		}
 	}
 }
 
 
-function ConfirmIronmanDialogue(UIButton ButtonControl) 
+function ConfirmIronmanDialogue(UIButton ButtonControl)
 {
 	local TDialogueBoxData kDialogData;
 
-	PlaySound( SoundCue'SoundUI.HUDOnCue' );
+	PlaySound(SoundCue'SoundUI.HUDOnCue');
 
-	kDialogData.eType       = eDialog_Normal;
-	kDialogData.strTitle    = m_strIronmanTitle;
-	kDialogData.strText     = m_strIronmanBody;
-	kDialogData.strAccept   = m_strIronmanOK;
-	kDialogData.strCancel   = m_strIronmanCancel;
-	kDialogData.fnCallback  = ConfirmIronmanCallback;
+	kDialogData.eType = eDialog_Normal;
+	kDialogData.strTitle = m_strIronmanTitle;
+	kDialogData.strText = m_strIronmanBody;
+	kDialogData.strAccept = m_strIronmanOK;
+	kDialogData.strCancel = m_strIronmanCancel;
+	kDialogData.fnCallback = ConfirmIronmanCallback;
 
-	Movie.Pres.UIRaiseDialog( kDialogData );
+	Movie.Pres.UIRaiseDialog(kDialogData);
 	Show();
 }
 
 simulated public function ConfirmIronmanCallback(eUIAction eAction)
 {
-	if (eAction == eUIAction_Accept)
+	if(eAction == eUIAction_Accept)
 	{
-		PlaySound( SoundCue'SoundUI.OverWatchCue' );
-			
+		PlaySound(SoundCue'SoundUI.OverWatchCue');
+
 	}
-	else if( eAction == eUIAction_Cancel )
+	else if(eAction == eUIAction_Cancel)
 	{
-		PlaySound( SoundCue'SoundUI.HUDOffCue' ); 	
+		PlaySound(SoundCue'SoundUI.HUDOffCue');
 	}
-	
+
 	UpdateIronman(eAction == eUIAction_Accept);
 	OnDifficultyConfirm(m_StartButton);
 }
 
 //------------------------------------------------------
-function ConfirmControlDialogue(UICheckbox CheckboxControl) 
+function ConfirmControlDialogue(UICheckbox CheckboxControl)
 {
 	local TDialogueBoxData kDialogData;
-	
+
 	// Can't enable any of the tutorial options with classic difficulty selected
 	if(m_iSelectedDifficulty >= eDifficulty_Classic)
 	{
@@ -694,18 +712,18 @@ function ConfirmControlDialogue(UICheckbox CheckboxControl)
 	}
 
 	//Only trigger the message when turning this off.
-	if( !CheckboxControl.bChecked )
+	if(!CheckboxControl.bChecked)
 	{
-		PlaySound( SoundCue'SoundUI.HUDOnCue' );
+		PlaySound(SoundCue'SoundUI.HUDOnCue');
 
-		kDialogData.eType       = eDialog_Normal;
-		kDialogData.strTitle    = m_strControlTitle;
-		kDialogData.strText     = m_strControlBody;
-		kDialogData.strAccept   = m_strControlOK;
-		kDialogData.strCancel   = m_strControlCancel;
-		kDialogData.fnCallback  = ConfirmControlCallback;
+		kDialogData.eType = eDialog_Normal;
+		kDialogData.strTitle = m_strControlTitle;
+		kDialogData.strText = m_strControlBody;
+		kDialogData.strAccept = m_strControlOK;
+		kDialogData.strCancel = m_strControlCancel;
+		kDialogData.fnCallback = ConfirmControlCallback;
 
-		Movie.Pres.UIRaiseDialog( kDialogData );
+		Movie.Pres.UIRaiseDialog(kDialogData);
 	}
 	else
 	{
@@ -718,23 +736,23 @@ simulated public function ConfirmControlCallback(eUIAction eAction)
 	local UICheckbox kCheckbox;
 	local array<string> mouseOutArgs;
 
-	PlaySound( SoundCue'SoundUI.HUDOffCue' );
+	PlaySound(SoundCue'SoundUI.HUDOffCue');
 	kCheckBox = m_TutorialMechaItem.Checkbox;
 
 	mouseOutArgs.AddItem("");
 
 	kCheckbox.OnMouseEvent(class'UIUtilities_Input'.const.FXS_L_MOUSE_OUT, mouseOutArgs);
 	//Only trigger the message when turning this off.
-	if( !kCheckBox.bChecked )
+	if(!kCheckBox.bChecked)
 	{
-		if( eAction == eUIAction_Cancel )
+		if(eAction == eUIAction_Cancel)
 		{
-			kCheckbox.SetChecked(true); 	
-			`XPROFILESETTINGS.Data.SetGameplayOption( eGO_Marathon, false );    // Marathon and tutorial don't play nice
+			kCheckbox.SetChecked(true);
+			`XPROFILESETTINGS.Data.SetGameplayOption(eGO_Marathon, false);    // Marathon and tutorial don't play nice
 			Movie.Pres.m_kGameToggles.UpdateData();
 		}
-		
-		UpdateTutorial(kCheckBox); 
+
+		UpdateTutorial(kCheckBox);
 	}
 	else
 	{
@@ -744,21 +762,21 @@ simulated public function ConfirmControlCallback(eUIAction eAction)
 
 simulated public function ConfirmFirstTimeTutorialCheckCallback(eUIAction eAction)
 {
-	PlaySound( SoundCue'SoundUI.HUDOffCue' ); 
+	PlaySound(SoundCue'SoundUI.HUDOffCue');
 
-	if (eAction == eUIAction_Accept)
+	if(eAction == eUIAction_Accept)
 	{
-		if( !m_TutorialMechaItem.Checkbox.bChecked )
+		if(!m_TutorialMechaItem.Checkbox.bChecked)
 			OnClickedTutorial();
 
 		m_bControlledStart = true;
-		`XPROFILESETTINGS.Data.SetGameplayOption( eGO_Marathon, false );    // Marathon and tutorial don't play nice
-		if( Movie.Pres.m_kGameToggles != none )
+		`XPROFILESETTINGS.Data.SetGameplayOption(eGO_Marathon, false);    // Marathon and tutorial don't play nice
+		if(Movie.Pres.m_kGameToggles != none)
 			Movie.Pres.m_kGameToggles.UpdateData();
 	}
 	else
 	{
-		m_bControlledStart = false; 
+		m_bControlledStart = false;
 	}
 	// Don't need to set Checkbox to false, this popup won't show up if it's set to true - sbatista 6/26/13
 
@@ -770,7 +788,7 @@ simulated public function ConfirmChangeDifficultySettingCallback(eUIAction eActi
 {
 	PlaySound(SoundCue'SoundUI.HUDOffCue');
 
-	if (eAction == eUIAction_Accept)
+	if(eAction == eUIAction_Accept)
 	{
 		m_bShowedFirstTimeChangeDifficultyWarning = true;
 		OnDifficultyConfirm(m_StartButton);
@@ -782,11 +800,11 @@ simulated public function ConfirmChangeDifficultySettingCallback(eUIAction eActi
 simulated function ForceTutorialOff()
 {
 	m_bControlledStart = false;
-	
+
 	//Refresh check this way, to not trigger the popups
 	m_TutorialMechaItem.Checkbox.SetChecked(false);
-	
-	if( !m_bIsPlayingGame )
+
+	if(!m_bIsPlayingGame)
 	{
 		m_TutorialMechaItem.Checkbox.SetReadOnly(true);
 	}
@@ -794,7 +812,7 @@ simulated function ForceTutorialOff()
 
 simulated function GrantTutorialReadAccess()
 {
-	if( !m_bIsPlayingGame )
+	if(!m_bIsPlayingGame)
 	{
 		m_TutorialMechaItem.Checkbox.SetReadOnly(false);
 	}
@@ -805,7 +823,7 @@ simulated function UpdateTutorial(UICheckbox CheckboxControl)
 	// Can't enable any of the tutorial options with classic difficulty selected
 	if(m_iSelectedDifficulty >= eDifficulty_Classic)
 	{
-		if( CheckboxControl.bChecked && !m_bIsPlayingGame )
+		if(CheckboxControl.bChecked && !m_bIsPlayingGame)
 			ShowSimpleDialog(m_strInvalidTutorialClassicDifficulty);
 
 		ForceTutorialOff();
@@ -817,13 +835,13 @@ simulated function UpdateTutorial(UICheckbox CheckboxControl)
 	}
 
 	m_bControlledStart = CheckboxControl.bChecked;
-	if( m_bControlledStart )
+	if(m_bControlledStart)
 	{
-		`XPROFILESETTINGS.Data.SetGameplayOption( eGO_Marathon, false );    // Marathon and tutorial don't play nice
+		`XPROFILESETTINGS.Data.SetGameplayOption(eGO_Marathon, false);    // Marathon and tutorial don't play nice
 	}
 	else
 	{
-		if( `XPROFILESETTINGS.Data.m_bPlayerHasUncheckedBoxTutorialSetting == false )
+		if(`XPROFILESETTINGS.Data.m_bPlayerHasUncheckedBoxTutorialSetting == false)
 		{
 			`XPROFILESETTINGS.Data.m_bPlayerHasUncheckedBoxTutorialSetting = true; //Only allow this to be activate for this profile, never toggled back. 
 			SaveSettings();
@@ -850,19 +868,19 @@ simulated function UpdateSubtitles(UICheckbox CheckboxControl)
 
 simulated function RefreshDescInfo()
 {
-	local string sDesc; 
+	local string sDesc;
 
-	sDesc = m_arrDifficultyDescStrings[ m_iSelectedDifficulty ];
+	sDesc = m_arrDifficultyDescStrings[m_iSelectedDifficulty];
 
-	if( m_iSelectedDifficulty >= eDifficulty_Classic )
+	if(m_iSelectedDifficulty >= eDifficulty_Classic)
 	{
-		if( m_bIsPlayingGame && Movie.Pres.ISCONTROLLED() )
-			sDesc = sDesc @ class'UIUtilities_Text'.static.GetColoredText( m_strTutorialNoChangeToImpossible, eUIState_Warning);
-		else if( Movie.Pres.m_eUIMode == eUIMode_Shell && m_iSelectedDifficulty == eDifficulty_Classic)
-			sDesc = sDesc @ class'UIUtilities_Text'.static.GetColoredText( m_strTutorialOnImpossible, eUIState_Warning);
+		if(m_bIsPlayingGame && Movie.Pres.ISCONTROLLED())
+			sDesc = sDesc @ class'UIUtilities_Text'.static.GetColoredText(m_strTutorialNoChangeToImpossible, eUIState_Warning);
+		else if(Movie.Pres.m_eUIMode == eUIMode_Shell && m_iSelectedDifficulty == eDifficulty_Classic)
+			sDesc = sDesc @ class'UIUtilities_Text'.static.GetColoredText(m_strTutorialOnImpossible, eUIState_Warning);
 	}
 
-	AS_SetDifficultyDesc( sDesc );
+	AS_SetDifficultyDesc(sDesc);
 }
 
 simulated function OnReceiveFocus()
@@ -880,20 +898,20 @@ simulated function OnLoseFocus()
 simulated public function SaveSettings()
 {
 	m_bSaveInProgress = true;
-	`ONLINEEVENTMGR.AddSaveProfileSettingsCompleteDelegate( SaveComplete );
-	`ONLINEEVENTMGR.SaveProfileSettings( true );
+	`ONLINEEVENTMGR.AddSaveProfileSettingsCompleteDelegate(SaveComplete);
+	`ONLINEEVENTMGR.SaveProfileSettings(true);
 }
 simulated public function SaveComplete(bool bWasSuccessful)
 {
-	if( !bWasSuccessful )
+	if(!bWasSuccessful)
 	{
 		SaveProfileFailedDialog();
 	}
 
-	`ONLINEEVENTMGR.ClearSaveProfileSettingsCompleteDelegate( SaveComplete );
-	m_bSaveInProgress = false; 
+	`ONLINEEVENTMGR.ClearSaveProfileSettingsCompleteDelegate(SaveComplete);
+	m_bSaveInProgress = false;
 
-	if( Movie.Pres.m_kProgressDialogStatus != eProgressDialog_None )
+	if(Movie.Pres.m_kProgressDialogStatus != eProgressDialog_None)
 	{
 		CloseSaveProgressDialog();
 	}
@@ -903,7 +921,7 @@ simulated public function SaveProfileFailedDialog()
 {
 	local TDialogueBoxData kDialogData;
 
-	kDialogData.strText = (WorldInfo.IsConsoleBuild(CONSOLE_Xbox360))? class'UIOptionsPCScreen'.default.m_strSavingOptionsFailed360 : class'UIOptionsPCScreen'.default.m_strSavingOptionsFailed;
+	kDialogData.strText = (WorldInfo.IsConsoleBuild(CONSOLE_Xbox360)) ? class'UIOptionsPCScreen'.default.m_strSavingOptionsFailed360 : class'UIOptionsPCScreen'.default.m_strSavingOptionsFailed;
 	kDialogData.strAccept = class'UIDialogueBox'.default.m_strDefaultAcceptLabel;
 
 	XComPresentationLayerBase(Owner).UIRaiseDialog(kDialogData);
@@ -920,28 +938,34 @@ simulated function ShowSimpleDialog(string txt)
 }
 
 // FLASH COMMUNICATION
-simulated function AS_InitBG(bool hasSecondWaveOption) {
+simulated function AS_InitBG(bool hasSecondWaveOption)
+{
 	Movie.ActionScriptVoid(MCPath$".InitBG");
 }
-simulated function AS_SetTitle( string title ) {
+simulated function AS_SetTitle(string title)
+{
 	Movie.ActionScriptVoid(MCPath$".SetTitle");
 }
-simulated function AS_SetDifficultyDesc( string desc ) {
+simulated function AS_SetDifficultyDesc(string desc)
+{
 	Movie.ActionScriptVoid(MCPath$".SetDifficultyDesc");
 }
-simulated function AS_SetAdvancedDesc( string desc ) {
+simulated function AS_SetAdvancedDesc(string desc)
+{
 	Movie.ActionScriptVoid(MCPath$".SetAdvancedDesc");
 }
-simulated function AS_SetAdvancedOptionsButton(string label, string icon) {
+simulated function AS_SetAdvancedOptionsButton(string label, string icon)
+{
 	Movie.ActionScriptVoid(MCPath$".SetAdvancedOptionsButton");
 }
-simulated function AS_ToggleAdvancedOptions() {
+simulated function AS_ToggleAdvancedOptions()
+{
 	Movie.ActionScriptVoid(MCPath$".ToggleAdvancedOptions");
 }
 
 simulated function AS_SetDifficultyMenu(string title, string tutorialLabel, string secondWaveLabel, string launchLabel, string CancelLabel)
 {
-    Movie.ActionScriptVoid( MCPath$".UpdateDifficultyMenu"); 
+	Movie.ActionScriptVoid(MCPath$".UpdateDifficultyMenu");
 }
 
 //==============================================================================
@@ -951,16 +975,15 @@ simulated function AS_SetDifficultyMenu(string title, string tutorialLabel, stri
 event Destroyed()
 {
 	super.Destroyed();
-	`ONLINEEVENTMGR.ClearSaveProfileSettingsCompleteDelegate( SaveComplete );
 }
 
 DefaultProperties
 {
-	Package   = "/ package/gfxDifficultyMenu/DifficultyMenu";
-	LibID     = "DifficultyMenu_Options" 
+	Package = "/ package/gfxDifficultyMenu/DifficultyMenu";
+	LibID = "DifficultyMenu_Options"
 
-	InputState= eInputState_Consume;
+		InputState = eInputState_Consume;
 	m_bSaveInProgress = false;
-	bConsumeMouseEvents=true
-	
+	bConsumeMouseEvents = true
+
 }

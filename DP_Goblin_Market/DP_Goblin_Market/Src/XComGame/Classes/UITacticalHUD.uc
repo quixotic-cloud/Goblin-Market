@@ -50,7 +50,7 @@ var UIStrategyTutorialBox                       m_kTutorialHelpBox;
 var UITacticalHUD_CommanderHUD					m_kCommanderHUD;
 var UITacticalHUD_ShotWings						m_kShotInfoWings;
 var UITargetingReticle							m_kTargetReticle;
-var UITacticalHUD_ChallengeCountdown			m_kChallengeCountdown;
+var UITacticalHUD_ChallengeCountdown            m_kChallengeCountdown; // DEPRECATED bsteiner 3/24/2016
 
 var UIEventNoticesTactical						m_kEventNotices;
 
@@ -182,12 +182,6 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 
 	// Target Reticle
 	m_kTargetReticle = Spawn(class'UITargetingReticle', Screen).InitTargetingReticle();
-
-	if(!class'Engine'.static.GetEngine().IsMultiPlayerGame())
-	{
-		// NOTE: only create this for SP otherwise it mucks with the MP turn timer object  -tsmith
-		m_kChallengeCountdown = Spawn(class'UITacticalHUD_ChallengeCountdown', Screen).InitCountdown();
-	}
 
 	//Event notice watcher. 
 	m_kEventNotices = new(self) class'UIEventNoticesTactical';
@@ -409,7 +403,7 @@ simulated function LowerTargetSystem()
 	if( m_kMouseControls != none )
 		m_kMouseControls.UpdateControls();
 	
-	m_kShotHUD.ResetDamageBreakdown(true);
+	m_kShotHUD.LowerShotHUD();
 	m_kEnemyTargets.RealizeTargets(-1);
 	m_kShotInfoWings.Hide();
 	m_kObjectivesControl.Show();
@@ -439,7 +433,7 @@ simulated function bool CancelTargetingAction()
 	LowerTargetSystem();
 	//XComPresentationLayer(Movie.Pres).m_kSightlineHUD.ClearSelectedEnemy();
 	PC.SetInputState('ActiveUnit_Moving');
-	return false;
+	return true;
 }
 
 simulated function TargetEnemy( int TargetIndex )
@@ -687,7 +681,8 @@ simulated function Show()
 
 	if( !Pres.m_kTurnOverlay.IsShowingAlienTurn() 
 	   && !Pres.m_kTurnOverlay.IsShowingOtherTurn()
-	   && !Pres.m_kTurnOverlay.IsShowingReflexAction() ) //And don't show if the turn overlay is still active. -bsteiner 5/11/2015
+	   && !Pres.m_kTurnOverlay.IsShowingReflexAction() 
+	   && !Pres.m_kTurnOverlay.IsShowingSpecialTurn() ) //And don't show if the turn overlay is still active. -bsteiner 5/11/2015
 		super.Show();
 }
 simulated function Hide()

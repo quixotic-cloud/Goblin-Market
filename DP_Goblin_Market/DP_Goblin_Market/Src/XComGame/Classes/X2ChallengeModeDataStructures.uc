@@ -234,6 +234,8 @@ struct native IntervalInfo
 	var qword							DateStart;  // Epoch Seconds UTC
 	var qword							DateEnd;    // Epoch Seconds UTC
 	var EChallengeStateType             IntervalState;
+	var string                          IntervalName;
+	var array<byte>                     StartState;
 };
 
 struct native FullSeedData

@@ -926,7 +926,7 @@ simulated function ClearTargetInformation()
 	TargetActor = none;
 }
 
-function TestEnemyUnitsForPeekSides(int CoverIndex, out int HasEnemiesOnLeftPeek, out int HasEnemiesOnRightPeek)
+function TestEnemyUnitsForPeekSides(int CoverIndex, out int HasEnemiesOnLeftPeek, out int HasEnemiesOnRightPeek, optional int HistoryIndex = -1)
 {
 	local array<StateObjectReference> EnemyUnitArray;
 	local StateObjectReference EnemyReference;
@@ -943,7 +943,7 @@ function TestEnemyUnitsForPeekSides(int CoverIndex, out int HasEnemiesOnLeftPeek
 	HasEnemiesOnLeftPeek = 0;
 	HasEnemiesOnRightPeek = 0;
 
-	class'X2TacticalVisibilityHelpers'.static.GetAllVisibleEnemyUnitsForUnit(Unit.ObjectID, EnemyUnitArray);
+	class'X2TacticalVisibilityHelpers'.static.GetAllVisibleEnemyUnitsForUnit(Unit.ObjectID, EnemyUnitArray, , HistoryIndex);
 	foreach EnemyUnitArray(EnemyReference)
 	{
 		EnemyUnit = XGUnit(History.GetVisualizer(EnemyReference.ObjectID));
@@ -1018,24 +1018,31 @@ event GetDesiredCoverState(out int CoverIndex, out UnitPeekSide PeekSide)
 	local UnitPeekSide PreviousPeekSide;
 	local int HasEnemiesOnLeftPeek;
 	local int HasEnemiesOnRightPeek;
+	local int VisualizationHistoryIndex;
 
 	PreviousPeekSide = PeekSide;
 
 	if( Unit.CanUseCover() ) //CoverIndex and PeekSide are only relevant from cover
 	{
+		VisualizationHistoryIndex = -1;
+		if( Unit.CurrentExitAction != none && Unit.CurrentExitAction.bUsePreviousGameState )
+		{
+			VisualizationHistoryIndex = Unit.CurrentExitAction.CurrentHistoryIndex - 1;
+		}
+
 		if( TargetActor != none && TargetActor.IsA('XGUnit') )
 		{
 			TargetUnit = XGUnit(TargetActor);
-			Unit.GetDirectionInfoForTarget(TargetUnit, CoverIndex, PeekSide, bCanSeeFromDefault, bRequiresLean);
+			Unit.GetDirectionInfoForTarget(TargetUnit, CoverIndex, PeekSide, bCanSeeFromDefault, bRequiresLean, , VisualizationHistoryIndex);
 		}
 		else
 		{
-			Unit.GetDirectionInfoForPosition(TargetLocation, CoverIndex, PeekSide, bCanSeeFromDefault, bRequiresLean);
+			Unit.GetDirectionInfoForPosition(TargetLocation, CoverIndex, PeekSide, bCanSeeFromDefault, bRequiresLean, , VisualizationHistoryIndex);
 		}
 
-		CurrentCoverPeekData = UnitNative.GetCachedCoverAndPeekData(VisualizationMgr.LastStateHistoryVisualized);
+		CurrentCoverPeekData = UnitNative.GetCachedCoverAndPeekData(VisualizationHistoryIndex);
 
-		TestEnemyUnitsForPeekSides(CoverIndex, HasEnemiesOnLeftPeek, HasEnemiesOnRightPeek);
+		TestEnemyUnitsForPeekSides(CoverIndex, HasEnemiesOnLeftPeek, HasEnemiesOnRightPeek, VisualizationHistoryIndex);
 
 		if( (PreviousPeekSide == ePeekLeft && CurrentCoverPeekData.CoverDirectionInfo[DesiredCoverIndex].LeftPeek.bHasPeekaround == 1) ||
 		   (PreviousPeekSide == ePeekRight && CurrentCoverPeekData.CoverDirectionInfo[DesiredCoverIndex].RightPeek.bHasPeekaround == 1) )
@@ -1044,7 +1051,7 @@ event GetDesiredCoverState(out int CoverIndex, out UnitPeekSide PeekSide)
 			{
 				PeekSide = PreviousPeekSide;
 			}
-			else if( Unit.GetCoverType() == CT_MidLevel && bCanSeeFromDefault == 1 && PreviousPeekSide != eNoPeek && PreviousPeekSide != PeekSide )
+			else if( Unit.GetCoverType(VisualizationHistoryIndex) == CT_MidLevel && bCanSeeFromDefault == 1 && PreviousPeekSide != eNoPeek && PreviousPeekSide != PeekSide )
 			{
 				// Keep your peek side if you can see the target from your default tile
 				// Don't keep it if we have enemies on the new peek side and none on the previous peek side.

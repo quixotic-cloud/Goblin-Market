@@ -6,7 +6,6 @@ const NUM_ABILITIES_PER_RANK = 2;
 var XComGameState PromotionState;
 
 var int PendingRank, PendingBranch;
-var bool bShownClassPopup, bShownCorporalPopup, bShownAWCPopup; // necessary to prevent infinite popups if the soldier ability data isn't set up correctly.
 
 var bool bAfterActionPromotion;	//Set to TRUE if we need to make a pawn and move the camera to the armory
 var UIAfterAction AfterActionScreen; //If bAfterActionPromotion is true, this holds a reference to the after action screen
@@ -28,6 +27,9 @@ var localized string m_strAbilityLockedTitle;
 var localized string m_strAbilityLockedDescription;
 
 var UIList  List;
+
+var bool bShownClassPopup, bShownCorporalPopup, bShownAWCPopup; // DEPRECATED bsteiner 3/24/2016 
+
 
 simulated function InitPromotion(StateObjectReference UnitRef, optional bool bInstantTransition)
 {
@@ -139,28 +141,21 @@ simulated function PopulateData()
 		}
 	}
 
-	// Check to see if Unit has just leveled up to Squaddie, they will then receive a batch of abilities.
-	if(Unit.GetRank() == 1 && Unit.HasAvailablePerksToAssign() && !bShownClassPopup)
+	// Check to see if Unit needs to show a new class popup.
+	if(Unit.bNeedsNewClassPopup)
 	{
-		AwardRankAbilities(ClassTemplate, 0);
-
 		`HQPRES.UIClassEarned(Unit.GetReference());
-		bShownClassPopup = true;
-
-		Unit = GetUnit(); // we've updated the UnitState, update the Unit to reflect the latest changes
 	}
 	
-	// Check for AWC Ability Update
-	if(Unit.NeedsAWCAbilityUpdate() && !bShownAWCPopup)
+	// Check for AWC Ability popup
+	if(Unit.NeedsAWCAbilityPopup())
 	{
-		AWCAbilityNames = AwardAWCAbilities();
+		AWCAbilityNames = Unit.GetAWCAbilityNames();
 		
 		if(AWCAbilityNames.Length > 0)
 		{
 			ShowAWCDialog(AWCAbilityNames);
 		}
-
-		Unit = GetUnit();  // we've updated the UnitState, update the Unit to reflect the latest changes
 	}
 
 	previewIndex = -1;
@@ -294,119 +289,11 @@ simulated function RequestPawn(optional Rotator DesiredRotation)
 	}
 }
 
-simulated function AwardRankAbilities(X2SoldierClassTemplate ClassTemplate, int Rank)
-{
-	local XComGameStateHistory History;
-	local int i;
-	local XComGameState UpdateState;
-	local XComGameState_Unit UpdatedUnit;
-	local XComGameStateContext_ChangeContainer ChangeContainer;
-	local array<SoldierClassAbilityType> AbilityTree;
-
-	History = `XCOMHISTORY;
-	ChangeContainer = class'XComGameStateContext_ChangeContainer'.static.CreateEmptyChangeContainer("Unit Promotion");
-	UpdateState = History.CreateNewGameState(true, ChangeContainer);
-
-	UpdatedUnit = XComGameState_Unit(UpdateState.CreateStateObject(class'XComGameState_Unit', UnitReference.ObjectID));
-
-	// Add new abilities to the Unit
-	AbilityTree = ClassTemplate.GetAbilityTree(Rank);
-	for(i = 0; i < AbilityTree.Length; ++i)
-	{
-		UpdatedUnit.BuySoldierProgressionAbility(UpdateState, Rank, i);
-	}
-
-	UpdateState.AddStateObject(UpdatedUnit);
-
-	`GAMERULES.SubmitGameState(UpdateState);
-}
-
-// Unlocks or removes AWC abilities, returns list of ability names which were unlocked
-simulated function array<name> AwardAWCAbilities()
-{
-	local XComGameState NewGameState;
-	local XComGameState_Unit UnitState;
-	local XComGameState_HeadquartersXCom XComHQ;
-	local array<name> AWCAbilityNames;
-	local int idx;
-
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Unlock AWC Abilities");
-	XComHQ = class'UIUtilities_Strategy'.static.GetXComHQ();
-	UnitState = XComGameState_Unit(NewGameState.CreateStateObject(class'XComGameState_Unit', UnitReference.ObjectID));
-	NewGameState.AddStateObject(UnitState);
-
-	if(XComHQ.HasFacilityByName('AdvancedWarfareCenter'))
-	{
-		// if you have the AWC, and have reached the rank for one of your hidden abilities, unlock it
-		for(idx = 0; idx < UnitState.AWCAbilities.Length; idx++)
-		{
-			if(!UnitState.AWCAbilities[idx].bUnlocked && UnitState.AWCAbilities[idx].iRank == UnitState.GetRank())
-			{
-				UnitState.AWCAbilities[idx].bUnlocked = true;
-				AWCAbilityNames.AddItem(UnitState.AWCAbilities[idx].AbilityType.AbilityName);
-			}
-		}
-	}
-	else
-	{
-		// if you don't have the AWC, remove any AWC abilities that haven't been unlocked
-		for(idx = 0; idx < UnitState.AWCAbilities.Length; idx++)
-		{
-			if(!UnitState.AWCAbilities[idx].bUnlocked)
-			{
-				UnitState.AWCAbilities.Remove(idx, 1);
-				idx--;
-			}
-		}
-
-		// if the unit has no AWC abilities, mark them as eligible to roll again if another AWC is built
-		if(UnitState.AWCAbilities.Length == 0)
-		{
-			UnitState.bRolledForAWCAbility = false;
-		}
-	}
-
-	`GAMERULES.SubmitGameState(NewGameState);
-
-	return AWCAbilityNames;
-}
-
-simulated function ShowCorporalDialog(X2SoldierClassTemplate ClassTemplate)
-{
-	local int i;
-	local string tmpStr;
-	local XGParamTag        kTag;
-	local TDialogueBoxData  kDialogData;
-	local X2AbilityTemplate AbilityTemplate;
-	local X2AbilityTemplateManager AbilityTemplateManager;
-	local array<SoldierClassAbilityType> AbilityTree;
-
-	kTag = XGParamTag(`XEXPANDCONTEXT.FindTag("XGParam"));
-
-	kDialogData.strTitle = m_strCorporalPromotionDialogTitle;
-
-	kTag.StrValue0 = "";
-	AbilityTemplateManager = class'X2AbilityTemplateManager'.static.GetAbilityTemplateManager();
-	AbilityTree = ClassTemplate.GetAbilityTree(1);
-	for(i = 0; i < AbilityTree.Length; ++i)
-	{
-		AbilityTemplate = AbilityTemplateManager.FindAbilityTemplate(AbilityTree[i].AbilityName);
-
-		// Ability Name
-		tmpStr = AbilityTemplate.LocFriendlyName != "" ? AbilityTemplate.LocFriendlyName : ("Missing 'LocFriendlyName' for ability '" $ AbilityTemplate.DataName $ "'");
-		kTag.StrValue0 $= "- " $ Caps(tmpStr) $ ":\n";
-
-		// Ability Description
-		tmpStr = AbilityTemplate.HasLongDescription() ? AbilityTemplate.GetMyLongDescription(, GetUnit()) : ("Missing 'LocLongDescription' for ability " $ AbilityTemplate.DataName $ "'");
-		kTag.StrValue0 $= tmpStr $ "\n\n";
-	}
-	
-	kDialogData.strText = `XEXPAND.ExpandString(m_strCorporalPromotionDialogText); 
-	kDialogData.strAccept = class'UIUtilities_Text'.default.m_strGenericOK;
-
-	Movie.Pres.UIRaiseDialog(kDialogData);
-	bShownCorporalPopup = true;
-}
+// DEPRECATED bsteiner 3/24/2016
+simulated function AwardRankAbilities(X2SoldierClassTemplate ClassTemplate, int Rank);
+simulated function array<name> AwardAWCAbilities();
+simulated function ShowCorporalDialog(X2SoldierClassTemplate ClassTemplate);
+// END DEPRECATED ITEMS bsteiner 3/24/2016
 
 simulated function ShowAWCDialog(array<name> AWCAbilityNames)
 {
@@ -416,6 +303,14 @@ simulated function ShowAWCDialog(array<name> AWCAbilityNames)
 	local TDialogueBoxData  kDialogData;
 	local X2AbilityTemplate AbilityTemplate;
 	local X2AbilityTemplateManager AbilityTemplateManager;
+	local XComGameState NewGameState;
+	local XComGameState_Unit UnitState;
+
+	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Display AWC Ability Popup");
+	UnitState = XComGameState_Unit(NewGameState.CreateStateObject(class'XComGameState_Unit', UnitReference.ObjectID));
+	NewGameState.AddStateObject(UnitState);
+	UnitState.bSeenAWCAbilityPopup = true;
+	`GAMERULES.SubmitGameState(NewGameState);
 
 	kTag = XGParamTag(`XEXPANDCONTEXT.FindTag("XGParam"));
 
@@ -440,7 +335,6 @@ simulated function ShowAWCDialog(array<name> AWCAbilityNames)
 	kDialogData.strAccept = class'UIUtilities_Text'.default.m_strGenericOK;
 
 	Movie.Pres.UIRaiseDialog(kDialogData);
-	bShownAWCPopup = true;
 }
 
 simulated function PreviewRow(UIList ContainerList, int ItemIndex)

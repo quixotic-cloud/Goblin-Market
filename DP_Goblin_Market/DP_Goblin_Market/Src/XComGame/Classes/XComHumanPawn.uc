@@ -29,6 +29,12 @@ var privatewrite XComPatternsContent FacePaintContent;
 var() privatewrite XComCharacterVoice Voice;
 var privatewrite XComLinearColorPaletteEntry BaseArmorTint;
 
+//Left / Right arm customization. Transient to avoid conflicts with base game cooked packages
+var transient privatewrite XComArmsContent LeftArmContent;
+var transient privatewrite XComArmsContent RightArmContent;
+var transient privatewrite XComArmsContent LeftArmDecoContent;
+var transient privatewrite XComArmsContent RightArmDecoContent;
+
 var bool bShouldUseUnderlay; //True if this character should be wearing their underlay
 
 //  STRATEGY ONLY VARIABLES
@@ -52,6 +58,7 @@ struct PawnContentRequest
 	var name TemplateName;
 	var Object kContent;
 	var Delegate<OnBodyPartLoadedDelegate> BodyPartLoadedFn;
+	var X2BodyPartTemplate Template;
 };
 
 var private array<PawnContentRequest>   PawnContentRequests;
@@ -59,6 +66,7 @@ var private bool                        m_bSetArmorKit;
 var private bool                        m_bSetAppearance;
 var private int                         m_iRequestKit;
 var private PawnContentRequest          m_kVoiceRequest;
+var transient PawnContentRequest		m_HelmetRequest;
 
 // Character customization
 enum ECCPawnAnim
@@ -91,6 +99,8 @@ var transient int NumPossibleArmorTints;
 var transient array<int> PossibleArmorKits;
 
 var transient TCharacter Character;
+var transient Rotator CustomizationRotation;
+var transient bool CustomizationRotationSet;
 
 Delegate OnBodyPartLoadedDelegate(PawnContentRequest ContentRequest);
 
@@ -124,6 +134,7 @@ simulated function RequestFullPawnContent()
 	local PawnContentRequest kRequest;
 	local XGUnit GameUnit;
 	local XComGameState_Unit UnitState;	
+	local name UnderlayName;
 
 	if(`HQGAME != none)
 	{		
@@ -132,6 +143,18 @@ simulated function RequestFullPawnContent()
 		{
 			bShouldUseUnderlay = XComHeadquartersGame(class'Engine'.static.GetCurrentWorldInfo().Game).GetGamecore().m_kGeoscape.m_kBase.m_kCrewMgr.ShouldUseUnderlay();
 			bShouldUseUnderlay = bShouldUseUnderlay && !UnitState.GetMyTemplate().bForceAppearance && (UnitState.IsASoldier() || UnitState.IsAScientist() || UnitState.IsAnEngineer());
+		}
+
+		if(bShouldUseUnderlay)
+		{
+			if(m_kAppearance.iGender <= 1)
+			{
+				UnderlayName = 'Clerk_Std_Torsos_A_M';
+			}
+			else
+			{
+				UnderlayName = 'Clerk_Std_A_F';
+			}
 		}
 	}
 
@@ -146,7 +169,7 @@ simulated function RequestFullPawnContent()
 		if( (!bShouldUseUnderlay && m_kAppearance.nmTorso != '') || (bShouldUseUnderlay && m_kAppearance.nmTorso_Underlay != '') )
 		{
 			kRequest.ContentCategory = 'Torso';
-			kRequest.TemplateName = bShouldUseUnderlay ? m_kAppearance.nmTorso_Underlay : m_kAppearance.nmTorso;
+			kRequest.TemplateName = bShouldUseUnderlay ? UnderlayName : m_kAppearance.nmTorso;
 			kRequest.BodyPartLoadedFn = OnTorsoLoaded;
 			PawnContentRequests.AddItem(kRequest);
 		}
@@ -202,17 +225,47 @@ simulated function RequestFullPawnContent()
 		}
 
 
-		if( (UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') &&
-		   ((!bShouldUseUnderlay && m_kAppearance.nmArms != '') || (bShouldUseUnderlay && m_kAppearance.nmArms_Underlay != '')) )
+		if((UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') && !bShouldUseUnderlay && m_kAppearance.nmArms != '')		  
 		{
 			kRequest.ContentCategory = 'Arms';
 			kRequest.TemplateName = bShouldUseUnderlay ? m_kAppearance.nmArms_Underlay : m_kAppearance.nmArms;
 			kRequest.BodyPartLoadedFn = OnArmsLoaded;
 			PawnContentRequests.AddItem(kRequest);
+		}		
+
+		if((UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') && !bShouldUseUnderlay && m_kAppearance.nmLeftArm != '')
+		{
+			kRequest.ContentCategory = 'LeftArm';
+			kRequest.TemplateName = m_kAppearance.nmLeftArm;
+			kRequest.BodyPartLoadedFn = OnArmsLoaded;
+			PawnContentRequests.AddItem(kRequest);
 		}
 
-		if( (UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') &&
-		   ((!bShouldUseUnderlay && m_kAppearance.nmLegs != '') || (bShouldUseUnderlay && m_kAppearance.nmLegs_Underlay != '')) )
+		if((UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') && !bShouldUseUnderlay && m_kAppearance.nmRightArm != '')		   
+		{
+			kRequest.ContentCategory = 'RightArm';
+			kRequest.TemplateName = m_kAppearance.nmRightArm;
+			kRequest.BodyPartLoadedFn = OnArmsLoaded;
+			PawnContentRequests.AddItem(kRequest);
+		}
+
+		if((UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') && !bShouldUseUnderlay && m_kAppearance.nmLeftArmDeco != '')		   
+		{
+			kRequest.ContentCategory = 'LeftArmDeco';
+			kRequest.TemplateName = m_kAppearance.nmLeftArmDeco;
+			kRequest.BodyPartLoadedFn = OnArmsLoaded;
+			PawnContentRequests.AddItem(kRequest);
+		}
+
+		if((UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') && !bShouldUseUnderlay && m_kAppearance.nmRightArmDeco != '')		   
+		{
+			kRequest.ContentCategory = 'RightArmDeco';
+			kRequest.TemplateName = m_kAppearance.nmRightArmDeco;
+			kRequest.BodyPartLoadedFn = OnArmsLoaded;
+			PawnContentRequests.AddItem(kRequest);
+		}
+
+		if((UnitState == none || UnitState.GetMyTemplateName() != 'Clerk') && !bShouldUseUnderlay && m_kAppearance.nmLegs != '')		   
 		{
 			kRequest.ContentCategory = 'Legs';
 			kRequest.TemplateName = bShouldUseUnderlay ? m_kAppearance.nmLegs_Underlay : m_kAppearance.nmLegs;
@@ -312,6 +365,7 @@ simulated function MakeAllContentRequests()
 		if (PartTemplate != none) //If the part couldn't be found, then just ignore it. This could happen when loading a save that had DLC installed that we don't have
 		{
 			PawnContentRequests[i].ArchetypeName = name(PartTemplate.ArchetypeName);
+			PawnContentRequests[i].Template = PartTemplate;
 			if(PawnContentRequests[i].ArchetypeName != '')
 			{
 				PawnContentRequests[i].kContent = `CONTENT.RequestGameArchetype(PartTemplate.ArchetypeName, self, none, false);
@@ -393,6 +447,8 @@ simulated exec function UpdateAnimations()
 			GetAnimTreeController().PlayAdditiveDynamicAnim(AnimParams);
 		}
 	}
+
+	XComReaddCarryAnimSets();
 }
 
 simulated function AddRequiredAnimSets()
@@ -429,7 +485,7 @@ simulated event PostInitAnimTree(SkeletalMeshComponent SkelComp)
 	// Do not reset here, just make sure we have the animsets we need to not get monkey people
 	// or freaked out flippy heads -- jboswell
 	// If we reset, in tactical the units will lose their weapon-based animations
-	AddRequiredAnimSets();
+	UpdateAnimations();
 
 	super.PostInitAnimTree(SkelComp);
 
@@ -457,7 +513,11 @@ simulated function UpdateAllMeshMaterials()
 	UpdateMeshAttachmentMaterials(Mesh); // Armor must always come first for the color tint saving code
 	UpdateMeshMaterials(m_kHeadMeshComponent);
 	UpdateMeshMaterials(m_kTorsoComponent);
-	UpdateMeshMaterials(m_kArmsMC);
+	UpdateMeshMaterials(m_kArmsMC);	
+	UpdateMeshMaterials(m_kLeftArm);
+	UpdateMeshMaterials(m_kRightArm);
+	UpdateMeshMaterials(m_kLeftArmDeco);
+	UpdateMeshMaterials(m_kRightArmDeco);
 	UpdateMeshMaterials(m_kLegsMC);
 	UpdateMeshMaterials(m_kHelmetMC);
 	UpdateMeshMaterials(m_kDecoKitMC);
@@ -550,15 +610,19 @@ simulated function UpdateSkinMaterial(MaterialInstanceConstant MIC, bool bHasHai
 
 		if(bIsHead)
 		{
-			if(m_kAppearance.nmScars != '' && ScarsContent.texture != none)
+			if(m_kAppearance.nmScars != '' && ScarsContent != none)
 			{
 				MIC.SetScalarParameterValue('ShowScars', 1);
 				MIC.SetTextureParameterValue('ScarNormal', ScarsContent.texture);
+				MIC.SetTextureParameterValue('ScarDiffuse', ScarsContent.diffuse);
+				MIC.SetTextureParameterValue('ScarSpecMask', ScarsContent.specmask);
 			}
 			else
 			{
 				MIC.SetScalarParameterValue('ShowScars', 0);
 				MIC.SetTextureParameterValue('ScarNormal', none);
+				MIC.SetTextureParameterValue('ScarDiffuse', none);
+				MIC.SetTextureParameterValue('ScarSpecMask', none);
 			}
 
 			if(m_kAppearance.nmFacePaint != '' && FacePaintContent.texture != none)
@@ -736,13 +800,17 @@ simulated function UpdateMeshMaterials(MeshComponent MeshComp)
 						break;
 					case 'HeadCustomizable_TC':						
 					case 'SkinCustomizable_TC':
+					case 'HeadCustomizable_Scars_TC':
 						UpdateSkinMaterial(MIC, true, MeshComp == m_kHeadMeshComponent);
 						break;
-					case 'SoldierArmorCustomizable_TC':		
+					case 'SoldierArmorCustomizable_TC':
+					case 'Diffuse_TC_Metalic':		
 					case 'M_Master_PwrdArm_TC':
+					case 'Diffuse_TC_Metalic':
 					case 'Props_OpcMask_TC':
-					case 'CivilianCustomizable_TC':
-						UpdateArmorMaterial(MeshComp, MIC, m_kAppearance.iArmorTint, m_kAppearance.iArmorTintSecondary, PatternsContent[0]);
+					case 'CivilianCustomizable_TC':					
+					case 'SoldierArmorCustomizable_Decals_TC':
+						UpdateArmorMaterial(MeshComp, MIC, m_kAppearance.iArmorTint, m_kAppearance.iArmorTintSecondary, PatternsContent.Length > 0 ? PatternsContent[0] : none);
 						break;
 					case 'WeaponCustomizable_TC':
 						// Weapon customization data is now stored in XComGameState_Item.WeaponAppearance, and applied in XGWeapon.UpdateWeaponMaterial
@@ -870,7 +938,7 @@ simulated function SetVoice(name NewVoice)
 		if(PartTemplate != none)
 		{
 			bShouldSpeak = true;
-			`CONTENT.RequestGameArchetype(PartTemplate.ArchetypeName, self, OnVoiceLoadedUI, true);
+			`CONTENT.RequestGameArchetype(PartTemplate.ArchetypeName, self, OnVoiceLoadedUI, false);
 			
 		}
 	}
@@ -930,25 +998,6 @@ simulated function RemoveProps()
 	m_aPhysicsProps.Length = 0;
 }
 
-simulated function RemoveProp(MeshComponent PropComponent)
-{
-	local int PropIdx;
-
-	DetachComponent(PropComponent);
-	Mesh.DetachComponent(PropComponent);
-	
-	for (PropIdx = 0; PropIdx < m_aPhysicsProps.Length; ++PropIdx)
-	{
-		if (m_aPhysicsProps[PropIdx] != none && m_aPhysicsProps[PropIdx].SkeletalMeshComponent == PropComponent)
-		{
-			//m_aPhysicsProps[PropIdx].SetBase(none);
-			m_aPhysicsProps[PropIdx].Destroy();
-			m_aPhysicsProps.Remove(PropIdx, 1);
-			break;
-		}
-	}  
-}
-
 simulated function RemoveAttachments()
 {
 	local ItemAttachment AttachedItem;
@@ -997,7 +1046,27 @@ simulated function ReturnFromMatinee()
 	super.ReturnFromMatinee();
 }
 
-simulated function FreezeHair()
+function FreezePhysics()
+{
+	local int Index;
+
+	for(Index = 0; Index < m_aPhysicsProps.Length; ++Index)
+	{
+		m_aPhysicsProps[Index].SkeletalMeshComponent.SetHasPhysicsAssetInstance(false);
+	}
+}
+
+function WakePhysics()
+{
+	local int Index;
+
+	for(Index = 0; Index < m_aPhysicsProps.Length; ++Index)
+	{
+		m_aPhysicsProps[Index].SkeletalMeshComponent.SetHasPhysicsAssetInstance(true);
+	}
+}
+
+simulated function FreezeHair() 
 {
 	
 }
@@ -1045,8 +1114,21 @@ simulated function OnHeadLoaded(PawnContentRequest ContentRequest)
 		return;
 
 	HeadContent = XComHeadContent(ContentRequest.kContent);
-	m_kHeadMeshComponent = Mesh; //The base mesh is the head for pawns that load head content
 	
+	if( HeadContent.SkeletalMesh != Mesh.SkeletalMesh )
+ 	{
+ 		m_kHeadMeshComponent.SetSkeletalMesh(HeadContent.SkeletalMesh);
+ 		m_kHeadMeshComponent.SetParentAnimComponent(Mesh);
+		AttachComponent(m_kHeadMeshComponent);
+		Mesh.AppendSockets(m_kHeadMeshComponent.Sockets, true);
+		ResetMaterials(m_kHeadMeshComponent);
+		m_kHeadMeshComponent.SetHidden(false);
+ 	}
+	else
+	{
+		m_kHeadMeshComponent = Mesh; //The base mesh is the head for pawns that load head content
+	}
+
 	// Head materials: 0 = skin, 1= eyelashes/eyebrows
 	// Add a new MIC so we can change parameters for just this character
 	SkinMaterial = HeadContent.HeadMaterial;
@@ -1056,7 +1138,18 @@ simulated function OnHeadLoaded(PawnContentRequest ContentRequest)
 	}
 
 	//Play the additive anim that will morph the head shape from the ref head
-	if( HeadContent.AdditiveAnimSet != none && HeadContent.AdditiveAnim != '' )
+	if(HelmetContent != none && HelmetContent.bUseDefaultHead)
+	{
+		if(m_kAppearance.iGender == eGender_Female)
+		{
+			AnimTreeController.SetHeadAnim('ADD_DEBUG_Neutral_FEM');
+		}
+		else
+		{
+			AnimTreeController.SetHeadAnim('ADD_DEBUG_Neutral_M');
+		}
+	}
+	else if( HeadContent.AdditiveAnimSet != none && HeadContent.AdditiveAnim != '' )
 	{		
 		AnimTreeController.SetHeadAnim(HeadContent.AdditiveAnim);		
 	}
@@ -1066,19 +1159,179 @@ simulated function OnHeadLoaded(PawnContentRequest ContentRequest)
 
 simulated function OnArmsLoaded(PawnContentRequest ContentRequest)
 {
-	if(ArmsContent == XComArmsContent(ContentRequest.kContent))
-		return;
-
-	ArmsContent = XComArmsContent(ContentRequest.kContent);
-	m_kArmsMC.SetSkeletalMesh(ArmsContent.SkeletalMesh);
-	ResetMaterials(m_kArmsMC);
-	if(ArmsContent.OverrideMaterial != none)
-	{
-		m_kArmsMC.SetMaterial(0, ArmsContent.OverrideMaterial);
-	}
-	m_kArmsMC.SetParentAnimComponent(Mesh);
+	local SkeletalMeshComponent UseMeshComponent;
+	local SkeletalMesh UseSkeletalMesh;
+	local XComArmsContent UseArmsContent;	
 	
-	Mesh.AppendSockets(m_kArmsMC.Sockets, true);
+	UseArmsContent = XComArmsContent(ContentRequest.kContent);		
+	UseSkeletalMesh = UseArmsContent.SkeletalMesh;
+
+	switch(ContentRequest.ContentCategory)
+	{
+		case 'Arms':		
+			if(m_kLeftArm != none && m_kLeftArm.SkeletalMesh != none)
+			{
+				m_kLeftArm.SetSkeletalMesh(none);
+			}
+
+			if(m_kRightArm != none && m_kRightArm.SkeletalMesh != none)
+			{
+				m_kRightArm.SetSkeletalMesh(none);
+			}
+
+			if(m_kLeftArmDeco != none && m_kLeftArmDeco.SkeletalMesh != none)
+			{
+				m_kLeftArmDeco.SetSkeletalMesh(none);
+			}
+
+			if(m_kRightArmDeco != none && m_kRightArmDeco.SkeletalMesh != none)
+			{
+				m_kRightArmDeco.SetSkeletalMesh(none);
+			}
+
+			UseMeshComponent = m_kArmsMC;
+
+			if(m_kArmsMC != none && m_kArmsMC.SkeletalMesh == UseSkeletalMesh && LeftArmContent != none &&
+			   (LeftArmContent.OverrideMaterial == ArmsContent.OverrideMaterial))
+			{
+				return;
+			}
+
+			if(UseSkeletalMesh == none)
+			{
+				m_kArmsMC.SetSkeletalMesh(none);
+			}
+
+			ArmsContent = UseArmsContent;
+			break;
+		case 'LeftArm':
+			//Make sure the paired arms are gone
+			if(m_kArmsMC != none && m_kArmsMC.SkeletalMesh != none)
+			{
+				m_kArmsMC.SetSkeletalMesh(none);
+			}
+
+			UseMeshComponent = m_kLeftArm;
+
+			if(m_kLeftArm != none && m_kLeftArm.SkeletalMesh == UseSkeletalMesh && LeftArmContent != none &&
+			   (LeftArmContent.OverrideMaterial == ArmsContent.OverrideMaterial))
+			{
+				return;
+			}
+
+			if(UseSkeletalMesh == none)
+			{
+				m_kLeftArm.SetSkeletalMesh(none);
+			}
+
+			LeftArmContent = UseArmsContent;
+			break;
+
+		case 'RightArm':
+			//Make sure the paired arms are gone
+			if(m_kArmsMC != none && m_kArmsMC.SkeletalMesh != none)
+			{
+				m_kArmsMC.SetSkeletalMesh(none);
+			}
+
+			UseMeshComponent = m_kRightArm;
+
+			if(m_kRightArm != none && m_kRightArm.SkeletalMesh == UseSkeletalMesh && RightArmContent != none &&
+			   (RightArmContent.OverrideMaterial == ArmsContent.OverrideMaterial))
+			{
+				return;
+			}
+
+			if(UseSkeletalMesh == none)
+			{
+				m_kRightArm.SetSkeletalMesh(none);
+			}
+
+			RightArmContent = UseArmsContent;
+			break;
+
+		case 'LeftArmDeco':
+			UseMeshComponent = m_kLeftArmDeco;
+
+			if(m_kLeftArmDeco != none && m_kLeftArmDeco.SkeletalMesh == UseSkeletalMesh && LeftArmDecoContent != none &&
+			   (LeftArmDecoContent.OverrideMaterial == ArmsContent.OverrideMaterial))
+			{
+				return;
+			}
+
+			if(UseSkeletalMesh == none)
+			{
+				m_kLeftArmDeco.SetSkeletalMesh(none);
+			}
+
+			LeftArmDecoContent = UseArmsContent;
+			break;
+
+		case 'RightArmDeco':		
+			UseMeshComponent = m_kRightArmDeco;
+
+			if(m_kRightArmDeco != none && m_kRightArmDeco.SkeletalMesh == UseSkeletalMesh && RightArmDecoContent != none &&
+			   (RightArmDecoContent.OverrideMaterial == ArmsContent.OverrideMaterial))
+			{
+				return;
+			}
+
+			if(UseSkeletalMesh == none)
+			{
+				m_kRightArmDeco.SetSkeletalMesh(none);
+			}
+
+			RightArmDecoContent = UseArmsContent;
+			break;
+	}
+
+	//Make a new one and set it up
+	if(m_kArmsMC != UseMeshComponent)
+	{
+		DetachComponent(UseMeshComponent);
+		UseMeshComponent = new(self) class'SkeletalMeshComponent';
+	}
+	
+	switch(ContentRequest.ContentCategory)
+	{
+		case 'Arms':
+			m_kArmsMC = UseMeshComponent;
+			break;
+		case 'LeftArm':
+			m_kLeftArm = UseMeshComponent;
+			break;
+		case 'RightArm':
+			m_kRightArm = UseMeshComponent;
+			break;
+		case 'LeftArmDeco':
+			m_kLeftArmDeco = UseMeshComponent;
+			break;
+		case 'RightArmDeco':
+			m_kRightArmDeco = UseMeshComponent;
+			break;
+	}
+
+	UseMeshComponent.LastRenderTime = WorldInfo.TimeSeconds;	
+	UseMeshComponent.SetSkeletalMesh(UseSkeletalMesh);
+	ResetMaterials(UseMeshComponent);
+	if(UseArmsContent.OverrideMaterial != none)
+	{
+		UseMeshComponent.SetMaterial(0, UseArmsContent.OverrideMaterial);
+	}
+
+	if(UseMeshComponent.SkeletalMesh != none)
+	{
+		UseMeshComponent.SetParentAnimComponent(Mesh);		
+		Mesh.AppendSockets(UseMeshComponent.Sockets, true);
+	}
+
+	UpdateMeshMaterials(UseMeshComponent);
+
+	if(m_kArmsMC != UseMeshComponent)
+	{
+		AttachComponent(UseMeshComponent); //Attach the new component
+	}
+
 	MarkAuxParametersAsDirty(m_bAuxParamNeedsPrimary, m_bAuxParamNeedsSecondary, m_bAuxParamUse3POutline);
 }
 
@@ -1136,6 +1389,9 @@ simulated function OnBodyPartLoaded(PawnContentRequest ContentRequest)
 	local MorphTargetSet UseMorph;
 	local bool bSkipAttachment;
 	local bool bHideForUnderlay;
+	local bool bForbiddenBySet;
+	local int Index;
+	local name SearchSetName;
 
 	if(ContentRequest.kContent == none)
 	{
@@ -1155,21 +1411,9 @@ simulated function OnBodyPartLoaded(PawnContentRequest ContentRequest)
 	switch(ContentRequest.ContentCategory)
 	{
 	case 'Eyes':
-		if( EyeContent == BodyPartContent )
-		{
-			return;
-		}
-		EyeContent = BodyPartContent;
-		UseMeshComponent = m_kEyeMC;
-		break;
+		return;		
 	case 'Teeth':
-		if( TeethContent == BodyPartContent )
-		{
-			return;
-		}
-		TeethContent = BodyPartContent;
-		UseMeshComponent = m_kTeethMC;
-		break;
+		return;
 	case 'Hair':
 		UseMeshComponent = m_kHairMC;
 		if(HelmetContent != none && HelmetContent.ObjectArchetype != none && m_kHelmetMC.SkeletalMesh != none)
@@ -1229,7 +1473,18 @@ simulated function OnBodyPartLoaded(PawnContentRequest ContentRequest)
 
 	case 'FacePropsUpper':
 		UseMeshComponent = m_kUpperFacialMC;
-		if(HelmetContent != none && (HelmetContent.bHideUpperFacialProps || bHideForUnderlay))
+
+		for(Index = 0; Index < ContentRequest.Template.SetNames.Length; ++Index)
+		{
+			SearchSetName = name("No" $ string(ContentRequest.Template.SetNames[Index]));
+			if(m_HelmetRequest.Template.SetNames.Find(SearchSetName) != INDEX_NONE)
+			{
+				bForbiddenBySet = true;
+				break;
+			}
+		}
+
+		if(HelmetContent != none && (HelmetContent.bHideUpperFacialProps || bHideForUnderlay || bForbiddenBySet))
 		{
 			UseSkeletalMesh = none;
 			bSkipAttachment = true;
@@ -1251,7 +1506,18 @@ simulated function OnBodyPartLoaded(PawnContentRequest ContentRequest)
 
 	case 'FacePropsLower':
 		UseMeshComponent = m_kLowerFacialMC;
-		if(HelmetContent != none && (HelmetContent.bHideLowerFacialProps || bHideForUnderlay))
+				
+		for(Index = 0; Index < ContentRequest.Template.SetNames.Length; ++Index)
+		{
+			SearchSetName = name("No" $ string(ContentRequest.Template.SetNames[Index]));
+			if(m_HelmetRequest.Template.SetNames.Find(SearchSetName) != INDEX_NONE)
+			{
+				bForbiddenBySet = true;
+				break;
+			}
+		}
+
+		if(HelmetContent != none && (HelmetContent.bHideLowerFacialProps || bHideForUnderlay || bForbiddenBySet))
 		{
 			UseSkeletalMesh = none;
 			bSkipAttachment = true;
@@ -1276,6 +1542,7 @@ simulated function OnBodyPartLoaded(PawnContentRequest ContentRequest)
 		{
 			return;
 		}
+		m_HelmetRequest = ContentRequest;
 		HelmetContent = XComHelmetContent(ContentRequest.kContent);
 		UseMeshComponent = m_kHelmetMC;
 		if(HelmetContent != none && bHideForUnderlay)
@@ -1283,6 +1550,19 @@ simulated function OnBodyPartLoaded(PawnContentRequest ContentRequest)
 			UseMeshComponent.SetSkeletalMesh(none);
 			bSkipAttachment = true;
 		}
+
+		if(HelmetContent.bUseDefaultHead)
+		{
+			if(m_kAppearance.iGender == eGender_Female)
+			{
+				AnimTreeController.SetHeadAnim('ADD_DEBUG_Neutral_FEM');
+			}
+			else
+			{
+				AnimTreeController.SetHeadAnim('ADD_DEBUG_Neutral_M');
+			}			
+		}
+
 		break;
 	}
 
@@ -1418,6 +1698,16 @@ function UpdateMorphs(SkeletalMeshComponent CheckMeshComponent, MorphTargetSet U
 
 simulated function OnTorsoLoaded(PawnContentRequest ContentRequest)
 {
+	local int AttachmentIndex;
+
+	if( TorsoContent != None )
+	{
+		for( AttachmentIndex = 0; AttachmentIndex < TorsoContent.DefaultAttachments.Length; ++AttachmentIndex )
+		{
+			RemoveBodyPartAttachment(TorsoContent.DefaultAttachments[AttachmentIndex]);
+		}
+	}
+
 	TorsoContent = XComTorsoContent(ContentRequest.kContent);
 	m_kTorsoComponent.SetSkeletalMesh(TorsoContent.SkeletalMesh);
 	ResetMaterials(m_kTorsoComponent);	
@@ -1428,6 +1718,14 @@ simulated function OnTorsoLoaded(PawnContentRequest ContentRequest)
 	m_kTorsoComponent.SetParentAnimComponent(Mesh);
 	
 	Mesh.AppendSockets(m_kTorsoComponent.Sockets, true);
+
+	for( AttachmentIndex = 0; AttachmentIndex < TorsoContent.DefaultAttachments.Length; ++AttachmentIndex )
+	{
+		CreateBodyPartAttachment(TorsoContent.DefaultAttachments[AttachmentIndex]);
+	}
+
+	UpdateAnimations();
+
 	MarkAuxParametersAsDirty(m_bAuxParamNeedsPrimary, m_bAuxParamNeedsSecondary, m_bAuxParamUse3POutline);
 }
 
@@ -1955,6 +2253,16 @@ state CharacterCustomization extends InHQ
 	{
 		super.BeginState(PreviousStateName);
 		SetUpdateSkelWhenNotRendered(true);
+	}
+
+	simulated event Tick(float DeltaTime)
+	{
+		super.Tick(DeltaTime);
+		if( CustomizationRotationSet )
+		{
+			SetRotation(CustomizationRotation);
+			CustomizationRotationSet = false;
+		}
 	}
 
 	simulated function OnPostInitAnimTree()

@@ -360,6 +360,18 @@ simulated function string GetPathUnderMouse()
 	return ActionscriptString(MCPath $ ".GetPathUnderMouse");
 }
 
+simulated function ClickPathUnderMouse( optional bool bDebugLogs = false)
+{
+	local ASValue myValue;
+	local Array<ASValue> myArray;
+
+	myValue.Type = AS_Boolean;
+	myValue.b = bDebugLogs;	
+	myArray.AddItem( myValue );
+
+	Invoke(MCPath $ ".ClickPathUnderMouse", myArray);
+}
+
 //Toggles the gfx extension in flash for disabling hittesting. 
 simulated function SetbHitTestDisabled( bool bShouldDisable )
 {

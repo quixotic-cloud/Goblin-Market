@@ -31,6 +31,7 @@ var bool bDirty;
 var bool bNoCancel;
 var bool bDisableEdit;
 var bool bDisableDismiss;
+var bool bDisableLoadout;
 
 // Because game state changes happen when we call UpdateData, 
 // we need to wait until the new XComHQ is created before adding Soldiers to the squad.
@@ -41,11 +42,15 @@ var localized string m_strMission;
 var localized string m_strStripGear;
 var localized string m_strStripGearConfirm;
 var localized string m_strStripGearConfirmDesc;
+var localized string m_strStripWeapons;
+var localized string m_strStripWeaponsConfirm;
+var localized string m_strStripWeaponsConfirmDesc;
 var localized string m_strStripItems;
 var localized string m_strStripItemsConfirm;
 var localized string m_strStripItemsConfirmDesc;
 var localized string m_strBuildItems; 
 
+var localized string m_strTooltipStripWeapons;
 var localized string m_strTooltipStripGear;
 var localized string m_strTooltipStripItems;
 var localized string m_strTooltipNeedsSoldiers;
@@ -105,6 +110,10 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 
 	bDisableEdit = class'XComGameState_HeadquartersXCom'.static.GetObjectiveStatus('T0_M3_WelcomeToHQ') == eObjectiveState_InProgress;
 	bDisableDismiss = bDisableEdit; // disable both buttons for now
+	bDisableLoadout = false;
+
+	//Make sure the kismet variables are up to date
+	WorldInfo.MyKismetVariableMgr.RebuildVariableMap();
 
 	UpdateData(true);
 	UpdateNavHelp();
@@ -129,8 +138,7 @@ function StartPreMissionCinematic()
 {
 	`GAME.GetGeoscape().m_kBase.SetPreMissionSequenceVisibility(true);
 
-	//Link the cinematic pawns to the matinee
-	WorldInfo.MyKismetVariableMgr.RebuildVariableMap();
+	//Link the cinematic pawns to the matinee	
 	WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(true);
 
 	Hide();
@@ -191,6 +199,7 @@ event OnRemoteEvent(name RemoteEventName)
 
 simulated function UpdateData(optional bool bFillSquad)
 {
+	local XComGameStateHistory History;
 	local int i;
 	local int SlotIndex;	//Index into the list of places where a soldier can stand in the after action scene, from left to right
 	local int SquadIndex;	//Index into the HQ's squad array, containing references to unit state objects
@@ -199,8 +208,10 @@ simulated function UpdateData(optional bool bFillSquad)
 	local UISquadSelect_ListItem ListItem;
 	local XComGameState_Unit UnitState;
 	local GeneratedMissionData MissionData;
-	local bool bAllowWoundedSoldiers;
+	local bool bAllowWoundedSoldiers, bSpecialSoldierFound;
+	local array<name> RequiredSpecialSoldiers;
 
+	History = `XCOMHISTORY;
 	ClearPawns();
 
 	// update list positioning in case the number of total slots has changed since init was called
@@ -213,10 +224,66 @@ simulated function UpdateData(optional bool bFillSquad)
 
 	MissionData = XComHQ.GetGeneratedMissionData(XComHQ.MissionRef.ObjectID);
 	bAllowWoundedSoldiers = MissionData.Mission.AllowDeployWoundedUnits;
-
+	RequiredSpecialSoldiers = MissionData.Mission.SpecialSoldiers;
+	
 	// add a unit to the squad if there is one pending
-	if(PendingSoldier.ObjectID > 0 && m_iSelectedSlot != -1)
+	if (PendingSoldier.ObjectID > 0 && m_iSelectedSlot != -1)
 		XComHQ.Squad[m_iSelectedSlot] = PendingSoldier;
+
+	// if this mission requires special soldiers, check to see if they already exist in the squad
+	if (RequiredSpecialSoldiers.Length > 0)
+	{
+		for (i = 0; i < RequiredSpecialSoldiers.Length; i++)
+		{
+			bSpecialSoldierFound = false;
+			for (SquadIndex = 0; SquadIndex < XComHQ.Squad.Length; SquadIndex++)
+			{
+				UnitState = XComGameState_Unit(History.GetGameStateForObjectID(XComHQ.Squad[SquadIndex].ObjectID));
+				if (UnitState != none && UnitState.GetMyTemplateName() == RequiredSpecialSoldiers[i])
+				{
+					bSpecialSoldierFound = true;
+					break;
+				}
+			}
+
+			if (!bSpecialSoldierFound)
+				break; // If a special soldier is missing, break immediately and reset the squad
+		}
+
+		// If no special soldiers are found, clear the squad, search for them, and add them
+		if (!bSpecialSoldierFound)
+		{
+			UpdateState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Add special soldier to squad");
+			XComHQ = XComGameState_HeadquartersXCom(UpdateState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+			XComHQ.Squad.Length = 0;
+
+			foreach History.IterateByClassType(class'XComGameState_Unit', UnitState)
+			{
+				// If this unit is one of the required special soldiers, add them to the squad
+				if (RequiredSpecialSoldiers.Find(UnitState.GetMyTemplateName()) != INDEX_NONE)
+				{
+					UnitState = XComGameState_Unit(UpdateState.CreateStateObject(class'XComGameState_Unit', UnitState.ObjectID));
+					
+					// safety catch: somehow Central has no appearance in the alien nest mission. Not sure why, no time to figure it out - dburchanowski
+					if(UnitState.GetMyTemplate().bHasFullDefaultAppearance && UnitState.kAppearance.nmTorso == '')
+					{
+						`Redscreen("Special Soldier " $ UnitState.ObjectID $ " with template " $ UnitState.GetMyTemplateName() $ " has no appearance, restoring default!");
+						UnitState.kAppearance = UnitState.GetMyTemplate().DefaultAppearance;
+					}
+
+					UpdateState.AddStateObject(UnitState);
+					UnitState.ApplyBestGearLoadout(UpdateState); // Upgrade the special soldier to have the best possible gear
+					
+					if (XComHQ.Squad.Length < SoldierSlotCount) // Only add special soldiers up to the squad limit
+					{
+						XComHQ.Squad.AddItem(UnitState.GetReference());
+					}
+				}
+			}
+
+			StoreGameStateChanges();
+		}
+	}
 
 	// fill out the squad as much as possible
 	if(bFillSquad)
@@ -274,27 +341,31 @@ simulated function UpdateData(optional bool bFillSquad)
 	if(ShowExtraSlot1() && !ShowExtraSlot2())
  		UISquadSelect_ListItem(m_kSlotList.GetItem(m_kSlotList.ItemCount - 1)).Hide();
 	
-	for(SlotIndex = 0; SlotIndex < SlotListOrder.Length; ++SlotIndex)
+	for (SlotIndex = 0; SlotIndex < SlotListOrder.Length; ++SlotIndex)
 	{
 		SquadIndex = SlotListOrder[SlotIndex];
 
 		// The slot list may contain more information/slots than available soldiers, so skip if we're reading outside the current soldier availability. 
-		if( SquadIndex >= SoldierSlotCount )
+		if (SquadIndex >= SoldierSlotCount)
 			continue;
 
-		if( SquadIndex < XComHQ.Squad.length && XComHQ.Squad[SquadIndex].ObjectID > 0 )
+		if (SquadIndex < XComHQ.Squad.length && XComHQ.Squad[SquadIndex].ObjectID > 0)
 		{
 			if (UnitPawns[SquadIndex] != none)
 			{
 				m_kPawnMgr.ReleaseCinematicPawn(self, UnitPawns[SquadIndex].ObjectID);
 			}
-			
+
 			UnitPawns[SquadIndex] = CreatePawn(XComHQ.Squad[SquadIndex], SquadIndex);
 		}
 
 		// We want the slots to match the visual order of the pawns in the slot list.
 		ListItem = UISquadSelect_ListItem(m_kSlotList.GetItem(ListItemIndex));
-		ListItem.UpdateData(SquadIndex, bDisableEdit, bDisableDismiss);
+		UnitState = XComGameState_Unit(History.GetGameStateForObjectID(XComHQ.Squad[SquadIndex].ObjectID));
+		if (RequiredSpecialSoldiers.Length > 0 && UnitState != none && RequiredSpecialSoldiers.Find(UnitState.GetMyTemplateName()) != INDEX_NONE)
+			ListItem.UpdateData(SquadIndex, true, true, false, UnitState.GetSoldierClassTemplate().CannotEditSlots); // Disable customization or removing any special soldier required for the mission
+		else
+			ListItem.UpdateData(SquadIndex, bDisableEdit, bDisableDismiss, bDisableLoadout);
 		++ListItemIndex;
 	}
 
@@ -437,7 +508,7 @@ simulated function MakeWoundedSoldierItemsAvailable()
 	{
 		UnitState = XComGameState_Unit(History.GetGameStateForObjectID(XComHQ.Crew[idx].ObjectID));
 
-		if(UnitState != None && UnitState.IsASoldier() && (UnitState.IsInjured() || UnitState.IsTraining()))
+		if(UnitState != None && UnitState.IsASoldier() && ((UnitState.IsInjured() && !UnitState.IgnoresInjuries()) || UnitState.IsTraining()))
 		{
 			UnitState = XComGameState_Unit(UpdateState.CreateStateObject(class'XComGameState_Unit', UnitState.ObjectID));
 			UpdateState.AddStateObject(UnitState);
@@ -471,6 +542,7 @@ simulated function UpdateNavHelp()
 		if(CheatMgr == none || !CheatMgr.bGamesComDemo)
 		{
 			`HQPRES.m_kAvengerHUD.NavHelp.AddCenterHelp(m_strStripItems, "", OnStripItems, false, m_strTooltipStripItems);
+			`HQPRES.m_kAvengerHUD.NavHelp.AddCenterHelp(m_strStripWeapons, "", OnStripWeapons, false, m_strTooltipStripWeapons);
 			`HQPRES.m_kAvengerHUD.NavHelp.AddCenterHelp(m_strStripGear, "", OnStripGear, false, m_strTooltipStripGear);
 		}
 
@@ -649,10 +721,63 @@ simulated function OnStripGearDialogCallback(eUIAction eAction)
 	}
 }
 
+simulated function OnStripWeapons()
+{
+	local TDialogueBoxData DialogData;
+	DialogData.eType = eDialog_Normal;
+	DialogData.strTitle = m_strStripWeaponsConfirm;
+	DialogData.strText = m_strStripWeaponsConfirmDesc;
+	DialogData.fnCallback = OnStripWeaponsDialogCallback;
+	DialogData.strAccept = class'UIDialogueBox'.default.m_strDefaultAcceptLabel;
+	DialogData.strCancel = class'UIDialogueBox'.default.m_strDefaultCancelLabel;
+	Movie.Pres.UIRaiseDialog(DialogData);
+}
+simulated function OnStripWeaponsDialogCallback(eUIAction eAction)
+{
+	local XComGameStateHistory History;
+	local XComGameState_Unit UnitState;
+	local array<EInventorySlot> RelevantSlots;
+	local array<XComGameState_Unit> Soldiers;
+	local int idx;
+
+	if (eAction == eUIAction_Accept)
+	{
+		History = `XCOMHISTORY;
+		UpdateState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Strip Items");
+		XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class' XComGameState_HeadquartersXCom'));
+		XComHQ = XComGameState_HeadquartersXCom(UpdateState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+		UpdateState.AddStateObject(XComHQ);
+		Soldiers = XComHQ.GetSoldiers(true);
+
+		RelevantSlots.AddItem(eInvSlot_PrimaryWeapon);
+		RelevantSlots.AddItem(eInvSlot_SecondaryWeapon);
+		RelevantSlots.AddItem(eInvSlot_HeavyWeapon);
+
+		for (idx = 0; idx < Soldiers.Length; idx++)
+		{
+			UnitState = XComGameState_Unit(UpdateState.CreateStateObject(class'XComGameState_Unit', Soldiers[idx].ObjectID));
+			UpdateState.AddStateObject(UnitState);
+			UnitState.MakeItemsAvailable(UpdateState, false, RelevantSlots);
+		}
+
+		`GAMERULES.SubmitGameState(UpdateState);
+	}
+}
+
 simulated function OnBuildItems()
 {
 	// This is a screen jump, but NOT a hotlink, so we DO NOT clear down to the HUD. 
 	bDirty = true; // Force a refresh of the pawns when you come back, in case the user purchased new weapons or armor
+
+	// Make sure the camera is set since we are leaving
+	SnapCamera();
+
+	// Wait a frame for camera set to complete
+	SetTimer(0.1f, false, nameof(GoToBuildItemScreen));
+}
+
+simulated function GoToBuildItemScreen()
+{
 	`HQPRES.UIBuildItem();
 }
 
@@ -798,7 +923,13 @@ simulated function OnLaunchMission(UIButton Button)
 
 simulated function CloseScreen()
 {
+	local XComGameStateHistory History;
+	local XComGameState NewGameState;
+	local XComGameState_Unit UnitState;
 	local XComGameState_MissionSite MissionState;
+	local GeneratedMissionData MissionData;
+	local array<name> RequiredSpecialSoldiers;
+	local int idx;
 
 	// Strategy map has its own button help
 	`HQPRES.m_kAvengerHUD.NavHelp.ClearButtonHelp();
@@ -820,6 +951,30 @@ simulated function CloseScreen()
 	else
 	{
 		`XCOMGRI.DoRemoteEvent('PreM_Cancel');
+
+		XComHQ = class'UIUtilities_Strategy'.static.GetXComHQ();
+		MissionData = XComHQ.GetGeneratedMissionData(XComHQ.MissionRef.ObjectID);
+		RequiredSpecialSoldiers = MissionData.Mission.SpecialSoldiers;
+
+		// If special soldiers are required on this mission and they were placed in the squad, remove them
+		if (RequiredSpecialSoldiers.Length > 0)
+		{
+			History = `XCOMHISTORY;
+			NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Remove special soldier from squad");
+			XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+			NewGameState.AddStateObject(XComHQ);
+			
+			for (idx = 0; idx < XComHQ.Squad.Length; idx++)
+			{
+				UnitState = XComGameState_Unit(History.GetGameStateForObjectID(XComHQ.Squad[idx].ObjectID));
+				if (UnitState != none && RequiredSpecialSoldiers.Find(UnitState.GetMyTemplateName()) != INDEX_NONE)
+				{					
+					XComHQ.Squad[idx].ObjectID = 0;					
+				}
+			}
+			
+			`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
+		}
 	}
 }
 
@@ -1213,6 +1368,10 @@ state Cinematic_PawnControl
 				{
 					UnitPawns[PawnIndex].SetHardAttach(true);
 					UnitPawns[PawnIndex].SetBase(Cinedummy);
+
+					//RAM - this combination of flags is necessary to correct an update order issue between the characters, the lift, and their body parts.
+					UnitPawns[PawnIndex].SetTickGroup(TG_PostAsyncWork);
+					UnitPawns[PawnIndex].Mesh.bForceUpdateAttachmentsInTick = false;
 				}
 
 				HumanPawn = XComHumanPawn(UnitPawns[PawnIndex]);
@@ -1258,13 +1417,12 @@ state Cinematic_PawnsIdling extends Cinematic_PawnControl
 {
 	simulated event BeginState(name PreviousStateName)
 	{
-		if(IsVisible() && Movie.Pres.ScreenStack.IsTopScreen(self))
+		if(IsVisible() && Movie.Pres.ScreenStack.IsInStack(self.Class) && !bDirty)
 		{
-			`HQPRES.CAMLookAtNamedLocation(UIDisplayCam, 0);
+			SnapCamera();
 		}
 
 		StartPawnAnimation('CharacterCustomization', 'Gremlin_Idle');
-		
 	}
 }
 

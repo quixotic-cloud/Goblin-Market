@@ -58,6 +58,7 @@ Begin:
 
 	// Start the animation
 	AnimParams.AnimName = AnimName;
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
 	AnimParams.HasDesiredEndingAtom = true;
 	AnimParams.DesiredEndingAtom.Scale = 1.0f;
 	AnimParams.DesiredEndingAtom.Translation = Destination;

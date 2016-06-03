@@ -42,6 +42,7 @@ var localized string m_strIsSuperSoldier;
 var localized string m_strNeedsVeteranStatus;
 var localized string m_strRemoveHelmet;
 var localized string m_strNoVariations;
+var localized string m_strIncompatibleStatus;
 
 delegate static bool IsSoldierEligible(XComGameState_Unit Soldier);
 
@@ -59,13 +60,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	FontSize = bIsIn3D ? class'UIUtilities_Text'.const.BODY_FONT_SIZE_3D : class'UIUtilities_Text'.const.BODY_FONT_SIZE_2D;
 
 	// HAX: Get the Unit from the customization menu screen since the customization manager might have been killed by the previous screen
-	if(Movie.Pres.m_kCustomizeManager == none)
-	{
-		Unit =  UICustomize_Menu(Movie.Stack.GetScreen(class'UICustomize_Menu')).Unit;
-		UnitRef =  UICustomize_Menu(Movie.Stack.GetScreen(class'UICustomize_Menu')).UnitRef;
-		Movie.Pres.InitializeCustomizeManager(Unit);
-	}
-
+	UpdateCustomizationManager();
 	CustomizeManager = Movie.Pres.GetCustomizeManager();
 
 	Unit = GetUnit();
@@ -76,6 +71,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	List = Spawn(class'UIList', self).InitList('armoryMenuList');
 	List.ItemPadding = 5;
 	List.bStickyHighlight = false;
+	List.width = 538;
 	ListBG.ProcessMouseEvents(List.OnChildMouseEvent);
 
 	Header = Spawn(class'UISoldierHeader', self);
@@ -94,6 +90,17 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	List.AddOnInitDelegate(OnListInited);
 
 	Movie.UpdateHighestDepthScreens(); 
+}
+
+// Separate function so it can be overwritten by class specific customization menus
+simulated function UpdateCustomizationManager()
+{
+	if (Movie.Pres.m_kCustomizeManager == none)
+	{
+		Unit = UICustomize_Menu(Movie.Stack.GetScreen(class'UICustomize_Menu')).Unit;
+		UnitRef = UICustomize_Menu(Movie.Stack.GetScreen(class'UICustomize_Menu')).UnitRef;
+		Movie.Pres.InitializeCustomizeManager(Unit);
+	}
 }
 
 simulated function XComGameState_Unit GetUnit()
@@ -256,6 +263,7 @@ simulated static function CycleToSoldier(StateObjectReference NewRef)
 	local UICustomize CustomizeScreen;
 	local UIScreenStack ScreenStack;
 	local UICustomize TopCustomizeScreen;
+	local XComGameState_Unit NewUnit;
 
 	// Update armory screens that might be bellow this screen
 	class'UIArmory'.static.CycleToSoldier(NewRef);
@@ -273,8 +281,23 @@ simulated static function CycleToSoldier(StateObjectReference NewRef)
 
 			if (!bRefreshedMgr)
 			{
-				CustomizeScreen.CustomizeManager.Refresh(CustomizeScreen.Unit, XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(NewRef.ObjectID)));
-				bRefreshedMgr = true;
+				// This code is always run on the first instance of UICustomize in the stack
+				NewUnit = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(NewRef.ObjectID));
+
+				// If the new unit uses a different customization class, the UICustomize menus must be reset
+				if (NewUnit.GetMyTemplate().CustomizationManagerClass != CustomizeScreen.CustomizeManager.Class)
+				{
+					// Pop all of the UICustomize menus, then re-add the appropriate Customization menus for the new unit
+					ScreenStack.PopUntil(CustomizeScreen);
+					ScreenStack.PopFirstInstanceOfClass(class'UICustomize');
+					`HQPRES.UICustomize_Menu(NewUnit, none);
+					break;
+				}
+				else
+				{
+					CustomizeScreen.CustomizeManager.Refresh(CustomizeScreen.Unit, NewUnit);
+					bRefreshedMgr = true;
+				}
 			}
 
 			CustomizeScreen.UnitRef = NewRef;

@@ -9,6 +9,7 @@ var CustomAnimParams    AnimParams;
 var vector				UnitGameStateLocation; //The final location of the unit. May or may not match Destination, depending on whether the final leg of the unit's movement is in the fog
 var XComWorldData		World;
 var bool                IgnoreDestinationMismatch; //If true, does not force pawn to end up at proper destination.
+var bool                bNotifyEnvironmentDamage; // If false, do not notify the environmental damage actions. This is needed for some visualizations that handle it themselves.
 
 function Init(const out VisualizationTrack InTrack)
 {
@@ -54,10 +55,22 @@ simulated function bool HasDoorsOpening()
 
 event bool BlocksAbilityActivation()
 {
+	local XComGameState_Unit UnitState;
+
 	// we only block if the move is interrupted in some way, or if this move is not actually the result of an ability ( certain types of AI move )
+	AbilityContext = XComGameStateContext_Ability(StateChangeContext); // Possible we haven't been inited yet (init happens at action start)
 	if (AbilityContext != none)
 	{
-		return AbilityContext.InterruptionStatus == eInterruptionStatus_Interrupt;
+		if(AbilityContext.InterruptionStatus == eInterruptionStatus_Interrupt)
+		{
+			return true;
+		}
+
+		UnitState = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(AbilityContext.InputContext.SourceObject.ObjectID));
+		if(UnitState.GetTeam() == eTeam_Alien)
+		{
+			return true; // if the aliens are moving around, then we need to wait for them to finish
+		}
 	}
 
 	return false;
@@ -132,7 +145,10 @@ Begin:
 	UnitPawn.Acceleration = vect(0,0,0);
 	UnitPawn.vMoveDirection = vect(0,0,0);
 	
-	FinalNotifyEnvironmentDamage();
+	if( bNotifyEnvironmentDamage )
+	{
+		FinalNotifyEnvironmentDamage();
+	}
 	FinalNotifyBreakInteractiveObject();
 
 	//Make sure we are at the proper location for cover queries
@@ -188,5 +204,6 @@ Begin:
 
 DefaultProperties
 {
-	IgnoreDestinationMismatch = false
+	IgnoreDestinationMismatch=false
+	bNotifyEnvironmentDamage=true
 }

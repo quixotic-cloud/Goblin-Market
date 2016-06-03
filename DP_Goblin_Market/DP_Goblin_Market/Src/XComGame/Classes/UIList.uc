@@ -445,9 +445,12 @@ simulated function OnItemSizeChanged(UIPanel Item)
 simulated function bool OnUnrealCommand(int cmd, int arg)
 {
 	local UIPanel CurrentSelection; 
+	local bool bConsumed; 
 
 	if ( !CheckInputIsReleaseOrDirectionRepeat(cmd, arg) )
 		return false;
+
+	bConsumed = false; 
 
 	if ((cmd == class'UIUtilities_Input'.const.FXS_KEY_ENTER ||
 		 cmd == class'UIUtilities_Input'.const.FXS_BUTTON_A ||
@@ -457,28 +460,28 @@ simulated function bool OnUnrealCommand(int cmd, int arg)
 		CurrentSelection = GetSelectedItem();
 		if( CurrentSelection != none )
 		{
-			CurrentSelection.OnUnrealCommand(cmd, arg);
+			bConsumed = CurrentSelection.OnUnrealCommand(cmd, arg);
 		}
 
-		if( OnItemDoubleClicked != none )
+		if( !bConsumed && OnItemDoubleClicked != none )
 		{
 			OnItemDoubleClicked(self, SelectedIndex);
 			return true;
 		}
 
-		if( OnItemClicked != none )
+		if( !bConsumed && OnItemClicked != none )
 		{
 			OnItemClicked(self, SelectedIndex);
 			return true;
 		}
 	}
 
-	if (super.OnUnrealCommand(cmd, arg))
+	if( !bConsumed && super.OnUnrealCommand(cmd, arg) )
 	{
 		return true;
 	}
 
-	return Navigator.OnUnrealCommand(cmd, arg);
+	return bConsumed || Navigator.OnUnrealCommand(cmd, arg);
 }
 
 simulated function OnChildMouseEvent(UIPanel Control, int cmd)
@@ -494,6 +497,18 @@ simulated function OnChildMouseEvent(UIPanel Control, int cmd)
 			SetSelectedIndex(GetItemIndex(Control));
 			if(OnItemClicked != none)
 				OnItemClicked(self, SelectedIndex);
+		}
+		break;
+
+	case class'UIUtilities_Input'.const.FXS_L_MOUSE_UP_DELAYED:
+		if( `XENGINE.m_SteamControllerManager.IsSteamControllerActive() )
+		{
+			if( HasItem(Control) )
+			{
+				SetSelectedIndex(GetItemIndex(Control));
+				if( OnItemClicked != none )
+					OnItemClicked(self, SelectedIndex);
+			}
 		}
 		break;
 	case class'UIUtilities_Input'.const.FXS_L_MOUSE_DOUBLE_UP:

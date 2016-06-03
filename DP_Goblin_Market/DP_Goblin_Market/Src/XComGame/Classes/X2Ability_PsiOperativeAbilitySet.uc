@@ -121,6 +121,7 @@ static function X2DataTemplate Stasis()
 	local X2AbilityCost_ActionPoints        ActionPointCost;
 	local X2Effect_Stasis                   StasisEffect;
 	local X2AbilityCooldown                 Cooldown;
+	local X2Effect_RemoveEffects            RemoveEffects;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'Stasis');
 
@@ -146,6 +147,10 @@ static function X2DataTemplate Stasis()
 	Template.AbilityTargetConditions.AddItem(new class'X2Condition_StasisTarget');
 	Template.AbilityTargetConditions.AddItem(default.GameplayVisibilityCondition);
 
+	RemoveEffects = new class'X2Effect_RemoveEffects';
+	RemoveEffects.EffectNamesToRemove.AddItem(class'X2Ability_Viper'.default.BindSustainedEffectName);
+	Template.AddTargetEffect(RemoveEffects);
+
 	StasisEffect = new class'X2Effect_Stasis';
 	StasisEffect.BuildPersistentEffect(1, false, false, false, eGameRule_PlayerTurnBegin);
 	StasisEffect.bUseSourcePlayerState = true;
@@ -161,10 +166,54 @@ static function X2DataTemplate Stasis()
 	Template.ActivationSpeech = 'NullShield';
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
-	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildVisualizationFn = Stasis_BuildVisualization;
 	Template.CinescriptCameraType = "Psionic_FireAtUnit";
 
 	return Template;
+}
+
+function Stasis_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+{
+	local XComGameStateHistory History;
+	local XComGameState_Effect RemovedEffect;
+	local VisualizationTrack BuildTrack, EmptyTrack;
+	local int TrackIndex;
+
+	TypicalAbility_BuildVisualization(VisualizeGameState, OutVisualizationTracks);
+	History = `XCOMHISTORY;
+
+	foreach VisualizeGameState.IterateByClassType(class'XComGameState_Effect', RemovedEffect)
+	{
+		if (RemovedEffect.bRemoved)
+		{
+			for (TrackIndex = 0; TrackIndex < OutVisualizationTracks.Length; ++TrackIndex)
+			{
+				if (OutVisualizationTracks[TrackIndex].StateObject_OldState.ObjectID == RemovedEffect.ApplyEffectParameters.SourceStateObjectRef.ObjectID)
+				{
+					BuildTrack = OutVisualizationTracks[TrackIndex];
+					break;
+				}
+			}
+			if (TrackIndex == OutVisualizationTracks.Length)        //  no track was found
+			{
+				BuildTrack = EmptyTrack;
+				BuildTrack.TrackActor = History.GetVisualizer(RemovedEffect.ApplyEffectParameters.SourceStateObjectRef.ObjectID);
+				BuildTrack.StateObject_OldState = History.GetGameStateForObjectID(RemovedEffect.ApplyEffectParameters.SourceStateObjectRef.ObjectID, , VisualizeGameState.HistoryIndex -1);
+				BuildTrack.StateObject_NewState = History.GetGameStateForObjectID(RemovedEffect.ApplyEffectParameters.SourceStateObjectRef.ObjectID);
+			}
+
+			RemovedEffect.GetX2Effect().AddX2ActionsForVisualization_RemovedSource(VisualizeGameState, BuildTrack, 'AA_Success', RemovedEffect);
+
+			if (TrackIndex == OutVisualizationTracks.Length)
+			{
+				OutVisualizationTracks.AddItem(BuildTrack);
+			}
+			else
+			{
+				OutVisualizationTracks[TrackIndex] = BuildTrack;
+			}
+		}
+	}
 }
 
 static function X2AbilityTemplate SoulSteal()

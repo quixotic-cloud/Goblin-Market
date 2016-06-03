@@ -82,6 +82,7 @@ var private array<StateObjectReference> FullCrew; //Clerks + staffable units
 var private XComUnitPawn UnitPawn;
 var private Vector ZeroVec;
 var private X2FacilityTemplate TempFacilityTemplate;
+var private int CurrentVisibleCrew;
 //------------------------------------------------------
 //------------------------------------------------------
 function Init()
@@ -417,6 +418,7 @@ function UpdateHeadStaffLocations()
 	if(HeadScientist == none && !bInShadowChamber)
 	{
 		Pawn = HeadScientistGameState.CreatePawn(self, HeadScientistLocation, HeadScientistRotation, false);
+		Pawn.RestoreAnimSetsToDefault();
 		Pawn.GotoState('InHQ');
 		Pawn.PlayHQIdleAnim();
 		History.SetVisualizer(HeadScientistGameState.ObjectID, Pawn);
@@ -432,6 +434,7 @@ function UpdateHeadStaffLocations()
 	if(HeadEngineer == none && !bInShadowChamber)
 	{
 		Pawn = HeadEngineerGameState.CreatePawn(self, HeadEngineerLocation, HeadEngineerRotation, false);
+		Pawn.RestoreAnimSetsToDefault();
 		Pawn.GotoState('InHQ');
 		Pawn.PlayHQIdleAnim();
 		History.SetVisualizer(HeadEngineerGameState.ObjectID, Pawn);
@@ -746,6 +749,11 @@ private function bool SpawnAndAddCrewToRoom(int RoomIdx, X2FacilityTemplate Faci
 	local int CrewIndex;
 	local XComGameState_Unit CrewStateObject;
 	
+	if( CurrentVisibleCrew >= `XPROFILESETTINGS.Data.MaxVisibleCrew && `XPROFILESETTINGS.Data.MaxVisibleCrew > 0 )
+	{
+		return false;
+	}
+
 	XPres = `HQPRES;
 
 	//If this is not a staff slot, then check to see if we can add this crew member. It is assumed the staff slot logic vetted this transaction so we don't check in that condition
@@ -793,6 +801,8 @@ private function bool SpawnAndAddCrewToRoom(int RoomIdx, X2FacilityTemplate Faci
 
 			m_arrRoomCrew[RoomIdx].Crew.AddItem(CrewInfo);
 		}
+
+		++CurrentVisibleCrew;
 
 		return true;
 	}
@@ -1375,6 +1385,7 @@ simulated state PlacingStaff
 	}
 
 Begin:		
+	CurrentVisibleCrew = 0;
 	for(TempIterator = 0; TempIterator < ProcessingRoomUpdates.Length; ++TempIterator)
 	{
 		//Clear the room out. Stop Matinees, clear pawns, etc. so we can start with a fresh state

@@ -649,7 +649,7 @@ static function FinalMissionOnSuccess()
 				}
 
 				//Otherwise we're making the assumption that all of a Unit's inventory should have a Tier of 0
-				if (InventoryItem.GetMyTemplate().Tier != 0)
+				if (InventoryItem.GetMyTemplate().Tier > 0)
 				{
 					AllConventionalGear = false;
 					break;

@@ -8,6 +8,9 @@
 //---------------------------------------------------------------------------------------
 class X2AbilityCooldown_Global extends X2AbilityCooldown;
 
+// NOTE: The Global cooldown is not using AditionalAbilityCooldowns currently. If desired in the future, use that to give
+// additional abilities global cooldowns.
+
 simulated function ApplyCooldown(XComGameState_Ability kAbility, XComGameState_BaseObject AffectState, XComGameState_Item AffectWeapon, XComGameState NewGameState)
 {
 	local XComGameState_Unit kUnitState;

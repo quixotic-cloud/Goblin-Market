@@ -64,9 +64,9 @@ simulated function UIText SetSubTitle(string NewText, optional delegate<OnTextSi
 	return self;
 }
 
-simulated function UIText SetHtmlText(string NewText, optional delegate<OnTextSizeRealized> TextSizeRealizedDelegate)
+simulated function UIText SetHtmlText(string NewText, optional delegate<OnTextSizeRealized> TextSizeRealizedDelegate, optional bool bForce = false)
 {
-	if(HtmlText != NewText)
+	if(bForce || HtmlText != NewText)
 	{
 		HtmlText = NewText;
 

@@ -572,6 +572,7 @@ simulated function BuildMenu()
 {
 	local int iCurrent; 
 	local XComMPTacticalGRI kMPGRI;
+	local UIListItemString SaveGameListItem;
 
 	kMPGRI = XComMPTacticalGRI(WorldInfo.GRI);
 
@@ -598,7 +599,11 @@ simulated function BuildMenu()
 		{
 			m_optSave = iCurrent++; 
 			//AS_AddOption(m_optSave, m_sSaveAndExitGame, 0);
-			UIListItemString(List.CreateItem()).InitListItem(m_bIsIronman ? m_sSaveAndExitGame : m_sSaveGame).SetDisabled(`TUTORIAL != none, class'XGLocalizedData'.default.SaveDisabledForTutorial);
+			SaveGameListItem = UIListItemString(List.CreateItem()).InitListItem(m_bIsIronman ? m_sSaveAndExitGame : m_sSaveGame);
+			if (`TUTORIAL != None)
+			{
+				SaveGameListItem.DisableListItem(class'XGLocalizedData'.default.SaveDisabledForTutorial);
+			}
 		}
 		
 		// in ironman, you cannot load at any time that saving would normally be disabled
@@ -641,7 +646,7 @@ simulated function BuildMenu()
 		m_optRestart = -1;  //set options to -1 so they don't interfere with the switch statement on selection
 
 	// Only allow changing difficulty if in an active single player game and only at times where saving is permitted
-	if( Movie.Pres.m_eUIMode != eUIMode_Shell && kMPGRI == none && m_bAllowSaving )
+	if( Movie.Pres.m_eUIMode != eUIMode_Shell && kMPGRI == none && m_bAllowSaving && !`ONLINEEVENTMGR.bIsChallengeModeGame)
 	{
 		m_optChangeDifficulty = iCurrent++; 
 		//AS_AddOption(m_optChangeDifficulty, m_sChangeDifficulty, 0);

@@ -8,17 +8,24 @@
 //---------------------------------------------------------------------------------------
 
 class X2Camera_Matinee extends X2Camera
-	dependson(X2MatineeInfo);
+	dependson(X2MatineeInfo)
+	native;
 
 /// <summary>
-/// Contains information about the matinee we will be sampling
+/// If true, the camera will do extra processing to dynamically detect and avoid blocking situations after selection.
+/// This is const global, and exists only too allow easily disabling the detection from an ini switch
 /// </summary>
-var privatewrite X2MatineeInfo MatineeInfo;
+var private const config bool AllowDynamicBlockDetection;
 
 /// <summary>
 /// If TRUE, this matinee camera will allow camera sequences that cross cut from the game camera
 /// </summary>
 var privatewrite config bool AllowCrossCuts;
+
+/// <summary>
+/// Contains information about the matinee we will be sampling
+/// </summary>
+var privatewrite X2MatineeInfo MatineeInfo;
 
 /// <summary>
 /// The current time in the matinee playback.
@@ -83,6 +90,31 @@ var bool PopWhenFinished;
 
 // If true, will update the event track on this matinee
 var bool UpdateEventTrack;
+
+// If the matinee should become blocked at any point, these structure will contain the adjusted camera location.
+// we interpolate to the adjusted location to prevent jumps, so we need to store both the target and the actual
+// locations
+var private bool CameraIsBlockingAdjusted;
+var private TPOV BlockingAdjustedCameraLocation;
+var private TPOV CachedCameraLocation;
+
+/// <summary>
+/// returns true if the given matinee will cause a "cross-cut" from the old camera location.
+/// A cross cut happens when the previous camera was looking at the focus actor's left side,
+/// but the new camera would be looking at his right. Or vice versa.
+/// </summary>
+protected native function bool WillMatineeCrossCut(const out Rotator OldCameraOrientation) const;
+
+/// <summary>
+/// Scores the given matinee for visibility. Higher scores indicate more blocking geometry.
+/// </summary>
+private function native bool IsMatineeBlocked(SeqAct_Interp Matinee, Actor FocusActor);
+
+/// <summary>
+/// Ensures that base actors are added to the ActorsToIgnoreForBlockingDetermination array. Should be called before
+/// doing blocking determinations
+/// </summary>
+private function native AddFocusUnitToIgnoreActors();
 
 function bool ShouldBlendFromCamera(X2Camera PreviousActiveCamera)
 {
@@ -218,7 +250,7 @@ function SetExplicitMatineeLocation(Vector MatineeLocation, Rotator MatineeFacin
 /// camera will be adjusted so that the matinee's world origin is centered and oriented at that
 /// location in the world.
 /// </summary>
-function SetMatinee(SeqAct_Interp Matinee, Actor FocusActor)
+event SetMatinee(SeqAct_Interp Matinee, Actor FocusActor)
 {
 	if(MatineeInfo == none)
 	{
@@ -230,134 +262,6 @@ function SetMatinee(SeqAct_Interp Matinee, Actor FocusActor)
 	MatineeFocusActor = FocusActor;
 
 	CenterMatinee();
-}
-
-/// <summary>
-/// Simple helper function to prevent repeating this code block.
-/// </summary>
-protected function bool IsLineOfSightBlockedToActor(Vector TestPoint, Actor FocusActor)
-{
-	local Actor HitActor;
-	local XComLevelActor LevelActor;
-	local XComFracLevelActor FracLevelActor;
-	local XGUnit FocusUnit;
-	local Vector FocusTarget;
-	local Vector HitLocation;
-	local Vector HitNormal;
-
-	FocusUnit = XGUnit(FocusActor);
-
-	FocusTarget = FocusUnit != none ? FocusUnit.GetPawn().GetHeadLocation() : FocusActor.Location;
-
-	ForEach `BATTLE.TraceActors(class'Actor', 
-						HitActor, 
-						HitLocation, 
-						HitNormal, 
-						TestPoint, 
-						FocusTarget, 
-						vect(0,0,0))
-	{
-		// don't count the firing and targeted units, we only care if something else is in the way
-		if(HitActor == FocusActor || (FocusUnit != none && HitActor == FocusUnit.GetPawn()))
-		{
-			continue;
-		}
-
-		// ignore any other actors that the callee doesn't care about
-		if(ActorsToIgnoreForBlockingDetermination.Find(HitActor) != INDEX_NONE)
-		{
-			continue;
-		}
-
-		// these get pulled in from matinees with animation
-		if(SkeletalMeshCinematicActor(HitActor) != none)
-		{
-			continue;
-		}
-
-		// if this actor doesn't block unit visibility, then it shouldn't block our trace either
-		LevelActor = XComLevelActor(HitActor);
-		if(LevelActor != none && !LevelActor.ShouldBlockCameraTraces())
-		{
-			continue;
-		}
-
-		FracLevelActor = XComFracLevelActor(HitActor);
-		if(FracLevelActor != none && !FracLevelActor.ShouldBlockCameraTraces())
-		{
-			continue;
-		}
-
-		// actors outside of pawns, level actors and frac level actors don't matter. We've had issues with
-		// being blocked by dumb stuff like points in space, so if it isn't explicitly level geo we don't care
-		if(LevelActor == none && FracLevelActor == none)
-		{
-			continue;
-		}
-
-		return true;
-	}
-
-	return false;
-}
-
-/// <summary>
-/// Scores the given matinee for visibility. Higher scores indicate more blocking geometry.
-/// </summary>
-private function bool IsMatineeBlocked(SeqAct_Interp Matinee, Actor FocusActor)
-{
-	local float SampleTime; // sample every second
-	local TPOV CameraLocation;
-	local Vector LastSamplePoint;
-	local bool LastSampleTooClose;
-	local float TimeStep;
-
-	SetMatinee(Matinee, FocusActor);
-
-	// sample the matinee along the path to determine how blocked it is. Take four samples every second (max of 20 samples)
-	// of matinee time, but only do a trace if the new sample is at least half a tile away from the 
-	// last sample we took. Otherwise we're just burning cpu time on redundant ray traces.
-	TimeStep = fMax(0.25f, MatineeInfo.GetMatineeDuration() / 20.0f);
-	for(SampleTime = 0; SampleTime < MatineeInfo.GetMatineeDuration(); SampleTime += TimeStep)
-	{
-		MatineeInfo.SampleDirectorTrack(SampleTime, CameraLocation);
-
-		LastSampleTooClose = SampleTime != 0 && VSize(LastSamplePoint - CameraLocation.Location) < class'XComWorldData'.const.WORLD_HalfStepSize;
-		if(!LastSampleTooClose)
-		{
-			if(IsLineOfSightBlockedToActor(CameraLocation.Location, FocusActor))
-			{
-				return true;
-			}
-
-			LastSamplePoint = CameraLocation.Location;
-		}
-	}
-
-	return false;
-}
-
-/// <summary>
-/// returns true if the given matinee will cause a "cross-cut" from the old camera location.
-/// A cross cut happens when the previous camera was looking at the focus actor's left side,
-/// but the new camera would be looking at his right. Or vice versa.
-/// </summary>
-protected function bool WillMatineeCrossCut(Rotator OldCameraOrientation)
-{
-	local Vector PlaneNormal;
-	local float PlaneDotOldCamera;
-	local float PlaneDotMatinee;
-	local TPov MatineeCameraLocation;
-
-	MatineeInfo.SampleDirectorTrack(0, MatineeCameraLocation);
-
-	// fake a vertical plane along the line of the focus actor's facing
-	PlaneNormal = Vector(MatineeInfo.SamplingOriginOrientation) cross vect(0,0,1);
-
-	PlaneDotOldCamera = PlaneNormal dot Vector(OldCameraOrientation);
-	PlaneDotMatinee = PlaneNormal dot Vector(MatineeCameraLocation.Rotation);
-
-	return sgn(PlaneDotOldCamera) != sgn(PlaneDotMatinee);
 }
 
 protected function bool FocusActorWillCollide()
@@ -500,6 +404,9 @@ function UpdateCamera(float DeltaTime)
 {
 	local float MatineeDuration;
 	local float SlomoRate;
+	local TPOV CameraLocation;
+	local vector TargetLocation;
+	local float LerpAlpha;
 
 	super.UpdateCamera(DeltaTime);
 
@@ -508,52 +415,104 @@ function UpdateCamera(float DeltaTime)
 		// we still haven't been activated the first time
 		return;
 	}
+
+	if(UpdateEventTrack)
+	{
+		MatineeInfo.TriggerEvents(MatineeTime, DeltaTime);
+	}
+
+	if(MatineeInfo.SampleSlomoTrack(MatineeTime, SlomoRate))
+	{
+		class'WorldInfo'.static.GetWorldInfo().Game.SetGameSpeed(SlomoRate);
+	}
+
+	MatineeTime = MatineeTime + DeltaTime;
+	
+	// update the matinee time
+	MatineeDuration = MatineeInfo.GetMatineeDuration();
+	if(MatineeTime >= MatineeDuration)
+	{
+		if(MatineeInfo.Matinee.bLooping)
+		{
+			// looping matinee, so go back to the beginning
+			MatineeTime = MatineeTime % MatineeDuration;
+		}
+		else
+		{
+			// not looping clamp to the end
+			MatineeTime = MatineeDuration;
+
+			if(PopWhenFinished)
+			{
+				RemoveSelfFromCameraStack();
+				return;
+			}
+		}
+	}
+
+	// and then compute and cache the camera location
+	// if the camera was ever blocked, stay there unless it get blocked again and needs further adjustment.
+	// this prevents the camera from bouncing around a lot as it becomes blocked and then unblocked
+	if(!CameraIsBlockingAdjusted)
+	{
+		// the camera is still clear, so continue sampling from the matinee
+		MatineeInfo.SampleDirectorTrack(MatineeTime, CameraLocation, CachedPostProcessParameters);
+	}
 	else
 	{
-		if(UpdateEventTrack)
+		CameraLocation = BlockingAdjustedCameraLocation;
+	}
+
+	// Don't want to do this for ShouldAlwaysShow cameras either, as they implicitly do not
+	// care about blocking
+	if(AllowDynamicBlockDetection && MatineeFocusActor != none && !ShouldAlwaysShow)
+	{
+		// ignore the matinee target and any additional ignore actors
+		if(XGUnit(MatineeFocusActor) != none)
 		{
-			MatineeInfo.TriggerEvents(MatineeTime, DeltaTime);
+			TargetLocation = XGUnit(MatineeFocusActor).GetPawn().GetHeadLocation();
+		}
+		else
+		{
+			TargetLocation = MatineeFocusActor.Location;
 		}
 
-		if(MatineeInfo.SampleSlomoTrack(MatineeTime, SlomoRate))
+		// check to see if our desired camera location is blocked and needs to be adjusted
+		AddFocusUnitToIgnoreActors();
+		if(AdjustCameraForBlockage(CameraLocation.Location, CameraLocation.Rotation, TargetLocation, ActorsToIgnoreForBlockingDetermination))
 		{
-			class'WorldInfo'.static.GetWorldInfo().Game.SetGameSpeed(SlomoRate);
-		}
+			// blocked!
+			BlockingAdjustedCameraLocation = CameraLocation;
+			CameraIsBlockingAdjusted = true;
 
-		MatineeTime = MatineeTime + DeltaTime;
-	
-		MatineeDuration = MatineeInfo.GetMatineeDuration();
-		if(MatineeTime >= MatineeDuration)
-		{
-			if(MatineeInfo.Matinee.bLooping)
+			if(CameraLocation.Location == vect(0,0,0))
 			{
-				// looping matinee, so go back to the beginning
-				MatineeTime = MatineeTime % MatineeDuration;
-			}
-			else
-			{
-				// not looping clamp to the end
-				MatineeTime = MatineeDuration;
-
-				if(PopWhenFinished)
-				{
-					RemoveSelfFromCameraStack();
-				}
+				// if this is the first frame the camera is active, then there is no cached location to interpolate from.
+				CachedCameraLocation = CameraLocation;
 			}
 		}
+	}
+	else
+	{
+		CachedCameraLocation = CameraLocation;
+	}
+
+	if(CameraIsBlockingAdjusted)
+	{
+		// smoothly interpolate to the unblocked location
+		LerpAlpha = fMin(DeltaTime * 2, 1.0f);
+		CachedCameraLocation.Location = VLerp(CachedCameraLocation.Location, BlockingAdjustedCameraLocation.Location, LerpAlpha);
+		CachedCameraLocation.Rotation = RLerp(CachedCameraLocation.Rotation, BlockingAdjustedCameraLocation.Rotation, LerpAlpha, true);
+	}
+	else
+	{
+		CachedCameraLocation = CameraLocation;
 	}
 }
 
 function TPOV GetCameraLocationAndOrientation()
 {
-	local TPOV CameraLocation;
-
-	if(MatineeInfo != none)
-	{
-		MatineeInfo.SampleDirectorTrack(MatineeTime, CameraLocation, CachedPostProcessParameters);
-	}
-
-	return CameraLocation;
+	return CachedCameraLocation;
 }
 
 function bool GetCameraPostProcessOverrides(out PostProcessSettings PostProcessOverrides)

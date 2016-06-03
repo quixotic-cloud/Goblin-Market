@@ -14,6 +14,7 @@ class UIScrollingText extends UIPanel;
 // UIText member variables
 var string text;
 var string htmlText;
+var bool bDisabled; //For gray text coloring 
 
 simulated function UIScrollingText InitScrollingText(optional name InitName, optional string initText, optional float initWidth,
 															 optional float initX, optional float initY, optional bool useTitleFont)
@@ -64,9 +65,9 @@ simulated function UIScrollingText SetSubTitle(optional string txt)
 	return self;
 }
 
-simulated function UIScrollingText SetHTMLText(optional string txt)
+simulated function UIScrollingText SetHTMLText(optional string txt, optional bool bForce = false)
 {
-	if(htmlText != txt)
+	if(bForce || htmlText != txt)
 	{
 		htmlText = txt;
 		mc.FunctionString("setText", htmlText);
@@ -99,6 +100,16 @@ simulated function UIPanel SetSize(float NewWidth, float NewHeight)
 simulated function UIScrollingText ResetScroll()
 {
 	mc.FunctionVoid("resetScroll");
+	return self;
+}
+
+simulated function UIScrollingText SetDisabled(optional bool bDisable = true)
+{
+	if( bDisabled != bDisable )
+	{
+		bDisabled = bDisable;
+		mc.FunctionBool("setDisabled", bDisabled);
+	}
 	return self;
 }
 

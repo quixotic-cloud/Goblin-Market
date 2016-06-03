@@ -552,6 +552,12 @@ struct native TAppearance
 	var name nmArms_Underlay;
 	var name nmLegs_Underlay;
 	var name nmFacePaint;
+
+	//Added to support armors that allow left arm / right arm customization
+	var name nmLeftArm;		
+	var name nmRightArm;	
+	var name nmLeftArmDeco;	
+	var name nmRightArmDeco;
 };
 
 struct native ExtensibleAppearanceElement

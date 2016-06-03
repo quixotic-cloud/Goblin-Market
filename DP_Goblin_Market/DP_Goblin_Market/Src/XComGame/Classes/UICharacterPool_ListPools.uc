@@ -83,6 +83,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 
 	// Create BG
 	BG = Spawn(class'UIBGBox', Container).InitBG('', 0, 0, Container.width, Container.height);
+	BG.SetAlpha(80);
 
 	// Create Title text
 	TitleHeader = Spawn(class'UIX2PanelHeader', Container);

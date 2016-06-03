@@ -66,3 +66,8 @@ Begin:
 
 	CompleteAction();
 }
+
+defaultproperties
+{
+	bCauseTimeDilationWhenInterrupting = true
+}

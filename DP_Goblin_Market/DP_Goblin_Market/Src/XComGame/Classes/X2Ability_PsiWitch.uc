@@ -640,6 +640,7 @@ static function X2AbilityTemplate CreateAvatarInitializationAbility()
 {
 	local X2AbilityTemplate Template;
 	local X2Effect_Regeneration RegenerationEffect;
+	local X2Effect_DamageImmunity DamageImmunity;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'AvatarInitialization');
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_mentalfortress"; 
@@ -662,6 +663,13 @@ static function X2AbilityTemplate CreateAvatarInitializationAbility()
 	RegenerationEffect.HealAmount = default.AVATAR_REGENERATION_HEAL_VALUE;
 	RegenerationEffect.EventToTriggerOnHeal = 'AvatarInitializationHeal';
 	Template.AddTargetEffect(RegenerationEffect);
+
+	// Build the immunities
+	DamageImmunity = new class'X2Effect_DamageImmunity';
+	DamageImmunity.BuildPersistentEffect(1, true, true, true);
+	DamageImmunity.ImmuneTypes.AddItem(class'X2Item_DefaultDamageTypes'.default.DisorientDamageType);
+	DamageImmunity.ImmuneTypes.AddItem('stun');
+	DamageImmunity.ImmuneTypes.AddItem('Unconscious');
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
 

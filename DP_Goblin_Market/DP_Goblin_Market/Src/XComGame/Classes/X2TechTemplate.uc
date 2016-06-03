@@ -21,12 +21,12 @@ var bool				bRepeatable;
 var bool				bJumpToLabs;  // On complete does this tech automatically jump to the labs
 var string				strImage;
 var array<Name>			ItemRewards;
-var array<Name>			ItemsToUpgrade; // Items that should be upgraded upon completion of this tech
 var Name				RewardDeck; // Deck a random reward should be drawn from
 var int					SortingTier; // The importance "tier" of this tech, used for sorting in lists
 
 // Requirements and Cost
 var config StrategyRequirement Requirements;
+var config array<StrategyRequirement> AlternateRequirements; // Other possible StrategyRequirements for this tech
 var config StrategyRequirement InstantRequirements; // If these requirements are met, the tech will become instant
 var config StrategyCost	Cost;
 

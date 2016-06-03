@@ -48,39 +48,42 @@ simulated state Executing
 	}
 
 Begin:
-	if( !bNewUnitSelected )
+	if( !ShouldPlayZipMode() )
 	{
-		LookAtCamera = new class'X2Camera_LookAtActor';
-		LookAtCamera.ActorToFollow = WorldNarrativeActor;
-		LookAtCamera.UseTether = false;
-		`CAMERASTACK.AddCamera(LookAtCamera);
-
-		while( LookAtCamera != None && !LookAtCamera.HasArrived )
+		if( !bNewUnitSelected )
 		{
-			Sleep(0.1f);
-		}
-	}
+			LookAtCamera = new class'X2Camera_LookAtActor';
+			LookAtCamera.ActorToFollow = WorldNarrativeActor;
+			LookAtCamera.UseTether = false;
+			`CAMERASTACK.AddCamera(LookAtCamera);
 
-	if (WorldNarrativeActor.NarrativeMoment.eType == eNarrMoment_VoiceOnlySoldierVO)
-	{
-		if (SpeakingUnit != none)
-			SpeakingUnit.UnitSpeak(WorldNarrativeActor.NarrativeMoment.SoldierVO);
-	}
-	else
-	{
-		if (WorldNarrativeActor.NarrativeMoment != none)
-		{
-			`PRES().UINarrative(WorldNarrativeActor.NarrativeMoment, , OnFinishedNarrative);
-
-			WaitingForCompletion = true;
-			while (WaitingForCompletion)
+			while( LookAtCamera != None && !LookAtCamera.HasArrived && LookAtCamera.IsLookAtValid() )
 			{
-				Sleep(0.1);
+				Sleep(0.1f);
 			}
+		}
+
+		if( WorldNarrativeActor.NarrativeMoment.eType == eNarrMoment_VoiceOnlySoldierVO )
+		{
+			if( SpeakingUnit != none )
+				SpeakingUnit.UnitSpeak(WorldNarrativeActor.NarrativeMoment.SoldierVO);
 		}
 		else
 		{
-			`RedScreen("X2Action_PlayWorldNarrative - NarrativeMoment is none:" @ WorldNarrativeActor);
+			if( WorldNarrativeActor.NarrativeMoment != none )
+			{
+				`PRES().UINarrative(WorldNarrativeActor.NarrativeMoment, , OnFinishedNarrative);
+
+				WaitingForCompletion = true;
+				while( WaitingForCompletion )
+				{
+					Sleep(0.1);
+				}
+			}
+			else
+			{
+				`RedScreen("X2Action_PlayWorldNarrative - NarrativeMoment is none:" @ WorldNarrativeActor);
+			}
 		}
 	}
 

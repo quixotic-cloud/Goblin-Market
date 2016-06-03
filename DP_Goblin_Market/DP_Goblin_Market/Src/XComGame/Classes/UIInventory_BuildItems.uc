@@ -448,7 +448,7 @@ simulated function bool CanBuildItem(X2ItemTemplate Item)
 	}
 
 	EngBonus = class'UIUtilities_Strategy'.static.GetEngineeringDiscount(Item.Requirements.RequiredEngineeringScore);
-	return XComHQ.MeetsRequirmentsAndCanAffordCost(Item.Requirements, Item.Cost, XComHQ.ItemBuildCostScalars, EngBonus);
+	return XComHQ.MeetsRequirmentsAndCanAffordCost(Item.Requirements, Item.Cost, XComHQ.ItemBuildCostScalars, EngBonus, Item.AlternateRequirements);
 }
 
 //------------------------------------------------------

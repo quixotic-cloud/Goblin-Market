@@ -17,8 +17,8 @@ var const bool                        bUseFullXpSystem; //  If true, RequiredXp 
 var protected config array<int>       RequiredXp;       //  defines total XP needed for each rank
 var protected localized array<string> RankNames;        //  there should be one name for each rank; e.g. Rookie, Squaddie, etc.
 var protected localized array<string> ShortNames;       //  the abbreviated rank name; e.g. Rk., Sq., etc.
-var protected localized array<string> PsiRankNames;     //  there should be one name for each rank; e.g. Initiate, Acolyte, etc.
-var protected localized array<string> PsiShortNames;    //  the abbreviated rank name; e.g. Ini., Aco., etc.
+var protected localized array<string> PsiRankNames;     //  deprecated
+var protected localized array<string> PsiShortNames;    //  deprecated
 var config array<XpEventDef>          XpEvents;         //  defines the name, shares, pool amount, and restrictions of all known XP-granting events
 var protected config array<int>       BaseMissionXp;    //  configured by force level
 var protected config array<int>       BonusMissionXp;   //  configured by force level
@@ -83,20 +83,28 @@ static native function int GetMaxKillscore(int ForceLevel);
 
 static function string GetRankName(const int Rank, name ClassName)
 {
+	local X2SoldierClassTemplate ClassTemplate;
+
 	CheckRank(Rank);
 	
-	if (ClassName == 'PsiOperative')
-		return default.PsiRankNames[Rank];
+	ClassTemplate = class'X2SoldierClassTemplateManager'.static.GetSoldierClassTemplateManager().FindSoldierClassTemplate(ClassName);
+	
+	if (ClassTemplate != none && ClassTemplate.RankNames.Length > 0)
+		return ClassTemplate.RankNames[Rank];
 	else
 		return default.RankNames[Rank];
 }
 
 static function string GetShortRankName(const int Rank, name ClassName)
 {
+	local X2SoldierClassTemplate ClassTemplate;
+
 	CheckRank(Rank);
 
-	if (ClassName == 'PsiOperative')
-		return default.PsiShortNames[Rank];
+	ClassTemplate = class'X2SoldierClassTemplateManager'.static.GetSoldierClassTemplateManager().FindSoldierClassTemplate(ClassName);
+
+	if (ClassTemplate != none && ClassTemplate.ShortNames.Length > 0)
+		return ClassTemplate.ShortNames[Rank];
 	else
 		return default.ShortNames[Rank];
 }

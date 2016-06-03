@@ -52,7 +52,8 @@ Begin:
 	{
 		AnimParams.AnimName = 'MV_ClimbLowObject_Over1Tile';
 	}
-	
+
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
 	AnimParams.HasDesiredEndingAtom = true;
 	LandingLocation.Z = Unit.GetDesiredZForLocation(LandingLocation);
 	AnimParams.DesiredEndingAtom.Translation = LandingLocation;

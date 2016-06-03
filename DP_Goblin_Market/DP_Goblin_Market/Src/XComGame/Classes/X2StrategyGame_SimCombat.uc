@@ -79,6 +79,9 @@ static function SimCombat()
 	local int NumAlive;
 	local bool bTacticalSuccess, bStrategySuccess, bTriadSuccess;
 	local array<StateObjectReference> Enemies;
+	local XComOnlineEventMgr EventManager;
+	local array<X2DownloadableContentInfo> DLCInfos;
+	local int i;
 
 	class'XComGameStateContext_StrategyGameRule'.static.UpdateSkyranger();
 	InitializeMission(SummaryData);
@@ -96,6 +99,13 @@ static function SimCombat()
 	ProcessMission(bTacticalSuccess, bStrategySuccess, bTriadSuccess, SummaryData);
 
 	class'XComGameStateContext_StrategyGameRule'.static.SquadTacticalToStrategyTransfer();
+
+	EventManager = `ONLINEEVENTMGR;
+	DLCInfos = EventManager.GetDLCInfos(false);
+	for (i = 0; i < DLCInfos.Length; ++i)
+	{
+		DLCInfos[i].OnPostMission();
+	}
 
 	CompleteTacticalGoldenPathObjectives();
 
@@ -263,6 +273,9 @@ static function InitializeMission(out TSimCombatSummaryData SummaryData)
 	local X2SelectedMissionData EmptyMissionData;
 	local XComGameState_Player CivilianPlayerState;
 	local XComGameState_GameTime TimeState;
+	local XComOnlineEventMgr EventManager;
+	local array<X2DownloadableContentInfo> DLCInfos;
+	local int i;
 
 	History = `XCOMHISTORY;
 	TacticalMissionManager = `TACTICALMISSIONMGR;
@@ -301,6 +314,13 @@ static function InitializeMission(out TSimCombatSummaryData SummaryData)
 	SummaryData.MissionName = MissionData.BattleOpName;
 	SummaryData.MissionType = class'X2MissionTemplateManager'.static.GetMissionTemplateManager().GetMissionDisplayName(MissionData.Mission.MissionName);
 	SummaryData.MissionLocation = MissionState.GetWorldRegion().GetMyTemplate().DisplayName;
+
+	EventManager = `ONLINEEVENTMGR;
+	DLCInfos = EventManager.GetDLCInfos(false);
+	for (i = 0; i < DLCInfos.Length; ++i)
+	{
+		DLCInfos[i].OnPreMission(NewGameState, MissionState);
+	}
 
 	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
 }

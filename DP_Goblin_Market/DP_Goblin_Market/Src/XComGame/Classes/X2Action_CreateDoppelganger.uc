@@ -116,7 +116,11 @@ simulated state Executing
 			DestinationPawn.m_kHeadMeshComponent = DestinationPawn.Mesh;
 
 			CopyMeshAndMaterials(SourcePawn.m_kTorsoComponent, DestinationPawn.m_kTorsoComponent, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
-			CopyMeshAndMaterials(SourcePawn.m_kArmsMC, DestinationPawn.m_kArmsMC, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
+			CopyMeshAndMaterials(SourcePawn.m_kArmsMC, DestinationPawn.m_kArmsMC, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);			
+			CopyMeshAndMaterials(SourcePawn.m_kLeftArm, DestinationPawn.m_kLeftArm, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
+			CopyMeshAndMaterials(SourcePawn.m_kRightArm, DestinationPawn.m_kRightArm, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
+			CopyMeshAndMaterials(SourcePawn.m_kLeftArmDeco, DestinationPawn.m_kLeftArmDeco, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
+			CopyMeshAndMaterials(SourcePawn.m_kRightArmDeco, DestinationPawn.m_kRightArmDeco, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
 			CopyMeshAndMaterials(SourcePawn.m_kLegsMC, DestinationPawn.m_kLegsMC, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
 			CopyMeshAndMaterials(SourcePawn.m_kHelmetMC, DestinationPawn.m_kHelmetMC, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
 			CopyMeshAndMaterials(SourcePawn.m_kDecoKitMC, DestinationPawn.m_kDecoKitMC, SourcePawn.Mesh, DestinationPawn.Mesh, SourcePawn.LightEnvironment);
@@ -214,7 +218,7 @@ Begin:
 			// Wait for the Original units ragdoll to complete (but not forever, don't let this hang us!)
 			if( (StartAnimationMaxDelaySec > 0) && (StartAnimationMinDelaySec > 0) )
 			{
-				Sleep(GetAnimationDelay());
+				Sleep(GetAnimationDelay() * GetDelayModifier());
 			}
 
 			DoppelgangerUnit.GetPawn().EnableRMA(true, true);
@@ -264,4 +268,5 @@ DefaultProperties
 	bReceivedStartMessage=false
 	bAllowNewAnimationsOnDoppelganger=true
 	bReplacingOriginalUnit=true
+	bCauseTimeDilationWhenInterrupting = true
 }

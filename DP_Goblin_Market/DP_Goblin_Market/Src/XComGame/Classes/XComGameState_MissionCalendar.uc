@@ -59,7 +59,7 @@ function bool Update(XComGameState NewGameState)
 	StrategyMap = `HQPRES.StrategyMap2D;
 
 	// Do not spawn any new missions while the Avenger or Skyranger are flying, or if another popup is already being presented
-	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+	if (StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.IsCurrentClass(class'UIAlert'))
 	{
 		// Check for mission events
 		for (idx = 0; idx < CurrentMissionMonth.Length; idx++)

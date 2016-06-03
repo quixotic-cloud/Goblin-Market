@@ -3,8 +3,9 @@ class X2Item_DefaultDamageTypes extends X2Item config(GameData_WeaponData);
 var name DefaultDamageType;
 var privatewrite name KnockbackDamageType;
 var privatewrite name ParthenogenicPoisonType;
+var privatewrite name DisorientDamageType;
 
-var array<name> DamagedTeleport_DmgNotAllowed;
+var config array<name> DamagedTeleport_DmgNotAllowed;
 
 static function array<X2DataTemplate> CreateTemplates()
 {
@@ -33,6 +34,7 @@ static function array<X2DataTemplate> CreateTemplates()
 	DamageTypes.AddItem(CreateMentalDamageType());
 	DamageTypes.AddItem(CreateUnconsciousDamageType());
 	DamageTypes.AddItem(CreateNonflammableExplosionDamageType());
+	DamageTypes.AddItem(CreateDisorientDamageType());
 	
 	return DamageTypes;
 }
@@ -298,15 +300,23 @@ static function X2DamageTypeTemplate CreateNonflammableExplosionDamageType()
 	return Template;
 }
 
+static function X2DamageTypeTemplate CreateDisorientDamageType()
+{
+	local X2DamageTypeTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2DamageTypeTemplate', Template, default.DisorientDamageType);
+
+	Template.bCauseFracture = false;
+	Template.MaxFireCount = 0;
+	Template.bAllowAnimatedDeath = true;
+
+	return Template;
+}
+
 defaultproperties
 {
 	DefaultDamageType = "DefaultProjectile"
 	KnockbackDamageType="KnockbackDamage"
 	ParthenogenicPoisonType="ParthenogenicPoison"
-
-	DamagedTeleport_DmgNotAllowed(0)="Fire"
-	DamagedTeleport_DmgNotAllowed(1)="Acid"
-	DamagedTeleport_DmgNotAllowed(2)="Poison"
-	DamagedTeleport_DmgNotAllowed(3)="ParthenogenicPoison"
-	DamagedTeleport_DmgNotAllowed(4)="ViperCrush"
+	DisorientDamageType="Disorient"
 }

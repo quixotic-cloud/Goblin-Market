@@ -138,8 +138,8 @@ simulated public function ConfirmIronman(UIButton ButtonControl)
 	local UIShellDifficulty difficultyMenu;
 	difficultyMenu = UIShellDifficulty(Movie.Stack.GetFirstInstanceOf(class'UIShellDifficulty'));
 	difficultyMenu.UpdateIronman(true);
-	Movie.Stack.Pop(self); 
-	difficultyMenu.OnDifficultyConfirm(ButtonControl);
+	Movie.Stack.Pop(self);
+	Movie.Pres.UIShellNarrativeContent();
 }
 
 simulated public function ConfirmWithoutIronman(UIButton ButtonControl)
@@ -148,7 +148,7 @@ simulated public function ConfirmWithoutIronman(UIButton ButtonControl)
 	difficultyMenu = UIShellDifficulty(Movie.Stack.GetFirstInstanceOf(class'UIShellDifficulty'));
 	difficultyMenu.UpdateIronman(false);
 	Movie.Stack.Pop(self); 
-	difficultyMenu.OnDifficultyConfirm(ButtonControl);
+	Movie.Pres.UIShellNarrativeContent();
 }
 
 simulated function OnReceiveFocus()

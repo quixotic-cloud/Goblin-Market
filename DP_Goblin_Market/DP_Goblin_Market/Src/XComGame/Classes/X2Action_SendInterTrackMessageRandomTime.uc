@@ -26,7 +26,7 @@ simulated state Executing
 	}
 
 Begin:
-	Sleep(GetAnimationDelay());
+	Sleep(GetAnimationDelay() * GetDelayModifier());
 
 	if( SendTrackMessageToRef.ObjectID != 0 )
 	{

@@ -14,6 +14,7 @@ var int MaxPointsPerTurn;           //  max times per turn the action point can 
 var bool bDirectAttackOnly;         //  covering fire check can only match when the target of this effect is directly attacked
 var bool bPreEmptiveFire;           //  if true, the reaction fire will happen prior to the attacker's shot; otherwise it will happen after
 var bool bOnlyDuringEnemyTurn;      //  only activate the ability during the enemy turn (e.g. prevent return fire during the sharpshooter's own turn)
+var bool bUseMultiTargets;          //  initiate AbilityToActivate against yourself and look for multi targets to hit, instead of direct retaliation
 
 function RegisterForEvents(XComGameState_Effect EffectGameState)
 {

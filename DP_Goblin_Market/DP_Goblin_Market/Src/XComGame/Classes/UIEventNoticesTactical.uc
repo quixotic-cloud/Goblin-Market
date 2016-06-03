@@ -39,7 +39,6 @@ function EventListenerReturn RankUpMessageListener(Object EventData, Object Even
 	if (UnitState != None)
 	{
 		Display = Repl(RankUpMessage, "%NAME", UnitState.GetName(eNameType_RankLast));
-		`PRES.Notify(Display, default.RankUpIcon);
 		`COMBATLOG(Display);
 
 		UnitState.RankUpTacticalVisualization();

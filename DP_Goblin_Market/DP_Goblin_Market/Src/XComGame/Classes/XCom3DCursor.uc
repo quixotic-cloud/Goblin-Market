@@ -9,10 +9,11 @@ class XCom3DCursor extends XComPawn
 	native(Unit)
 	config(GameCore);
 
-var const config int MaxFloor; // highest floor the units can path to/the cursor can ascend to.
 var const config float CursorFloorHeight; // how high is each floor, in unreal units?
 var const config float CursorFloorOffset; // In the case that the floor volumes do not start at Z == 0, what is the Z Offset at which they start.
 var const config float MinDrawCylinderHeightThreshold; // how high above the ground, in units, must a flying unit be before drawing the height cylinder
+
+var protected int CachedMaxFloor; // cached from the plot definition of the current map. Don't use directly, instead call GetMaxFloor()
 
 struct native CursorSearchResult
 {
@@ -105,6 +106,7 @@ var float                       m_fCursorExtentFactor;
 ////////////////////////
 // Native functions
 ////////////////////////
+native function int GetMaxFloor();
 native function bool IsCursorOccluded();
 native function bool CameraLineCheck( Vector PositionToTest, out Vector OutFurthestOccluder  );
 native function UpdateCursorVisibility();
@@ -200,10 +202,17 @@ reliable server function ServerSetChainedPawn(XComUnitPawn kChainedPawn)
 simulated function MoveToUnit( XComUnitPawn Unit, optional bool bSetCamView=true, optional bool bResetChainedDistance=true )
 {
 	local Vector kLocation;
+	
 	if( bResetChainedDistance )
 	{
-		m_fMaxChainedDistance = 0;
-		m_fMinChainedDistance = 0;
+		// Exploit fix: don't reset the chain distances if a targeting method is currently active. 
+		// You could throw a grenade completely across the map if we did that
+		if(`Pres.m_kTacticalHUD.m_kAbilityHUD.TargetingMethod == none)
+		{
+			m_fMaxChainedDistance = 0;
+			m_fMinChainedDistance = 0;
+		}
+
 		ChainedPawn = Unit;
 		if(Role < ROLE_Authority)
 		{
@@ -450,7 +459,7 @@ state CursorMode_NoCollision
 		// when the user wants to ascend, they are wanting to ascend from the floor where the cursor is.
 		// The last requested floor could be different if they were on top of a building and then
 		// then dropped down to the ground, for example, so always make sure to use the last effective floor
-		m_iRequestedFloor = min(m_iLastEffectiveFloorIndex + 1, MaxFloor);
+		m_iRequestedFloor = min(m_iLastEffectiveFloorIndex + 1, GetMaxFloor());
 
 		// update cursor height switching logic. Only increase our requested floor
 		// if the user was able to see a change (i.e., the effective floor also increased)
@@ -600,6 +609,7 @@ defaultproperties
 	m_bPerformPhysicsForRoleAutonomous=true
 
 	m_iRequestedFloor=0
+	CachedMaxFloor=-1
 
 	m_bLastCursorInBuildingStatus=false
 	m_bIgnoreCursorSnapToFloor=false;

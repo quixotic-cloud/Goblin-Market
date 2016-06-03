@@ -117,7 +117,11 @@ function Activated(TPOV CurrentPOV, X2Camera PreviousActiveCamera, X2Camera_Look
 	StartingLookAt = CurrentLookAt;
 	StartingRotationForZoom = CurrentRotation;
 
-	if(FirstActivation)
+	// note that if something tried and failed to activate, we will get control back immediately.
+	// since visually nothing changed for the user, treat this case as a first activation
+	// so that we initialize with the same parameters and don't do the small zoom out. Otherwise the
+	// camera will visually pop
+	if(FirstActivation || PreviousActiveCamera == self)
 	{
 		// add a small bit of extra zoom as an accent to the framing of the camera.
 		TargetZoom += AccentZoom;

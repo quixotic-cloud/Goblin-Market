@@ -19,7 +19,7 @@ function Init(const out VisualizationTrack InTrack)
 simulated state Executing
 {
 Begin:
-	Sleep(SendMessagesAfterSec);
+	Sleep(SendMessagesAfterSec * GetDelayModifier());
 
 	DoNotifyTargetsAbilityApplied(VisualizeGameState, AbilityContext, CurrentHistoryIndex);
 

@@ -103,12 +103,14 @@ var localized string StunnedFriendlyDesc;
 var localized string StunnedEffectAcquiredString;
 var localized string StunnedEffectTickedString;
 var localized string StunnedEffectLostString;
+var localized string StunnedPerActionFriendlyName;
 
 var localized string RoboticStunnedFriendlyName;
 var localized string RoboticStunnedFriendlyDesc;
 var localized string RoboticStunnedEffectAcquiredString;
 var localized string RoboticStunnedEffectTickedString;
 var localized string RoboticStunnedEffectLostString;
+var localized string RoboticStunnedPerActionFriendlyName;
 
 var name UnconsciousName;
 var localized string UnconsciousFriendlyName;
@@ -331,6 +333,7 @@ static function X2Effect_Burning CreateBurningStatusEffect(int DamagePerTick, in
 	BurningEffect.bRemoveWhenTargetDies = true;
 	BurningEffect.DamageTypes.AddItem('Fire');
 	BurningEffect.DuplicateResponse = eDupe_Refresh;
+	BurningEffect.bCanTickEveryAction = true;
 
 	if (default.FireEnteredParticle_Name != "")
 	{
@@ -409,6 +412,7 @@ static function X2Effect_Burning CreateAcidBurningStatusEffect(int DamagePerTick
 	BurningEffect.DamageTypes.Length = 0;   // By default X2Effect_Burning has a damage type of fire, but acid is not fire
 	BurningEffect.DamageTypes.InsertItem(0, 'Acid');
 	BurningEffect.DuplicateResponse = eDupe_Refresh;
+	BurningEffect.bCanTickEveryAction = true;
 
 	if (default.AcidEnteredParticle_Name != "")
 	{
@@ -479,6 +483,7 @@ static function X2Effect_PersistentStatChange CreateConfusedStatusEffect(int Num
 	PersistentStatChangeEffect.EffectRemovedVisualizationFn = ConfusedVisualizationRemoved;
 	PersistentStatChangeEffect.EffectHierarchyValue = default.CONFUSED_HIERARCHY_VALUE;
 	PersistentStatChangeEffect.bRemoveWhenTargetDies = true;
+	PersistentStatChangeEffect.bCanTickEveryAction = true;
 
 	UnitPropCondition = new class'X2Condition_UnitProperty';
 	UnitPropCondition.ExcludeFriendlyToSource = false;
@@ -535,7 +540,7 @@ static function ConfusedVisualizationRemoved(XComGameState VisualizeGameState, o
 }
 
 
-static function X2Effect_PersistentStatChange CreateDisorientedStatusEffect(optional bool bExcludeFriendlyToSource=false, float DelayVisualizationSec=0.0f)
+static function X2Effect_PersistentStatChange CreateDisorientedStatusEffect(optional bool bExcludeFriendlyToSource=false, float DelayVisualizationSec=0.0f, optional bool bIsMentalDamage = true)
 {
 	local X2Effect_PersistentStatChange     PersistentStatChangeEffect;
 	local X2Condition_UnitProperty			UnitPropCondition;
@@ -553,9 +558,15 @@ static function X2Effect_PersistentStatChange CreateDisorientedStatusEffect(opti
 	PersistentStatChangeEffect.EffectHierarchyValue = default.DISORIENTED_HIERARCHY_VALUE;
 	PersistentStatChangeEffect.bRemoveWhenTargetDies = true;
 	PersistentStatChangeEffect.bIsImpairingMomentarily = true;
-	PersistentStatChangeEffect.DamageTypes.AddItem('Mental');
+
+	PersistentStatChangeEffect.DamageTypes.AddItem(class'X2Item_DefaultDamageTypes'.default.DisorientDamageType);
+	if( bIsMentalDamage )
+	{
+		PersistentStatChangeEffect.DamageTypes.AddItem('Mental');
+	}
 	PersistentStatChangeEffect.EffectAddedFn = DisorientedAdded;
 	PersistentStatChangeEffect.DelayVisualizationSec = DelayVisualizationSec;
+	PersistentStatChangeEffect.bCanTickEveryAction = true;
 
 	if (default.DisorientedParticle_Name != "")
 	{
@@ -794,6 +805,7 @@ static function X2Effect_PersistentStatChange CreatePoisonedStatusEffect()
 	PersistentStatChangeEffect.EffectRemovedVisualizationFn = PoisonedVisualizationRemoved;
 	PersistentStatChangeEffect.DamageTypes.AddItem('Poison');
 	PersistentStatChangeEffect.bRemoveWhenTargetDies = true;
+	PersistentStatChangeEffect.bCanTickEveryAction = true;
 
 	if (default.PoisonEnteredParticle_Name != "")
 	{
@@ -989,7 +1001,7 @@ static function PoisonedVisualizationRemoved(XComGameState VisualizeGameState, o
 }
 
 
-static function X2Effect_Stunned CreateStunnedStatusEffect(int StunLevel, int Chance)
+static function X2Effect_Stunned CreateStunnedStatusEffect(int StunLevel, int Chance, optional bool bIsMentalDamage = true)
 {
 	local X2Effect_Stunned StunnedEffect;
 	local X2Condition_UnitProperty UnitPropCondition;
@@ -1005,6 +1017,12 @@ static function X2Effect_Stunned CreateStunnedStatusEffect(int StunLevel, int Ch
 	StunnedEffect.EffectTickedVisualizationFn = StunnedVisualizationTicked;
 	StunnedEffect.EffectRemovedVisualizationFn = StunnedVisualizationRemoved;
 	StunnedEffect.bRemoveWhenTargetDies = true;
+	StunnedEffect.bCanTickEveryAction = true;
+
+	if( bIsMentalDamage )
+	{
+		StunnedEffect.DamageTypes.AddItem('Mental');
+	}
 
 	if (default.StunnedParticle_Name != "")
 	{
@@ -1029,8 +1047,29 @@ static function X2Effect_StunRecover CreateStunRecoverEffect()
 	return StunRecover;
 }
 
+private static function string GetStunnedFlyoverText(XComGameState_Unit TargetState, bool FirstApplication)
+{
+	local XComGameState_Effect EffectState;
+	local X2AbilityTag AbilityTag;
+	local bool bRobotic;
+
+	bRobotic = TargetState.IsRobotic();
+	EffectState = TargetState.GetUnitAffectedByEffectState('Stunned');
+	if(FirstApplication || (EffectState != none && EffectState.GetX2Effect().IsTickEveryAction(TargetState)))
+	{
+		AbilityTag = X2AbilityTag(`XEXPANDCONTEXT.FindTag("Ability"));
+		AbilityTag.ParseObj = TargetState;
+		return `XEXPAND.ExpandString(bRobotic ? default.RoboticStunnedPerActionFriendlyName : default.StunnedPerActionFriendlyName);
+	}
+	else
+	{
+		return bRobotic ? default.RoboticStunnedFriendlyName : default.StunnedFriendlyName;
+	}
+}
+
 static function StunnedVisualization(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, const name EffectApplyResult)
 {
+	local XComGameState_Unit TargetState;
 	local bool bRobotic;
 
 	if( EffectApplyResult != 'AA_Success' )
@@ -1038,12 +1077,13 @@ static function StunnedVisualization(XComGameState VisualizeGameState, out Visua
 		return;
 	}
 
-	if (XComGameState_Unit(BuildTrack.StateObject_NewState) == none)
+	TargetState = XComGameState_Unit(VisualizeGameState.GetGameStateForObjectID(BuildTrack.StateObject_NewState.ObjectID));
+	if (TargetState == none)
 		return;
 
-	bRobotic = XComGameState_Unit(BuildTrack.StateObject_NewState).IsRobotic();
+	bRobotic = TargetState.IsRobotic();
 	
-	AddEffectSoundAndFlyOverToTrack(BuildTrack, VisualizeGameState.GetContext(), bRobotic ? default.RoboticStunnedFriendlyName : default.StunnedFriendlyName, '', eColor_Bad, class'UIUtilities_Image'.const.UnitStatus_Stunned);
+	AddEffectSoundAndFlyOverToTrack(BuildTrack, VisualizeGameState.GetContext(), GetStunnedFlyoverText(TargetState, true), '', eColor_Bad, class'UIUtilities_Image'.const.UnitStatus_Stunned);
 	AddEffectMessageToTrack(BuildTrack, bRobotic ? default.RoboticStunnedEffectAcquiredString : default.StunnedEffectAcquiredString, VisualizeGameState.GetContext());
 	UpdateUnitFlag(BuildTrack, VisualizeGameState.GetContext());
 }
@@ -1053,7 +1093,7 @@ static function StunnedVisualizationTicked(XComGameState VisualizeGameState, out
 	local XComGameState_Unit UnitState;
 	local bool bRobotic;
 
-	UnitState = XComGameState_Unit(BuildTrack.StateObject_NewState);
+	UnitState = XComGameState_Unit(VisualizeGameState.GetGameStateForObjectID(BuildTrack.StateObject_NewState.ObjectID));
 	if (UnitState == none)
 		return;
 
@@ -1066,7 +1106,7 @@ static function StunnedVisualizationTicked(XComGameState VisualizeGameState, out
 	bRobotic = UnitState.IsRobotic();
 
 	AddEffectCameraPanToAffectedUnitToTrack(BuildTrack, VisualizeGameState.GetContext());
-	AddEffectSoundAndFlyOverToTrack(BuildTrack, VisualizeGameState.GetContext(), bRobotic ? default.RoboticStunnedFriendlyName : default.StunnedFriendlyName, '', eColor_Bad, class'UIUtilities_Image'.const.UnitStatus_Stunned);
+	AddEffectSoundAndFlyOverToTrack(BuildTrack, VisualizeGameState.GetContext(), GetStunnedFlyoverText(UnitState, false), '', eColor_Bad, class'UIUtilities_Image'.const.UnitStatus_Stunned);
 	AddEffectMessageToTrack(BuildTrack, bRobotic ? default.RoboticStunnedEffectTickedString : default.StunnedEffectTickedString, VisualizeGameState.GetContext());
 	UpdateUnitFlag(BuildTrack, VisualizeGameState.GetContext());
 }
@@ -1219,19 +1259,43 @@ static function X2Effect_PersistentStatChange CreateBoundStatusEffect(int NumTur
 	PersistentStatChangeEffect = new class'X2Effect_PersistentStatChange';
 	PersistentStatChangeEffect.EffectName = class'X2AbilityTemplateManager'.default.BoundName;
 	PersistentStatChangeEffect.DuplicateResponse = eDupe_Refresh;
-	PersistentStatChangeEffect.BuildPersistentEffect(NumTurns, bIsInfinite, false,,eGameRule_PlayerTurnBegin);
+	PersistentStatChangeEffect.BuildPersistentEffect(NumTurns, bIsInfinite, true,,eGameRule_PlayerTurnBegin);
 	if( bOnUnitBeingBound )
 	{
 		PersistentStatChangeEffect.SetDisplayInfo(ePerkBuff_Penalty, default.BoundFriendlyName, default.BoundFriendlyDesc, "img:///UILibrary_PerkIcons.UIPerk_viper_bind");
 	}
-	PersistentStatChangeEffect.AddPersistentStatChange(eStat_Mobility, default.BOUND_MOBILITY_ADJUST, MODOP_Multiplication);
+	PersistentStatChangeEffect.AddPersistentStatChange(eStat_Mobility, default.BOUND_MOBILITY_ADJUST, MODOP_PostMultiplication);
 	PersistentStatChangeEffect.VisualizationFn = BoundVisualization;
 	PersistentStatChangeEffect.EffectTickedVisualizationFn = BoundVisualizationTicked;
 	PersistentStatChangeEffect.EffectRemovedVisualizationFn = BoundVisualizationRemoved;
 	PersistentStatChangeEffect.EffectHierarchyValue = default.BIND_HIERARCHY_VALUE;
 	PersistentStatChangeEffect.bRemoveWhenTargetDies = true;
+	PersistentStatChangeEffect.EffectAddedFn = BoundEffectAdded;
+	PersistentStatChangeEffect.EffectRemovedFn = BountEffectRemoved;
+	PersistentStatChangeEffect.bCanTickEveryAction = true;
 
 	return PersistentStatChangeEffect;
+}
+
+static function BoundEffectAdded(X2Effect_Persistent PersistentEffect, const out EffectAppliedData ApplyEffectParameters, XComGameState_BaseObject kNewTargetState, XComGameState NewGameState)
+{
+	local XComGameState_Unit UnitState;
+
+	UnitState = XComGameState_Unit(kNewTargetState);
+	if (UnitState == none)
+		return;
+
+	// Immobilize to prevent scamper, panic, or movement from enabling this unit to move again.
+	UnitState.SetUnitFloatValue(class'X2Ability_DefaultAbilitySet'.default.ImmobilizedValueName, 1, eCleanup_Never);
+}
+
+static function BountEffectRemoved(X2Effect_Persistent PersistentEffect, const out EffectAppliedData ApplyEffectParameters, XComGameState NewGameState, bool bCleansed)
+{
+	local XComGameState_Unit UnitState;
+
+	UnitState = XComGameState_Unit(NewGameState.CreateStateObject(class'XComGameState_Unit', ApplyEffectParameters.TargetStateObjectRef.ObjectID));
+	UnitState.SetUnitFloatValue(class'X2Ability_DefaultAbilitySet'.default.ImmobilizedValueName, 0);
+	NewGameState.AddStateObject(UnitState);
 }
 
 static function BoundVisualization(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, const name EffectApplyResult)
@@ -1621,7 +1685,7 @@ static function AddEffectCameraPanToAffectedUnitToTrack(out VisualizationTrack B
 
 	CameraLookAt = X2Action_CameraLookAt(class'X2Action_CameraLookAt'.static.AddToVisualizationTrack(BuildTrack, Context));
 	CameraLookAt.LookAtObject = BuildTrack.StateObject_NewState;
-	CameraLookAt.LookAtDuration = Delay;
+	CameraLookAt.LookAtDuration = Delay * (`XPROFILESETTINGS.Data.bEnableZipMode ? class'X2TacticalGameRuleset'.default.ZipModeDelayModifier : 1.0);
 	CameraLookAt.BlockUntilActorOnScreen = true;
 	CameraLookAt.UseTether = false;
 	CameraLookAt.DesiredCameraPriority = eCameraPriority_GameActions; // increased camera priority so it doesn't get stomped

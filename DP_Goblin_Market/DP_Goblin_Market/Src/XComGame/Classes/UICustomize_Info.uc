@@ -8,7 +8,7 @@
 
 class UICustomize_Info extends UICustomize;
 
-const MAX_CHARACTERS_BIO = 500;
+const MAX_CHARACTERS_BIO = 3000;
 
 //----------------------------------------------------------------------------
 // MEMBERS
@@ -47,20 +47,20 @@ simulated function UpdateData()
 	// FIRST NAME
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strFirstNameLabel, ColorState), OpenFirstNameInputBox)
+		.UpdateDataDescription(m_strFirstNameLabel, OpenFirstNameInputBox)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// LAST NAME
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strLastNameLabel, ColorState), OpenLastNameInputBox)
+		.UpdateDataDescription(m_strLastNameLabel, OpenLastNameInputBox)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// NICKNAME
 	//-----------------------------------------------------------------------------------------
 	ColorState = (bIsSuperSoldier || (!Unit.IsVeteran() && !InShell())) ? eUIState_Disabled : eUIState_Normal;
 	GetListItem(i++)
-		.UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strNickNameLabel, ColorState), OpenNickNameInputBox)
+		.UpdateDataDescription(m_strNickNameLabel, OpenNickNameInputBox)
 		.SetDisabled(bIsSuperSoldier || (!Unit.IsVeteran() && !InShell()), bIsSuperSoldier ? m_strIsSuperSoldier : m_strNeedsVeteranStatus); // Don't disable in the shell. 
 
 	ColorState = bIsSuperSoldier ? eUIState_Disabled : eUIState_Normal;
@@ -68,30 +68,30 @@ simulated function UpdateData()
 	// BIO
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataDescription(class'UIUtilities_Text'.static.GetColoredText(m_strEditBiography, ColorState), OpenBiographyInputBox)
+		.UpdateDataDescription(m_strEditBiography, OpenBiographyInputBox)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// NATIONALITY
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strNationality, ColorState), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Country, ColorState, FontSize), CustomizeCountry)
+		.UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Country)$ m_strNationality, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Country, ColorState, FontSize), CustomizeCountry)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// GENDER
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strGender, ColorState), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Gender, ColorState, FontSize), CustomizeGender)
+		.UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Gender)$ m_strGender, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Gender, ColorState, FontSize), CustomizeGender)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
-	AS_SetCharacterBio(m_strBiographyLabel, class'UIUtilities_Text'.static.GetColoredText(Unit.GetBackground(), eUIState_Normal, FontSize));
+	AS_SetCharacterBio(m_strBiographyLabel, class'UIUtilities_Text'.static.GetSizedText(Unit.GetBackground(), FontSize));
 
 	if (currentSel > -1 && currentSel < List.ItemCount)
 	{
-		List.Navigator.SetSelected(GetListItem(currentSel));
+		List.Navigator.SetSelected(List.GetItem(currentSel));
 	}
 	else
 	{
-		List.Navigator.SetSelected(GetListItem(0));
+		List.Navigator.SetSelected(List.GetItem(0));
 	}
 }
 

@@ -44,6 +44,7 @@ Begin:
 	DesiredFacing = Normal(DesiredFacing);
 
 	AnimParams.AnimName = 'MV_ClimbHighJump_Start';
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
 	StartingAtom.Translation = UnitPawn.Location;
 	StartingAtom.Rotation = QuatFromRotator(Rotator(DesiredFacing));
 	StartingAtom.Scale = 1.0f;

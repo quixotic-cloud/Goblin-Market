@@ -81,12 +81,13 @@ event XComGameState_Unit CreateSoldier(name DataTemplateName)
 	ChangeContainer = class'XComGameStateContext_ChangeContainer'.static.CreateEmptyChangeContainer("Character Pool Manager");
 	SoldierContainerState = History.CreateNewGameState(true, ChangeContainer);
 
-	CharacterGenerator = `XCOMGAME.spawn( class 'XGCharacterGenerator' );
-
 	CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 	`assert(CharTemplateMgr != none);
 
 	CharacterTemplate = CharTemplateMgr.FindCharacterTemplate(DataTemplateName);	
+	`assert(CharacterTemplate != none);
+	CharacterGenerator = `XCOMGAME.Spawn(CharacterTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	NewSoldierState = CharacterTemplate.CreateInstanceFromTemplate(SoldierContainerState);
 	NewSoldierState.RandomizeStats();
@@ -147,20 +148,37 @@ event InitSoldier( XComGameState_Unit Unit, const out CharacterPoolDataElement C
 	if (!FixAppearanceOfInvalidAttributes(Unit.kAppearance))
 	{
 		//This should't fail now that we attempt to fix invalid attributes
-		CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
+		CharacterGenerator = `XCOMGRI.Spawn(Unit.GetMyTemplate().CharacterGeneratorClass);
+		`assert(CharacterGenerator != none);
 		CharacterGeneratorResult = CharacterGenerator.CreateTSoldierFromUnit(Unit, none);
 		Unit.SetTAppearance(CharacterGeneratorResult.kAppearance);
 	}
 }
 
-function bool FixAppearanceOfInvalidAttributes_FixSingle(string PartsType, out name PartsName)
+function bool FixAppearanceOfInvalidAttributes_FixSingle(string PartsType, out name PartsName, optional bool ArmorTorsoFilter)
 {
 	local X2BodyPartTemplateManager PartTemplateManager;
 	local array<X2BodyPartTemplate> listPartTemplate;
+	local X2SimpleBodyPartFilter BodyPartFilter;
+
+	BodyPartFilter = `XCOMGAME.SharedBodyPartFilter;
+
 	PartTemplateManager = class'X2BodyPartTemplateManager'.static.GetBodyPartTemplateManager();
 	if (!(PartTemplateManager.FindUberTemplate(PartsType, PartsName) != none))
 	{
-		PartTemplateManager.GetFilteredUberTemplates(PartsType, `XCOMGAME.SharedBodyPartFilter, `XCOMGAME.SharedBodyPartFilter.FilterByGenderAndNonSpecializedAndTech, listPartTemplate);
+		if(PartsType == "Torso")
+		{
+			BodyPartFilter.Set(BodyPartFilter.Gender, BodyPartFilter.Race, '');
+			BodyPartFilter.SetTorsoSelection('NoCharacterTemplateName', 'KevlarArmor');
+			PartTemplateManager.GetFilteredUberTemplates(PartsType, BodyPartFilter,
+														 BodyPartFilter.FilterTorso, listPartTemplate);
+		}
+		else
+		{
+			PartTemplateManager.GetFilteredUberTemplates(PartsType, BodyPartFilter,
+														 ArmorTorsoFilter ? BodyPartFilter.FilterByTorsoAndArmorMatch : BodyPartFilter.FilterByGenderAndNonSpecializedAndTech, listPartTemplate);
+		}
+		
 		PartsName = (listPartTemplate.length > 0) ? listPartTemplate[0].DataName : '';
 		if (len(PartsName) <= 0)
 			return false;
@@ -192,15 +210,15 @@ function bool FixUnderlay(out TAppearance Appearance)
 
 function bool FixAppearanceOfInvalidAttributes(out TAppearance Appearance)
 {
-	
-
 	local bool bSuccess;
-	bSuccess = true;
+	bSuccess = true;	
 	GenderHelper = Appearance.iGender;
-	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Torso", Appearance.nmTorso);
+	`XCOMGAME.SharedBodyPartFilter.Set(EGender(Appearance.iGender), ECharacterRace(Appearance.iRace), Appearance.nmTorso, false, true);
+	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Torso", Appearance.nmTorso, true);
 	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Head", Appearance.nmHead);
-	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Legs", Appearance.nmLegs);
-	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Arms", Appearance.nmArms);
+	`XCOMGAME.SharedBodyPartFilter.Set(EGender(Appearance.iGender), ECharacterRace(Appearance.iRace), Appearance.nmTorso, false, true);
+	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Legs", Appearance.nmLegs, true);
+	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Arms", Appearance.nmArms, true);
 	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Hair", Appearance.nmHaircut);
 	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Eyes", Appearance.nmEye);
 	bSuccess = bSuccess && FixAppearanceOfInvalidAttributes_FixSingle("Teeth", Appearance.nmTeeth);
@@ -231,12 +249,18 @@ function bool ValidateAppearance(const out TAppearance Appearance)
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Torso", Appearance.nmTorso) != none;
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Head", Appearance.nmHead) != none;
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Legs", Appearance.nmLegs) != none;
+
+	//Check for dual arm as well as individual arm selections
+	if(PartTemplateManager.FindUberTemplate("Arms", Appearance.nmArms) == none &&
+	   PartTemplateManager.FindUberTemplate("LeftArm", Appearance.nmLeftArm) == none)
+	{
+		bValid = false;
+	}
+
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Arms", Appearance.nmArms) != none;
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Hair", Appearance.nmHaircut) != none;
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Eyes", Appearance.nmEye) != none;
-	bValid = bValid && PartTemplateManager.FindUberTemplate("Teeth", Appearance.nmTeeth) != none;
-	//currently decokit assets are only male, can be commented out when there are female assets 
-	//bValid = bValid && PartTemplateManager.FindUberTemplate("DecoKits", Appearance.nmDecoKit) != none;
+	bValid = bValid && PartTemplateManager.FindUberTemplate("Teeth", Appearance.nmTeeth) != none;	
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Helmets", Appearance.nmHelmet) != none;
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Patterns", Appearance.nmPatterns) != none;
 	bValid = bValid && PartTemplateManager.FindUberTemplate("Tattoos", Appearance.nmTattoo_LeftArm) != none;
@@ -285,6 +309,7 @@ function XComGameState_Unit CreateCharacter(XComGameState StartState, optional E
 	local X2CharacterTemplate CharacterTemplate;
 	local XGCharacterGenerator CharacterGenerator;
 	local TSoldier CharacterGeneratorResult;
+	local array<X2StrategyElementTemplate> PersonalityTemplates;
 
 	local XComGameState_Unit SoldierState;
 	local XComGameState_Unit Unit;
@@ -405,9 +430,14 @@ function XComGameState_Unit CreateCharacter(XComGameState StartState, optional E
 	else
 	{
 
-		CharacterGenerator = XComGameInfo(class'WorldInfo'.static.GetWorldInfo().Game).m_CharacterGen;
-
+		CharacterGenerator = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+		`assert(CharacterGenerator != none);
 		CharacterGeneratorResult = CharacterGenerator.CreateTSoldier(CharacterTemplateName);
+
+		// Give Random Personality if not from pool
+		PersonalityTemplates = class'X2StrategyElementTemplateManager'.static.GetStrategyElementTemplateManager().GetAllTemplatesOfClass(class'X2SoldierPersonalityTemplate');
+		CharacterGeneratorResult.kAppearance.iAttitude = `SYNC_RAND(PersonalityTemplates.Length);
+
 		SoldierState.SetTAppearance(CharacterGeneratorResult.kAppearance);
 		SoldierState.SetCharacterName(CharacterGeneratorResult.strFirstName, CharacterGeneratorResult.strLastName, CharacterGeneratorResult.strNickName);
 		SoldierState.SetCountry(CharacterGeneratorResult.nmCountry);

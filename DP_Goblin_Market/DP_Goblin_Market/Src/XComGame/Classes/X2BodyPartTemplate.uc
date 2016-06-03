@@ -25,7 +25,10 @@ var () bool bIsHelmet;
 
 // Armor
 var bool bVeteran;
-var name ArmorTemplate;
+var name ArmorTemplate; //Name of the armor item this part should be associated with, if any
+
+// Sets - define 'sets' of torsos / arms / legs that will work together. Torso is the primary key here, with arms / legs becoming available or unavailable based on the torso selection
+var array<name> SetNames;
 
 // Character
 var name CharacterTemplate; //If ArmorTemplate is specified, the current assumption is that CharacterTemplate is 'soldier'. Otherwise this is used
@@ -38,3 +41,6 @@ var name Tech;
 
 // Localized text displayed in customization screen
 var localized string DisplayName;
+
+// Indicates which mod / dlc this belongs to
+var name DLCName;

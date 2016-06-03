@@ -81,7 +81,7 @@ function PrepareGremlinMoveVaraiables()
 	GremlinStartingRotation = GremlinWeapon.Rotation;
 	GremlinPreviousLocation = GremlinWeapon.Location;
 	GremlinMoveTime = 0.f;
-	GremlinMoveDuration = 5.0f; // 5 Seconds of travel time
+	GremlinMoveDuration = 5.0f * GetDelayModifier(); // 5 Seconds of travel time
 	GremlinMovePercent = 0.f;
 }
 
@@ -104,13 +104,15 @@ Begin:
 	}
 
 	Params.AnimName = 'HL_SendGremlin';
+	Params.PlayRate = GetNonCriticalAnimationSpeed();
 	FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
 	UnitPawn.m_kGameUnit.IdleStateMachine.PlayIdleAnim();
 	
  	///////////////////////////////////////////////////////////////////////////////////////////////////
  	// Begin Gremlin anims
  	Params.AnimName = GremlinAnimName;
- 	FinishAnim(GremlinWeapon.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
+	Params.PlayRate = GetNonCriticalAnimationSpeed();
+	FinishAnim(GremlinWeapon.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
 
 	// Once the gremlin is finished playing its animation follow the unit's animation
 	TargetPawn.GetAnimTreeController().AttachChildController(GremlinWeapon.GetAnimTreeController());

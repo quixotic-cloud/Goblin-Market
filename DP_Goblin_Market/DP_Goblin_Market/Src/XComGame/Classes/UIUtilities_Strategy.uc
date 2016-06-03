@@ -15,6 +15,7 @@ struct TWeaponUpgradeAvailabilityData
 	var bool bHasModularWeapons;
 	var bool bHasWeaponUpgrades;
 	var bool bHasWeaponUpgradeSlotsAvailable;
+	var bool bCanWeaponBeUpgraded;
 };
 
 struct TPCSAvailabilityData
@@ -977,6 +978,19 @@ simulated static function X2SoldierClassTemplate GetAllowedClassForWeapon(X2Weap
 	}
 }
 
+simulated static function X2SoldierClassTemplate GetAllowedClassForArmor(X2ArmorTemplate ArmorTemplate)
+{
+	local X2DataTemplate DataTemplate;
+	local X2SoldierClassTemplate SoldierClassTemplate;
+
+	foreach class'X2SoldierClassTemplateManager'.static.GetSoldierClassTemplateManager().IterateTemplates(DataTemplate, none)
+	{
+		SoldierClassTemplate = X2SoldierClassTemplate(DataTemplate);
+		if (SoldierClassTemplate.IsArmorAllowedByClass(ArmorTemplate))
+			return SoldierClassTemplate;
+	}
+}
+
 // Used for Popular Support and Alert meters in UIStrategyMap and UIStrategyMapItem_LandingPin
 simulated static function array<int> GetMeterBlockTypes(int NumBlocks, int NumFilled, int NumPreview, array<int> ThresholdIndicies)
 {
@@ -1249,16 +1263,21 @@ simulated static function GetWeaponUpgradeAvailability(XComGameState_Unit Unit, 
 {
 	local XComGameState_HeadquartersXCom XComHQ;
 	local XComGameState_Item PrimaryWeapon;
+	local X2WeaponTemplate WeaponTemplate;
 	local int AvailableSlots, EquippedUpgrades;
 
 	XComHQ = GetXComHQ();
 
-	PrimaryWeapon = Unit.GetPrimaryWeapon();	
+	PrimaryWeapon = Unit.GetPrimaryWeapon();
+	WeaponTemplate = X2WeaponTemplate(PrimaryWeapon.GetMyTemplate());
 	EquippedUpgrades = PrimaryWeapon.GetMyWeaponUpgradeTemplateNames().Length;
-	AvailableSlots = X2WeaponTemplate(PrimaryWeapon.GetMyTemplate()).NumUpgradeSlots;
-	if (XComHQ.bExtraWeaponUpgrade)
+	AvailableSlots = WeaponTemplate.NumUpgradeSlots;
+
+	// Only add an extra slot if the weapon had some to begin with
+	if (XComHQ.bExtraWeaponUpgrade && AvailableSlots > 0)
 		AvailableSlots++;
 
+	WeaponUpgradeAvailabilityData.bCanWeaponBeUpgraded = (AvailableSlots > 0);
 	WeaponUpgradeAvailabilityData.bHasWeaponUpgradeSlotsAvailable = (AvailableSlots > EquippedUpgrades);
 	WeaponUpgradeAvailabilityData.bHasWeaponUpgrades = XComHQ.HasWeaponUpgradesInInventory();
 	WeaponUpgradeAvailabilityData.bHasModularWeapons = XComHQ.bModularWeapons;

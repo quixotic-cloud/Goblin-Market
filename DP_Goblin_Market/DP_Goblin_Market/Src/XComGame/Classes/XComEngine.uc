@@ -72,6 +72,7 @@ var private X2MPCharacterTemplateManager        MPCharacterTemplateManager;
 var private X2MissionNarrativeTemplateManager   MissionNarrativeTemplateManager;
 var private X2MissionTemplateManager            MissionTemplateManager;
 var private X2AmbientNarrativeCriteriaTemplateManager AmbientNarrativeCriteriaTemplateManager;
+var private X2ChallengeTemplateManager			ChallengeModeTemplateManager;
 var private X2EventManager						EventManager;
 var private XComAISpawnManager					SpawnManager;
 var private X2CardManager						CardManager;
@@ -93,7 +94,7 @@ var public bool								bReviewFlagged;
 
 var CharacterPoolManager					m_CharacterPoolManager;
 
-var private XComSteamControllerManager		m_SteamControllerManager;
+var XComSteamControllerManager				m_SteamControllerManager;
 
 //=======================================================================================
 
@@ -106,13 +107,27 @@ var X2MetricTag		MetricTag;
 /** objects that are listening for events from the engine */
 var privatewrite array<XComMCPEventListener>     MCPEventListeners;
 
+var private bool m_showChart;
+
 native static function XComMCP GetMCP();
 
 native static function int GetStringCRC(string Text);
 
 native static function int GetMaxSaveSizeInBytes();
 
-native function array<Object> GetClassDefaultObjects(class SeachClass);
+// Gets the default class object for the specified class
+native static function Class GetClassByName(name ClassName);
+
+// Gets the default class object for the specified class
+native static function Object GetClassDefaultObject(class SeachClass);
+
+// Gets the default class object for the specified class
+native static function Object GetClassDefaultObjectByName(name ClassName);
+
+// Gets the default class objects for the specified class and all derived subclasses
+native static function array<Object> GetClassDefaultObjects(class SeachClass);
+
+native function bool DoesPackageExist(string Package);
 
 // ONLY use for loading movies, uses a different code path than normal movies -- jboswell
 native static final function PlaySpecificLoadingMovie(string MovieName, optional string WiseEvent);
@@ -149,6 +164,7 @@ native function Object GetCardManager();
 native function Object GetImageCaptureManager();
 native function Object GetBehaviorTreeManager();
 native function Object GetAIJobManager();
+native function Object GetChallengeTemplateManager();
 
 native function Object GetCharacterPoolManager();
 
@@ -390,8 +406,12 @@ event BuildLocalization()
 	LocalizeContext.LocalizeTags.AddItem(MetricTag);
 }
 
+static native function XComSoundEmitter FindSoundEmitterForParticleSystem(ParticleSystemComponent Component);
+
 // jboswell: bOverrideAll should only be true when working around fullscreen movies
 static native final function AddStreamingTextureSlaveLocation(vector Loc, rotator Rot, float Duration, bool bOverrideAll=false);
+
+native function SetEnableAllLightsInLevel(Level kLevel, bool bEnable);
 
 defaultproperties
 {

@@ -113,7 +113,7 @@ simulated state Executing
 
 			foreach WorldEmitterPool.ActiveComponents(TestPSComponent)
 			{
-				if( PathName(TestPSComponent.Template) == EffectName && TestPSComponent.Translation == EffectLocation )
+				if( PathName(TestPSComponent.Template) ~= EffectName && TestPSComponent.Translation == EffectLocation )
 				{
 					PSComponent = TestPSComponent;
 					break;
@@ -202,7 +202,7 @@ Begin:
 		{
 			RequestLookAtCamera();
 
-			while( (bWaitForCameraCompletion || bWaitForCameraArrival) && LookAtCam != None && !LookAtCam.HasArrived )
+			while( (bWaitForCameraCompletion || bWaitForCameraArrival) && LookAtCam != None && !LookAtCam.HasArrived && LookAtCam.IsLookAtValid() )
 			{
 				Sleep(0.0);
 			}

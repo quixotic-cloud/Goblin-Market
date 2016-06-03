@@ -125,12 +125,18 @@ var(Flags)bool bIsEngineer;						// used for staffing
 var(Flags)bool bStaffingAllowed;				// used for staffing
 
 var(Flags)bool bBlocksPathingWhenDead;          // If true, units cannot path into or through the tile(s) this unit is on when dead.
+var(Flags)bool bCanTickEffectsEveryAction;      // If true, persistent effects will be allowed to honor the bCanTickEveryAction flag
+var(Flags)bool bManualCooldownTick;             // If true, ability cooldowns will not automatically decrease at the start of this unit's turn
+
+var(Flags)bool bHideInShadowChamber;			// If true, do not display this enemy in pre-mission Shadow Chamber lists
+var(Flags)bool bDontClearRemovedFromPlay;		// Used for strategy state units, should not change their bRemovedFromPlay status when entering tactical
 
 var(X2CharacterTemplate) array<string> strPawnArchetypes;
 var(X2CharacterTemplate) localized string strCharacterName;
 var(X2CharacterTemplate) localized array<string> strCharacterBackgroundMale;
 var(X2CharacterTemplate) localized array<string> strCharacterBackgroundFemale;
-var(X2CharacterTemplate) array<string> strMatineePackages;          // name of the package that contains this character's cinematic matinees
+var(X2CharacterTemplate) localized string strCharacterHealingPaused; // Unique string to display if the character's healing project is paused
+var(X2CharacterTemplate) config array<string> strMatineePackages;    // names of the packages that contains this character's cinematic matinees
 var(X2CharacterTemplate) string strTargetingMatineePrefix;  // prefix of the character specific targeting matinees for this character
 var(X2CharacterTemplate) string strHackIconImage;               // The path to the icon for the hacking UI
 var(X2CharacterTemplate) string strTargetIconImage;             // The path to the icon for the targeting UI
@@ -142,8 +148,16 @@ var(X2CharacterTemplate) string RevealMatineePrefix;
 
 var(X2CharacterTemplate) bool bSetGenderAlways; //This flag indicates that this character should always get a gender assigned, use on characters where bAppearanceDefinesPawn is FALSE but they want a gender anyways
 var(X2CharacterTemplate) bool bForceAppearance; //Indicates that this character should use ForceAppearance to set its appearance
+var(X2CharacterTemplate) bool bHasFullDefaultAppearance; // This character's default appearance should be used when creating the unit (not just by the character generator)
 var(X2CharacterTemplate) config TAppearance ForceAppearance; //If bForceAppearance and bAppearanceDefinesPawn are true, this structure can be used to force this character type to use a certain appearance
 var(X2CharacterTemplate) config TAppearance DefaultAppearance; //Use to force a set of default appearance settings for this character. For instance - setting their armor tint to a specific value
+var(X2CharacterTemplate) class<UICustomize> UICustomizationMenuClass; // UI menu class for customizing this soldier
+var(X2CharacterTemplate) class<UICustomize> UICustomizationInfoClass; // UI info class for customizing this soldier
+var(X2CharacterTemplate) class<UICustomize> UICustomizationPropsClass; // UI props class for customizing this soldier
+var(X2CharacterTemplate) class<XComCharacterCustomization> CustomizationManagerClass; // Customization manager for this soldier class
+var(X2CharacterTemplate) class<XGCharacterGenerator> CharacterGeneratorClass;   // customize the class used for character generation stuff (random appearances, names, et cetera)
+var(X2CharacterTemplate) name                        DefaultSoldierClass;   // specific soldier class to set on creation
+
 
 var(X2CharacterTemplate) string strBehaviorTree;   	// By default all AI behavior trees use "GenericAIRoot".
 var(X2CharacterTemplate) string strPanicBT;        // Behavior Tree for panicking units.
@@ -157,6 +171,8 @@ var(X2CharacterTemplate) array<int> SkillLevelThresholds; // Used to determine n
 
 var(X2CharacterTemplate) array<XComNarrativeMoment> SightedNarrativeMoments;	// Add to array in order of conversation
 var(X2CharacterTemplate) array<name>				SightedEvents;				// These events are triggered upon any sighting
+var(X2CharacterTemplate) name						DeathEvent;					// This event is triggered when a unit of this character type is killed
+var(X2CharacterTemplate) delegate<OnRevealEvent>	OnRevealEventFn;			// This event triggers when the character is revealed on a mission
 
 var(X2CharacterTemplate) string SpeakerPortrait; // Portrait that shows in a comm link if spoken by this character
 
@@ -166,6 +182,11 @@ var(X2CharacterTemplate) string HQOnscreenAnimPrefix;
 var(X2CharacterTemplate) Vector HQOnscreenOffset;
 
 var(X2CharacterTemplate) name ReactionFireDeathAnim;	//The animation to play when killed by reaction fire.
+
+var(X2CharacterTemplate) delegate<OnStatAssignmentComplete> OnStatAssignmentCompleteFn;
+var(X2CharacterTemplate) bool bIgnoreEndTacticalHealthMod; // Do not adjust health at the end of tactical missions
+var(X2CharacterTemplate) bool bIgnoreEndTacticalRestoreArmor; // Do not restore armor at the end of tactical missions
+var(X2CharacterTemplate) delegate<OnCosmeticUnitCreated> OnCosmeticUnitCreatedFn;
 
 var array<name> ImmuneTypes;
 var bool CanFlankUnits;
@@ -178,6 +199,15 @@ var private transient TAppearance FilterAppearance;
 // some characters need to do different reveal matinees based on their current state.
 // this delegate allows characters to specify that matinee prefix
 delegate string GetRevealMatineePrefix(XComGameState_Unit UnitState);
+
+// to modify game states after the character has been revealed
+delegate OnRevealEvent(XComGameState_Unit UnitState);
+
+// some characters need to have modified stats after they are created
+delegate OnStatAssignmentComplete(XComGameState_Unit UnitState);
+
+// to handle any special stuff after a cosmetic unit has been created in tactical - this should be placed on the "owning" unit template, not the cosmetic unit template
+delegate OnCosmeticUnitCreated(XComGameState_Unit CosmeticUnit, XComGameState_Unit OwnerUnit, XComGameState_Item SourceItem, XComGameState StartGameState);
 
 function XComGameState_Unit CreateInstanceFromTemplate(XComGameState NewGameState)
 {
@@ -301,6 +331,11 @@ DefaultProperties
 	bDisplayUIUnitFlag=true;
 
 	bAllowRushCam=true
+
+	UICustomizationMenuClass = class'UICustomize_Menu'
+	UICustomizationInfoClass = class'UICustomize_Info'
+	UICustomizationPropsClass = class'UICustomize_Props'
+	CustomizationManagerClass = class'XComCharacterCustomization'
 
 	bShouldCreateDifficultyVariants=true
 }

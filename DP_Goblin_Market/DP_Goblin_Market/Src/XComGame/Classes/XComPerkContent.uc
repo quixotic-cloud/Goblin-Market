@@ -4,6 +4,12 @@ class XComPerkContent extends Actor
 	notplaceable
 	HideCategories(Movement,Display,Attachment,Actor,Collision,Physics,Advanced,Debug);
 
+struct native TParticleContentParameters
+{
+	var() array<name> AssociatedCharacters<DynamicList = "AssociatedCharacterList">;
+	var() EmitterInstanceParameterSet EmitterInstanceParameters;
+};
+
 struct native TParticleContent
 {
 	var() ParticleSystem FXTemplate;
@@ -13,6 +19,7 @@ struct native TParticleContent
 	var() bool SetActorParameter;
 	var() name SetActorName<EditCondition=SetActorParameter>;
 	var() bool ForceRemoveOnDeath;
+	var(InstanceParameters) array<TParticleContentParameters> CharacterParameters;
 };
 
 struct native TAnimContent
@@ -223,8 +230,46 @@ simulated protected function StopTargetLocationSoundCue( out array< DynamicPoint
 	LocationActors.Length = 0;
 }
 
+static function EmitterInstanceParameterSet GetEmitterInstanceParametersForParticleContent(const out TParticleContent Content, XComUnitPawn kPawn)
+{
+	local XComGameState_Unit UnitState;
+	local XGUnit Unit;
+	local EmitterInstanceParameterSet DefaultParameters;
+	local int i;
+
+	//  Try to find the character template that matches the pawn
+	//  If instance parameters are defined with no associated character type, that is the default to fall back to
+	if (Content.CharacterParameters.Length > 0)
+	{
+		Unit = XGUnit(kPawn.GetGameUnit());
+		if (Unit != none)
+		{
+			UnitState = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(Unit.ObjectID));
+			if (UnitState != none)
+			{
+				for (i = 0; i < Content.CharacterParameters.Length; ++i)
+				{
+					if (Content.CharacterParameters[i].AssociatedCharacters.Length == 0)
+					{
+						DefaultParameters = Content.CharacterParameters[i].EmitterInstanceParameters;
+						continue;
+					}
+					if (Content.CharacterParameters[i].AssociatedCharacters.Find(UnitState.GetMyTemplateName()) != INDEX_NONE)
+					{
+						return Content.CharacterParameters[i].EmitterInstanceParameters;
+					}
+				}
+			}
+		}
+	}
+
+	return DefaultParameters;
+}
+
 simulated protected function StartParticleSystem(XComUnitPawn kPawn, TParticleContent Content, out ParticleSystemComponent kComponent, bool sync = false)
 {
+	local EmitterInstanceParameterSet ParameterSet;
+
 	if (Content.FXTemplate != none)
 	{
 		if (kComponent != none)
@@ -240,7 +285,12 @@ simulated protected function StartParticleSystem(XComUnitPawn kPawn, TParticleCo
 		}
 
 		kComponent.SetTickGroup( TG_EffectsUpdateWork );
-
+				
+		ParameterSet = GetEmitterInstanceParametersForParticleContent(Content, kPawn);
+		if (ParameterSet != none)
+		{
+			kComponent.InstanceParameters = ParameterSet.InstanceParameters;
+		}		
 		kComponent.SetTemplate(Content.FXTemplate);
 
 		if (kPawn != none)
@@ -296,6 +346,11 @@ simulated function StartTargetParticleSystem(XComUnitPawn kPawn, TParticleConten
 simulated function name GetAbilityName( )
 {
 	return AssociatedAbility;
+}
+
+simulated function ReassociateToAbility( name AbilityName )
+{
+	AssociatedAbility = AbilityName;
 }
 
 simulated function StartPersistentFX(XComUnitPawn kPawn)

@@ -39,6 +39,11 @@ cpptext
 	void CreateLightOppositePrimary(USpotLightComponent* pLight, USpotLightComponent* pPrimaryLight, FSHVectorRGB& Environment, FLOAT BrightnessMod);
 }
 
+event bool IsStrategyGame()
+{
+	return `STRATEGYRULES != none;
+}
+
 defaultproperties
 {
 	LastUpdateTime = 0;

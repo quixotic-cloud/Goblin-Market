@@ -106,6 +106,27 @@ var bool IgnoreSlomo;
 native static final function GetFrustumPlanes(const out TPOV CameraLocation, out Plane TopPlane, out Plane BottomPlane, out Plane LeftPlane, out Plane RightPlane);
 
 /// <summary>
+/// Utility function to guarantee an unblocked line of sight to the target location. If the line trace from 
+/// CameraLocation to TargetLocation is blocked, will adjust CameraLocation and CameraRotation to
+/// find an unblocked location.
+/// ActorsToIgnore contains a list of actors that should not be considered as blocking the trace.
+/// Returns true if the camera was adjusted, or false otherwise
+/// </summary>
+native static final function bool AdjustCameraForBlockage(out Vector CameraLocation, 
+														  out Rotator CameraRotation,
+														  const out Vector TargetLocation,
+														  optional const out array<Actor> ActorsToIgnore) const;
+
+/// <summary>
+/// Utility function to determine if the given trace is blocked for camera purposes.
+///
+/// Returns true if the trace was blocked, and false otherwise
+/// </summary>
+native static final function bool IsLineOfSightBlockedToLocation(const out Vector TraceStart,
+																 const out Vector TraceEnd,
+																 optional const out array<Actor> ActorsToIgnore) const;
+
+/// <summary>
 /// Returns true if the given point lies within the given camera frustum
 /// </summary>
 native static final function bool IsPointWithinCameraFrustum(const out TPOV CameraLocation, Vector Point);

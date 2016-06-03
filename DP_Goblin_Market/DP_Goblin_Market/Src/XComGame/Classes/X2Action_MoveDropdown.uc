@@ -16,6 +16,8 @@ var int     m_iAimingIterations;
 var bool    bStoredSkipIK;
 var CustomAnimParams AnimParams;
 var float   DropHeight;
+var float	DistanceTraveledZ;
+var float	StartingLocationZ;
 var private BoneAtom StartingAtom;
 var private AnimNodeSequence PlayingSequence;
 var Rotator DesiredRotation;
@@ -52,7 +54,8 @@ Begin:
 	
 	DropHeight = UnitPawn.Location.Z - Destination.Z;
 
-	if (DropHeight <= 256)
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
+	if( DropHeight <= 256 )
 	{
 		AnimParams.AnimName = bClimbOver ?  'MV_ClimbDropLow_StartWall' : 'MV_ClimbDropLow_Start';
 		if(!UnitPawn.GetAnimTreeController().CanPlayAnimation(AnimParams.AnimName))
@@ -79,18 +82,25 @@ Begin:
 	StartingAtom.Rotation = QuatFromRotator(DesiredRotation);
 	UnitPawn.GetAnimTreeController().GetDesiredEndingAtomFromStartingAtom(AnimParams, StartingAtom);
 	PlayingSequence = UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(AnimParams);
-
-	while(Unit.Location.Z >= Destination.Z)
+	
+	DistanceTraveledZ = 0.0f;
+	StartingLocationZ = Unit.Location.Z;
+	while( DistanceTraveledZ < DropHeight )
 	{
 		if( !PlayingSequence.bRelevant || !PlayingSequence.bPlaying || PlayingSequence.AnimSeq == None )
 		{
-			`RedScreen("Dropdown never made it to the destination");
+			if( DropHeight - DistanceTraveledZ > fPawnHalfHeight )
+			{
+				`RedScreen("Dropdown never made it to the destination");
+			}
 			break;
 		}
 		Sleep(0.0f);
+		DistanceTraveledZ = StartingLocationZ - Unit.Location.Z;
 	}
 
 	AnimParams = default.AnimParams;
+	AnimParams.PlayRate = GetMoveAnimationSpeed();
 	AnimParams.HasDesiredEndingAtom = true;
 	AnimParams.DesiredEndingAtom.Translation = Destination;
 	AnimParams.DesiredEndingAtom.Rotation = QuatFromRotator(DesiredRotation);

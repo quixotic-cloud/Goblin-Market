@@ -72,6 +72,7 @@ private function FindATTMatinee()
 	for (Index = 0; Index < FoundMatinees.length; Index++)
 	{
 		Matinee = SeqAct_Interp(FoundMatinees[Index]);
+		`log("Matinee:"@ Matinee.ObjComment);
 		if( Instr(Matinee.ObjComment, MatineeCommentPrefix, , true) >= 0 )
 		{
 			return;
@@ -79,6 +80,7 @@ private function FindATTMatinee()
 	}
 
 	`Redscreen("Could not find the ATT matinee!");
+	Matinee = none;
 }
 
 simulated state Executing

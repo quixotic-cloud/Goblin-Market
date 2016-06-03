@@ -68,7 +68,7 @@ function array<SoldierClassAbilityType> GetCrossClassAbilities(optional X2Soldie
 
 	foreach arrClassTemplates(ClassTemplate)
 	{
-		if(ClassTemplate.DataName != DefaultSoldierClass && ClassTemplate != ExcludeClass)
+		if(ClassTemplate.DataName != DefaultSoldierClass && ClassTemplate != ExcludeClass && ClassTemplate.bAllowAWCAbilities)
 		{
 			for(iRank = 0; iRank < ClassTemplate.GetMaxConfiguredRank(); iRank++)
 			{

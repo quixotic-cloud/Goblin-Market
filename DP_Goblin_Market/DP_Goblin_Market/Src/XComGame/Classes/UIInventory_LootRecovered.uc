@@ -137,6 +137,13 @@ simulated function PopulateData()
 					`HQPRES.UINarrative(LootRecoveredNarrative);
 				}
 			}
+
+			if (ItemState.GetMyTemplate().ItemRecoveredAsLootEventToTrigger != '')
+			{
+				NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Trigger Loot Recovered Event");
+				`XEVENTMGR.TriggerEvent(ItemState.GetMyTemplate().ItemRecoveredAsLootEventToTrigger, , , NewGameState);
+				`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
+			}
 		}
 	}
 

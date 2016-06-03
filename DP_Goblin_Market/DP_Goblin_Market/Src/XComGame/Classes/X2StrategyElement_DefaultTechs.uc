@@ -1597,9 +1597,6 @@ static function X2DataTemplate CreateBattlefieldMedicineTemplate()
 	Template.SortingTier = 1;
 	Template.ResearchCompletedFn = UpgradeItems;
 	
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Medikit');
-
 	// Requirements
 	Template.Requirements.RequiredTechs.AddItem('AutopsyViper');
 
@@ -1633,9 +1630,6 @@ static function X2DataTemplate CreatePlasmaGrenadeTemplate()
 	Template.SortingTier = 1;
 	Template.ResearchCompletedFn = UpgradeItems;
 	
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('FragGrenade');
-
 	// Requirements
 	Template.Requirements.RequiredTechs.AddItem('AutopsyMuton');
 
@@ -1672,11 +1666,6 @@ static function X2DataTemplate CreateAdvancedGrenadesTemplate()
 	Template.SortingTier = 1;
 	Template.ResearchCompletedFn = UpgradeItems;
 	
-	// Items to Upgrade
-	Template.ItemsToUpgrade.AddItem('Firebomb');
-	Template.ItemsToUpgrade.AddItem('GasGrenade');
-	Template.ItemsToUpgrade.AddItem('AcidGrenade');
-
 	// Requirements
 	Template.Requirements.RequiredTechs.AddItem('PlasmaGrenade');
 
@@ -1845,153 +1834,16 @@ function GiveDeckedItemReward(XComGameState NewGameState, XComGameState_Tech Tec
 }
 
 function GiveItemReward(XComGameState NewGameState, XComGameState_Tech TechState, X2ItemTemplate ItemTemplate)
-{
-	local XComGameStateHistory History;
-	local XComGameState_HeadquartersXCom XComHQ;
-	local X2ItemTemplateManager ItemTemplateManager;
-	local XComGameState_Item ItemState;
-	local XComGameState_Tech CompletedTechState;
-	local array<XComGameState_Tech> CompletedTechs;
-	
-	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
-
-	foreach NewGameState.IterateByClassType(class'XComGameState_HeadquartersXCom', XComHQ)
-	{
-		break;
-	}
-
-	if (XComHQ == none)
-	{
-		History = `XCOMHISTORY;
-		XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
-		XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
-		NewGameState.AddStateObject(XComHQ);
-	}
-
-	// If it is possible for this item to be upgraded, check to see if the upgrade has already been researched
-	if (ItemTemplate.UpgradeItem != '')
-	{
-		CompletedTechs = XComHQ.GetCompletedProvingGroundTechStates();
-		foreach CompletedTechs(CompletedTechState)
-		{
-			if (CompletedTechState.GetMyTemplate().ItemsToUpgrade.Find(ItemTemplate.DataName) != INDEX_NONE)
-			{
-				// A tech has already been completed which has upgraded this item, so replace the template with the upgraded version
-				ItemTemplate = ItemTemplateManager.FindItemTemplate(ItemTemplate.UpgradeItem);
-				break;
-			}
-		}
-	}
-
-	ItemState = ItemTemplate.CreateInstanceFromTemplate(NewGameState);
-	NewGameState.AddStateObject(ItemState);
-
-	// Act as though it was just built, and immediately add it to the inventory
-	ItemState.OnItemBuilt(NewGameState);
+{	
+	class'XComGameState_HeadquartersXCom'.static.GiveItem(NewGameState, ItemTemplate);
 
 	TechState.ItemReward = ItemTemplate; // Needed for UI Alert display info
 	TechState.bSeenResearchCompleteScreen = false; // Reset the research report for techs that are repeatable
-
-	XComHQ.PutItemInInventory(NewGameState, ItemState);
-
-	`XEVENTMGR.TriggerEvent('ItemConstructionCompleted', ItemState, ItemState, NewGameState);
 }
 
 function UpgradeItems(XComGameState NewGameState, XComGameState_Tech TechState)
 {
-	local XComGameStateHistory History;
-	local XComGameState_HeadquartersXCom XComHQ;
-	local X2ItemTemplateManager ItemTemplateManager;
-	local X2ItemTemplate BaseItemTemplate, UpgradeItemTemplate;
-	local XComGameState_Item InventoryItemState, BaseItemState, UpgradedItemState;
-	local array<XComGameState_Item> InventoryItems;
-	local array<XComGameState_Unit> Soldiers;
-	local EInventorySlot InventorySlot;
-	local array<name> ItemsToUpgrade;
-	local int idx, iSoldier;
-
-	ItemTemplateManager = class'X2ItemTemplateManager'.static.GetItemTemplateManager();
-
-	foreach NewGameState.IterateByClassType(class'XComGameState_HeadquartersXCom', XComHQ)
-	{
-		break;
-	}
-
-	if (XComHQ == none)
-	{
-		History = `XCOMHISTORY;
-		XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
-		XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
-		NewGameState.AddStateObject(XComHQ);
-	}
-
-	ItemsToUpgrade = TechState.GetMyTemplate().ItemsToUpgrade;
-
-	for (idx = 0; idx < ItemsToUpgrade.Length; idx++)
-	{
-		BaseItemTemplate = ItemTemplateManager.FindItemTemplate(ItemsToUpgrade[idx]);
-		UpgradeItemTemplate = ItemTemplateManager.FindItemTemplate(BaseItemTemplate.UpgradeItem);
-		
-		// First check if this item is in the XComHQ inventory
-		BaseItemState = XComHQ.GetItemByName(BaseItemTemplate.DataName);
-		if (BaseItemState != none)
-		{
-			UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
-			NewGameState.AddStateObject(UpgradedItemState);
-
-			if (UpgradeItemTemplate.bInfiniteItem)
-			{
-				// If the new item is infinite (ex: Alien Grenades), just add it directly to the inventory
-				XComHQ.AddItemToHQInventory(UpgradedItemState);
-			}
-			else
-			{
-				// Otherwise match quantities and add it to the inventory the proper way
-				UpgradedItemState.Quantity = BaseItemState.Quantity;
-				XComHQ.PutItemInInventory(NewGameState, UpgradedItemState);
-
-				// Remove all of the base items from the inventory
-				XComHQ.RemoveItemFromInventory(NewGameState, BaseItemState.GetReference(), BaseItemState.Quantity);
-				NewGameState.RemoveStateObject(BaseItemState.GetReference().ObjectID);
-			}
-
-			// Add the template to the tech state to trigger the Item Upgraded popup
-			if (TechState.ItemsUpgraded.Find(UpgradeItemTemplate) == INDEX_NONE)
-			{
-				TechState.ItemsUpgraded.AddItem(UpgradeItemTemplate);
-			}
-		}
-
-		// Then check every soldier's inventory and replace the old item with a new one
-		Soldiers = XComHQ.GetSoldiers();
-		for (iSoldier = 0; iSoldier < Soldiers.Length; iSoldier++)
-		{
-			InventoryItems = Soldiers[iSoldier].GetAllInventoryItems(NewGameState, false);
-
-			foreach InventoryItems(InventoryItemState)
-			{
-				if (InventoryItemState.GetMyTemplateName() == BaseItemTemplate.DataName)
-				{
-					UpgradedItemState = UpgradeItemTemplate.CreateInstanceFromTemplate(NewGameState);
-					NewGameState.AddStateObject(UpgradedItemState);
-					InventorySlot = InventoryItemState.InventorySlot; // save the slot location
-
-					// Remove the old item and delete it from the game
-					Soldiers[iSoldier].RemoveItemFromInventory(InventoryItemState, NewGameState);
-					NewGameState.RemoveStateObject(InventoryItemState.GetReference().ObjectID);
-
-					// Then add the new item to the soldier in the same slot
-					Soldiers[iSoldier].AddItemToInventory(UpgradedItemState, InventorySlot, NewGameState);
-
-					// Add the template to the tech state to trigger the Item Upgraded popup
-					if (TechState.ItemsUpgraded.Find(UpgradeItemTemplate) == INDEX_NONE)
-					{
-						TechState.ItemsUpgraded.AddItem(UpgradeItemTemplate);
-					}
-				}
-			}
-		}
-	}
+	class'XComGameState_HeadquartersXCom'.static.UpgradeItems(NewGameState, TechState.GetMyTemplateName());
 }
 
 function bool AlwaysPriority()

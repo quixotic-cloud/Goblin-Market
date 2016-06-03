@@ -9,6 +9,7 @@ class X2PointOfInterestTemplate extends X2StrategyElementTemplate
 	config(GameBoard);
 
 var() bool								bStaffPOI; // Does this POI reward staff (Sci or Eng)?
+var() bool								bNeverExpires; // Does this POI never expire?
 
 // Data
 var() config array<name>				RewardTypes;
@@ -25,6 +26,8 @@ var localized array<string>				DisplayNames;
 var localized array<string>				CompletedSummaries;
 var localized array<string>				POIImages;
 
+var class<XComGameState_PointOfInterest> POIClass; // The POI class this template should use. Defaults to the original XComGameState_PointOfInterest
+
 var() Delegate<CanAppearDelegate>		CanAppearFn;
 var() Delegate<IsRewardNeededDelegate>	IsRewardNeededFn; // allows logical augmentation of POI availability. Used to indicate if the player desperately needs this POI
 
@@ -35,8 +38,13 @@ function XComGameState_PointOfInterest CreateInstanceFromTemplate(XComGameState 
 {
 	local XComGameState_PointOfInterest PointState;
 
-	PointState = XComGameState_PointOfInterest(NewGameState.CreateStateObject(class'XComGameState_PointOfInterest'));	 
+	PointState = XComGameState_PointOfInterest(NewGameState.CreateStateObject(POIClass));
 	PointState.OnCreation(self);
 
 	return PointState;
+}
+
+DefaultProperties
+{
+	POIClass = class'XComGameState_PointOfInterest'
 }

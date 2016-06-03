@@ -120,7 +120,7 @@ Begin:
 			//If BlockUntilActorOnScreen is set, release our grip on the actor track once the Location of our look-at target is on-screen. We also consider
 			//this wait condition satisfied if we have reached our camera destination but the look at actor is not on screen ( the camera stack may have
 			//another camera as the dominant one )
-			while( LookAtActorCamera != None && !LookAtActorCamera.HasArrived )
+			while( LookAtActorCamera != None && !LookAtActorCamera.HasArrived && LookAtActorCamera.IsLookAtValid() )
 			{
 				Sleep(0.0);
 			}
@@ -145,7 +145,7 @@ Begin:
 		}
 		else if(BlockUntilActorOnScreen)
 		{
-			while( LookAtLocationCamera != None && !LookAtLocationCamera.HasArrived )
+			while( LookAtLocationCamera != None && !LookAtLocationCamera.HasArrived && LookAtLocationCamera.IsLookAtValid() )
 			{
 				Sleep(0.0);
 			}

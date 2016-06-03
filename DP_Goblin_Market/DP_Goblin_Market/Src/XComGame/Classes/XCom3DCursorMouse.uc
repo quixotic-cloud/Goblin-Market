@@ -41,7 +41,7 @@ state CursorMode_NoCollision
 			ServerAscendFloor();
 		}
 
-		m_iRequestedFloor = min(m_iRequestedFloor + 1, MaxFloor);
+		m_iRequestedFloor = min(m_iRequestedFloor + 1, GetMaxFloor());
 
 		kResult = CursorSnapToFloor(m_iRequestedFloor, eCursorSearch_ExactFloor);
 		m_bCursorLaunchedInAir = !kResult.m_bOnGround;

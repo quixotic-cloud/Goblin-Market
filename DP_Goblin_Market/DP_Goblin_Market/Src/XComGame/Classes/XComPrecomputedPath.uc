@@ -54,6 +54,8 @@ var bool						  m_bIsUnderhandToss;
 var bool						  bOverrideSourceTargetFromSocketLocation;
 var Name						  m_SocketNameForSourceLocation;
 
+// keep track of the last targeted location, so we don't keep updating if the target doesn't change
+var vector LastTargetLocation;
 
 native simulated function UpdateWeaponProjectilePhysics(XComWeapon kWeapon, float dT);
 native simulated function BuildSpline();
@@ -99,6 +101,7 @@ simulated function ActivatePath(XComWeapon kWeapon, ETeam eForTeam, const out Pr
 	bUseOverrideSourceLocation = false;
 	SetupPath(kWeapon, eForTeam, PrePathData);
 	kRenderablePath.SetHidden(FALSE);
+	LastTargetLocation.Z = -1000; // force a rebuild of the grenade path
 }
 
 simulated function SetupPath(XComWeapon kWeapon, ETeam eForTeam, const out PrecomputedPathData PrePathData)

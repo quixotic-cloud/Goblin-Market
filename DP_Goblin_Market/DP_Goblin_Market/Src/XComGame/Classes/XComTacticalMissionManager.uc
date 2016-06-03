@@ -74,6 +74,7 @@ var const config private array<ProxyRewardUnitTemplateMapping> ProxyRewardUnitMa
 var const config array<string> arrTMissionTypes;
 var const config array<InclusionExclusionList> InclusionExclusionLists;
 var const config array<ConfigurableEncounter> ConfigurableEncounters;
+var const config array<EncounterBucket> EncounterBuckets;
 var const config array<MissionSchedule> MissionSchedules;
 var const config array<MissionDefinition> arrMissions;
 var const config array<MissionSourceRewardMapping> arrSourceRewardMissionTypes;
@@ -103,6 +104,7 @@ var bool bBlockingLoadParcels;
 var private bool HasCachedCards; // Allows us to only cache the deck cards once per run
 
 var private transient Name LastSelectedRewardName;
+var private transient bool BuildingChallengeMission;
 
 
 private function CacheMissionManagerCards()
@@ -286,7 +288,12 @@ event Name ChooseMissionSchedule(Object Caller)
 final native function int GetMissionScheduleIndex(Name LookupID);
 final native function GetMissionSchedule(Name LookupID, out MissionSchedule MissionScheduleRef);
 final native function GetActiveMissionSchedule(out MissionSchedule MissionScheduleRef);
-final native function GetConfigurableEncounter(Name LookupID, out ConfigurableEncounter ConfigurableEncounterRef);
+final native function GetConfigurableEncounter(
+	Name LookupID, 
+	out ConfigurableEncounter ConfigurableEncounterRef, 
+	optional int ForceLevel = -1, 
+	optional int AlertLevel = -1, 
+	optional XComGameState_HeadquartersXCom XComHQ);
 
 function InitMission(XComGameState_BattleData BattleData)
 {
@@ -383,8 +390,18 @@ function InitMission(XComGameState_BattleData BattleData)
 	BattleData.UniqueHackRewardsAcquired.Remove(0, BattleData.UniqueHackRewardsAcquired.Length);
 	BattleData.bTacticalHackCompleted = false;
 
-	SelectHackRewards('TacticalHackRewards', 'NegativeTacticalHackRewards', BattleData.TacticalHackRewards);
-	SelectHackRewards('StrategyHackRewards', 'NegativeStrategyHackRewards', BattleData.StrategyHackRewards);
+	if (`XCOMHISTORY.GetSingleGameStateObjectForClass( class'XComGameState_ChallengeData', true ) == none)
+	{
+		SelectHackRewards( 'TacticalHackRewards', 'NegativeTacticalHackRewards', BattleData.TacticalHackRewards );
+		SelectHackRewards( 'StrategyHackRewards', 'NegativeStrategyHackRewards', BattleData.StrategyHackRewards );
+	}
+	else
+	{
+		BuildingChallengeMission = true;
+		SelectHackRewards( 'TacticalHackRewards', 'NegativeTacticalHackRewards', BattleData.TacticalHackRewards );
+		SelectHackRewards( 'TacticalHackRewards', '', BattleData.StrategyHackRewards );
+		BuildingChallengeMission = false;
+	}
 }
 
 simulated function Name GetNextIntelPurchaseableHackReward(optional bool bUseGuaranteedDeck = false)
@@ -1444,6 +1461,11 @@ function bool ValidateTier2HackRewards(string CardLabel, Object ValidationData)
 		return false;
 	}
 
+	if (BuildingChallengeMission && HackRewardTemplate.bIsStrategyReward)
+	{
+		return false;
+	}
+
 	// TODO: add additional validation for strategy requirements
 	if( !HackRewardTemplate.IsHackRewardCurrentlyPossible() )
 	{
@@ -1472,6 +1494,11 @@ function bool ValidateTier1HackRewards(string CardLabel, Object ValidationData)
 		{
 			return false;
 		}
+	}
+
+	if (BuildingChallengeMission && HackRewardTemplate.bIsStrategyReward)
+	{
+		return false;
 	}
 
 	// TODO: add additional validation for strategy requirements
@@ -1535,14 +1562,17 @@ static function XComGameState_Unit CreateProxyRewardUnitIfNeeded(XComGameState_U
 
 	// generate an appearance that is appropriate for the proxy template. We'll steal it's body, arms, and legs,
 	// and leave the rest matching the original unit
-	Generator = class'WorldInfo'.static.GetWorldInfo().Spawn(class'XGCharacterGenerator');
-	GeneratedSoldier = Generator.CreateTSoldier(ProxyTemplate.DataName, EGender(ProxyUnit.kAppearance.iGender));
-	ProxyUnit.kAppearance.nmArms = GeneratedSoldier.kAppearance.nmArms;
-	ProxyUnit.kAppearance.nmArms_Underlay = GeneratedSoldier.kAppearance.nmArms_Underlay;
-	ProxyUnit.kAppearance.nmLegs = GeneratedSoldier.kAppearance.nmLegs;
-	ProxyUnit.kAppearance.nmLegs_Underlay = GeneratedSoldier.kAppearance.nmLegs_Underlay;
-	ProxyUnit.kAppearance.nmTorso = GeneratedSoldier.kAppearance.nmTorso;
-	ProxyUnit.kAppearance.nmTorso_Underlay = GeneratedSoldier.kAppearance.nmTorso_Underlay;
+	Generator = `XCOMGRI.Spawn(ProxyTemplate.CharacterGeneratorClass);
+	if (Generator != none)
+	{
+		GeneratedSoldier = Generator.CreateTSoldier(ProxyTemplate.DataName, EGender(ProxyUnit.kAppearance.iGender));
+		ProxyUnit.kAppearance.nmArms = GeneratedSoldier.kAppearance.nmArms;
+		ProxyUnit.kAppearance.nmArms_Underlay = GeneratedSoldier.kAppearance.nmArms_Underlay;
+		ProxyUnit.kAppearance.nmLegs = GeneratedSoldier.kAppearance.nmLegs;
+		ProxyUnit.kAppearance.nmLegs_Underlay = GeneratedSoldier.kAppearance.nmLegs_Underlay;
+		ProxyUnit.kAppearance.nmTorso = GeneratedSoldier.kAppearance.nmTorso;
+		ProxyUnit.kAppearance.nmTorso_Underlay = GeneratedSoldier.kAppearance.nmTorso_Underlay;
+	}
 
 	// start off on the same team as the proxy
 	if(OriginalUnit.ControllingPlayer.ObjectID > 0)
@@ -1562,7 +1592,11 @@ cpptext
 
 	// Accessors for the mission schedule information structs by lookup IDs
 	const FMissionSchedule* GetMissionSchedule(const FName& LookupID) const;
-	const FConfigurableEncounter* GetConfigurableEncounter(const FName& LookupID) const;
+	const FConfigurableEncounter* GetConfigurableEncounter(
+		const FName& LookupID, 
+		INT ForceLevel, 
+		INT AlertLevel, 
+		const UXComGameState_HeadquartersXCom* XComHQ) const;
 	const FInclusionExclusionList* GetInclusionExclusionList(const FName& LookupID) const;
 }
 

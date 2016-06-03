@@ -13,7 +13,8 @@
 
 class UITacticalQuickLaunch extends UIScreen 
 	dependson(XComParcelManager, XComPlotCoverParcelManager)
-	native(UI);
+	native(UI)
+	config(Game);
 
 var XComPresentationLayer   Pres;
 var XComTacticalController  TacticalController;
@@ -35,6 +36,7 @@ var XComParcelManager           ParcelManager;
 //Game state objects
 var XComGameStateHistory        History;
 var XComGameState_BattleData    BattleDataState;
+var XComGameState_MissionSite	ChallengeMissionSite;
 
 // stuff for ui interaction
 var XComParcel HighlightedParcel;
@@ -46,6 +48,18 @@ var UIButton    Button_ChooseMapData;
 var UIButton    Button_ChooseSquadLoadout;
 var UIButton    Button_ToggleDebugCamera;
 var UIButton    Button_ReturnToShell;
+var UIButton	Button_StartChallenge;
+
+var UIDropdown Challenge_SquadSize;
+var UIDropdown Challenge_ClassSelector;
+var UIDropdown Challenge_AlienSelector;
+var UIDropdown Challenge_RankSelector;
+var UIDropdown Challenge_ArmorSelector;
+var UIDropdown Challenge_PrimaryWeaponSelector;
+var UIDropdown Challenge_SecondaryWeaponSelector;
+var UIDropdown Challenge_UtilityItemSelector;
+var UIDropdown Challenge_AlertForceLevelSelector;
+var UIDropdown Challenge_EnemyForcesSelector;
 
 var UIPanel		InfoBoxContainer;
 var UIBGBox		BGBox_InfoBox;
@@ -78,6 +92,7 @@ var bool MapGenerated;
 
 //Set after hitting generate. Indicates that the map will need to be cleared before a new one can be generated
 var bool bAutoStartBattleAfterGeneration;
+var bool bGenerateChallengeHistory;
 
 //Variables to help display progress while building a level
 var int LastPhase; 
@@ -94,7 +109,7 @@ var array<Name> TacticalGameplayTags;
 // MEMBERS
 
 simulated function InitScreen(XComPlayerController InitController, UIMovie InitMovie, optional name InitName)
-{	
+{
 	super.InitScreen(InitController, InitMovie, InitName);
 
 	TacticalController = XComTacticalController(InitController);
@@ -113,6 +128,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	BuildButton_ChooseSquadLoadout();
 	BuildButton_ToggleDebugCamera();
 	BuildButton_ReturnToShell();
+	BuildChallengeControls();
 
 	//Set up the info box element
 	InfoBoxContainer = Spawn(class'UIPanel', self).InitPanel();
@@ -157,7 +173,7 @@ function InitHistory()
 	Profile = `XPROFILESETTINGS;
 
 	History = `XCOMHISTORY;
-	History.ResetHistory();
+	History.ResetHistory(, false);
 
 	// Grab the start state from the profile
 	Pres.TacticalStartState = class'XComGameStateContext_TacticalGameRule'.static.CreateDefaultTacticalStartState_Singleplayer();	
@@ -248,6 +264,74 @@ simulated private function OnButtonStartBattleClicked(UIButton button)
 	{
 		bAutoStartBattleAfterGeneration = true;
 		GotoState('GeneratingMap');
+	}
+	else
+	{
+		PlaySound( SoundCue'SoundUI.NegativeSelection2Cue', true );
+	}
+}
+
+simulated private function UIDropdown SpawnChallengeDropdown( name ID, string Label, int dropx, int dropy, class<X2ChallengeTemplate> TemplateType, X2ChallengeTemplateManager ChallengeTemplateManager )
+{
+	local UIDropdown Dropdown;
+	local array<X2ChallengeTemplate> Templates;
+	local X2ChallengeTemplate Template;
+
+	Dropdown = Spawn(class'UIDropdown', self);
+	Dropdown.InitDropdown( ID, Label );
+	Dropdown.SetX( dropx );
+	Dropdown.SetY( dropy );
+
+	Dropdown.AddItem( "Random" );
+
+	Templates = ChallengeTemplateManager.GetAllTemplatesOfClass( TemplateType );
+	foreach Templates( Template )
+	{
+		Dropdown.AddItem( string( Template.DataName ) );
+	}
+
+	Dropdown.SetSelected( 0 );
+
+	return Dropdown;
+}
+
+simulated private function BuildChallengeControls()
+{
+	local X2ChallengeTemplateManager ChallengeTemplateManager;
+
+	ChallengeTemplateManager = class'X2ChallengeTemplateManager'.static.GetChallengeTemplateManager( );
+
+	Button_StartChallenge = Spawn( class'UIButton', self );
+	Button_StartChallenge.InitButton( 'Button_StartChallenge', "Start Challenge", OnButtonStartChallengeClicked, eUIButtonStyle_HOTLINK_BUTTON );
+	Button_StartChallenge.SetGamepadIcon( class'UIUtilities_Input'.const.ICON_A_X );
+	Button_StartChallenge.SetPosition( 50, 200 );
+
+	Challenge_UtilityItemSelector		= SpawnChallengeDropdown( 'ChallengeUtility',			"Utility Items Template",		80, 230 + 65 * 8, class'X2ChallengeUtility', ChallengeTemplateManager );
+	Challenge_SecondaryWeaponSelector	= SpawnChallengeDropdown( 'ChallengeSecondaryWeapon',	"Secondary Weapon Template",	80, 230 + 65 * 7, class'X2ChallengeSecondaryWeapon', ChallengeTemplateManager );
+	Challenge_PrimaryWeaponSelector		= SpawnChallengeDropdown( 'ChallengePrimaryWeapon',		"Primary Weapon Template",		80, 230 + 65 * 6, class'X2ChallengePrimaryWeapon', ChallengeTemplateManager );
+	Challenge_ArmorSelector				= SpawnChallengeDropdown( 'ChallengeArmor',				"Armor Template",				80, 230 + 65 * 5, class'X2ChallengeArmor', ChallengeTemplateManager );
+	Challenge_RankSelector				= SpawnChallengeDropdown( 'ChallengeSoldierRank',		"Soldier Rank Template",		80, 230 + 65 * 4, class'X2ChallengeSoldierRank', ChallengeTemplateManager );
+	Challenge_AlienSelector				= SpawnChallengeDropdown( 'ChallengeSquadAlien',		"Alien Squad Member Template",	80, 230 + 65 * 3, class'X2ChallengeSquadAlien', ChallengeTemplateManager );
+	Challenge_ClassSelector				= SpawnChallengeDropdown( 'ChallengeSoldierClass',		"Soldier Class Template",		80, 230 + 65 * 2, class'X2ChallengeSoldierClass', ChallengeTemplateManager );
+	Challenge_SquadSize					= SpawnChallengeDropdown( 'ChallengeSquadSize',			"Squad Size Template",			80, 230 + 65 * 1, class'X2ChallengeSquadSize', ChallengeTemplateManager );
+
+	Challenge_EnemyForcesSelector		= SpawnChallengeDropdown( 'ChallengeEnemyForces',		"Enemy Forces Template",		80 + 350, 230 + 65 * 2, class'X2ChallengeEnemyForces', ChallengeTemplateManager );
+	Challenge_AlertForceLevelSelector	= SpawnChallengeDropdown( 'ChallengeAlertForce',		"Alert & Force Level Template",	80 + 350, 230 + 65 * 1, class'X2ChallengeAlertForce', ChallengeTemplateManager );
+}
+
+simulated private function OnButtonStartChallengeClicked( UIButton button )
+{
+	if (IsIdle( ) && MapGenerated)
+	{
+		Movie.Pres.PlayUISound( eSUISound_MenuSelect );
+		bGenerateChallengeHistory = true;
+		GotoState( 'GoingToBattle' );
+	}
+	else if (IsIdle( ) && !bMapNeedsClear)
+	{
+		bAutoStartBattleAfterGeneration = true;
+		bGenerateChallengeHistory = true;
+		GotoState( 'GeneratingMap' );
 	}
 	else
 	{
@@ -458,7 +542,7 @@ simulated function bool OnUnrealCommand(int cmd, int arg)
 simulated public function OnUCancel()
 {
 	Movie.Pres.PlayUISound(eSUISound_MenuClose);
-	`XCOMHISTORY.ResetHistory(); //Don't leave any of our battle data behind (causes problems for obstacle course launching)
+	`XCOMHISTORY.ResetHistory(, false); //Don't leave any of our battle data behind (causes problems for obstacle course launching)
 	ConsoleCommand("disconnect");
 }
 
@@ -595,6 +679,7 @@ function OnParcelDefinitionItemClicked(UIList listControl, int itemIndex)
 			{
 				ParcelManager.ObjectiveParcel = HighlightedParcel;
 				Button_StartBattle.SetDisabled(false);
+				Button_StartChallenge.SetDisabled(false);
 			}
 			else if(HighlightedParcel == ParcelManager.ObjectiveParcel)
 			{
@@ -602,6 +687,7 @@ function OnParcelDefinitionItemClicked(UIList listControl, int itemIndex)
 
 				// plots with only a single parcel are test plots. Allow those to start without a valid objective parcel
 				Button_StartBattle.SetDisabled(BattleDataState.MapData.ParcelData.Length > 1);
+				Button_StartChallenge.SetDisabled(BattleDataState.MapData.ParcelData.Length > 1);
 			}
 		}
 	}
@@ -860,9 +946,9 @@ state GoingToBattle
 		Movie.Stack.Pop(self);
 
 		//Mark that we are tactical quick launch
-		TacticalStartState = History.GetStartState();
-		LatestBattleDataState = XComGameState_BattleData(TacticalStartState.GetGameStateForObjectID(BattleDataState.ObjectID));
-		LatestBattleDataState.bIsTacticalQuickLaunch = true;
+		TacticalStartState = History.GetStartState( );
+		LatestBattleDataState = XComGameState_BattleData( TacticalStartState.GetGameStateForObjectID( BattleDataState.ObjectID ) );
+		LatestBattleDataState.bIsTacticalQuickLaunch = History.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) == none;
 
 		//Since we are a tactical quick launch game, remove any units that are not in this battle
 		//***
@@ -970,7 +1056,15 @@ state GeneratingMap
 		`ONLINEEVENTMGR.SaveProfileSettings();
 
 		// add the strategy game start info to the tactical start state
-		class'XComGameStateContext_StrategyGameRule'.static.CreateStrategyGameStart(StartState, , , `DifficultySetting);
+		if (bGenerateChallengeHistory)
+		{
+			InitWithChallengeHistory( );
+			bGenerateChallengeHistory = false;
+		}
+		else
+		{
+			class'XComGameStateContext_StrategyGameRule'.static.CreateStrategyGameStart(StartState, , , `DifficultySetting);
+		}
 
 		if( !bDebugCameraActive )
 		{
@@ -981,8 +1075,334 @@ state GeneratingMap
 		Button_GenerateMap.SetDisabled(true);
 		Button_ChooseMapData.SetDisabled(true);
 		Button_ChooseSquadLoadout.SetDisabled(true);
+		Button_StartChallenge.SetDisabled(true);
 
 		MapGenerated = false;
+	}
+
+	simulated function X2ChallengeTemplate GetChallengeTemplate( UIDropdown Dropdown, class<X2ChallengeTemplate> TemplateType, X2ChallengeTemplateManager TemplateManager )
+	{
+		local X2ChallengeTemplate Template;
+		local string TemplateName;
+
+		if (Dropdown.SelectedItem == 0)
+		{
+			Template = TemplateManager.GetRandomChallengeTemplateOfClass( TemplateType );
+		}
+		else
+		{
+			TemplateName = Dropdown.GetSelectedItemText( );
+			Template = TemplateManager.FindChallengeTemplate( name( TemplateName ) );
+		}
+
+		`assert( Template !=  none );
+
+		return Template;
+	}
+
+	function InitWithChallengeHistory( )
+	{
+		local XComGameState StartState;
+		local XComGameStateContext_TacticalGameRule TacticalStartContext;
+		local XComGameState_Player XComPlayerState;
+		local XComGameState_Player EnemyPlayerState;
+		local XComGameState_Player CivilianPlayerState;
+		local XComGameState_Cheats CheatState;
+		local XComGameState_Analytics Analytics;
+		local XComGameState_ChallengeData ChallengeData;
+		local XComGameState_CampaignSettings CampaignSettings;
+		local XComGameState_HeadquartersXCom HeadquartersStateObject;
+		local XComGameState_ObjectivesList ObjListState;
+		local XComGameState_BattleData OldBattleData;
+		local XComGameState_TimerData Timer;
+		local int AlertLevel, ForceLevel;
+		local X2ChallengeTemplateManager ChallengeTemplateManager;
+		local X2ChallengeAlertForce AlertForceSelector;
+		local X2ChallengeEnemyForces EnemyForcesSelector;
+
+		OldBattleData = XComGameState_BattleData( History.GetSingleGameStateObjectForClass( class'XComGameState_BattleData' ));
+
+		History.ResetHistory(, false);
+
+		TacticalStartContext = XComGameStateContext_TacticalGameRule( class'XComGameStateContext_TacticalGameRule'.static.CreateXComGameStateContext( ) );
+		TacticalStartContext.GameRuleType = eGameRule_TacticalGameStart;
+		StartState = History.CreateNewGameState( false, TacticalStartContext );
+
+		BattleDataState = XComGameState_BattleData( StartState.CreateStateObject( class'XComGameState_BattleData' ) );
+
+		BattleDataState.MapData = OldBattleData.MapData;
+		BattleDataState.PlotData = OldBattleData.PlotData;
+		BattleDataState.iLevelSeed = OldBattleData.iLevelSeed;
+		BattleDataState.m_iMissionType = OldBattleData.m_iMissionType;
+		BattleDataState.m_nQuestItem = OldBattleData.m_nQuestItem;
+		BattleDataState.PlotType = OldBattleData.PlotType;
+
+		// Civilians are always pro-advent
+		BattleDataState.SetPopularSupport( 0 );
+		BattleDataState.SetMaxPopularSupport( 1 );
+
+		BattleDataState.m_strDesc = "Challenge Mode"; //If you change this, be aware that this is how the ruleset knows the battle is a challenge mode battle
+		BattleDataState.m_strOpName = class'XGMission'.static.GenerateOpName( false );
+		BattleDataState.m_strMapCommand = "open" @ BattleDataState.MapData.PlotMapName $ "?game=XComGame.XComTacticalGame";
+
+		BattleDataState = XComGameState_BattleData( StartState.AddStateObject( BattleDataState ) );
+
+		XComPlayerState = class'XComGameState_Player'.static.CreatePlayer( StartState, eTeam_XCom );
+		XComPlayerState.bPlayerReady = true; // Single Player game, this will be synchronized out of the gate!
+		BattleDataState.PlayerTurnOrder.AddItem( XComPlayerState.GetReference( ) );
+		StartState.AddStateObject( XComPlayerState );
+
+		EnemyPlayerState = class'XComGameState_Player'.static.CreatePlayer( StartState, eTeam_Alien );
+		EnemyPlayerState.bPlayerReady = true; // Single Player game, this will be synchronized out of the gate!
+		BattleDataState.PlayerTurnOrder.AddItem( EnemyPlayerState.GetReference( ) );
+		StartState.AddStateObject( EnemyPlayerState );
+
+		CivilianPlayerState = class'XComGameState_Player'.static.CreatePlayer( StartState, eTeam_Neutral );
+		CivilianPlayerState.bPlayerReady = true; // Single Player game, this will be synchronized out of the gate!
+		BattleDataState.CivilianPlayerRef = CivilianPlayerState.GetReference( );
+		StartState.AddStateObject( CivilianPlayerState );
+
+		// create a default cheats object
+		CheatState = XComGameState_Cheats( StartState.CreateStateObject( class'XComGameState_Cheats' ) );
+		StartState.AddStateObject( CheatState );
+
+		ChallengeData = XComGameState_ChallengeData( StartState.CreateStateObject( class'XComGameState_ChallengeData' ) );
+		ChallengeData.LeaderBoardName = BattleDataState.m_strOpName /*@ LeaderBoardSuffix*/;
+		StartState.AddStateObject( ChallengeData );
+
+		Analytics = XComGameState_Analytics( StartState.CreateStateObject( class'XComGameState_Analytics' ) );
+		Analytics.SubmitToFiraxisLive = false;
+		StartState.AddStateObject( Analytics );
+
+		CampaignSettings = XComGameState_CampaignSettings( StartState.CreateStateObject( class'XComGameState_CampaignSettings' ) );
+		CampaignSettings.SetDifficulty( 2 ); // Force challenge mode to 'Commander' difficulty
+		CampaignSettings.SetIronmanEnabled( true );
+		CampaignSettings.SetSuppressFirstTimeNarrativeEnabled( true );
+		CampaignSettings.SetTutorialEnabled( false );
+		StartState.AddStateObject( CampaignSettings );
+
+		HeadquartersStateObject = XComGameState_HeadquartersXCom( StartState.CreateStateObject( class'XComGameState_HeadquartersXCom' ) );
+		HeadquartersStateObject.AdventLootWeight = class'XComGameState_HeadquartersXCom'.default.StartingAdventLootWeight;
+		HeadquartersStateObject.AlienLootWeight = class'XComGameState_HeadquartersXCom'.default.StartingAlienLootWeight;
+		HeadquartersStateObject.bHasPlayedAmbushTutorial = true;
+		HeadquartersStateObject.bHasPlayedMeleeTutorial = true;
+		HeadquartersStateObject.bHasPlayedNeutralizeTargetTutorial = true;
+		HeadquartersStateObject.SetGenericKeyValue( "NeutralizeTargetTutorial", 1 );
+		StartState.AddStateObject( HeadquartersStateObject );
+
+		ObjListState = XComGameState_ObjectivesList( StartState.CreateStateObject( class'XComGameState_ObjectivesList' ) );
+		StartState.AddStateObject( ObjListState );
+
+ 		Timer = XComGameState_TimerData( StartState.CreateStateObject( class'XComGameState_TimerData' ) );
+ 		Timer.bIsChallengeModeTimer = true;
+ 		Timer.SetTimerData( EGSTT_AppRelativeTime, EGSTDT_Down, EGSTRT_None );
+ 		Timer.SetRealTimeTimer( 30 * 60 );
+		Timer.bStopTime = true;
+ 		StartState.AddStateObject( Timer );
+
+		class'XComGameState_GameTime'.static.CreateGameStartTime( StartState );
+
+		AddRandomSoldiers( StartState, XComPlayerState, HeadquartersStateObject, ChallengeData );
+
+		SetupMissionSite( StartState, BattleDataState );
+
+		BattleDataState.SetGlobalAbilityEnabled( 'PlaceEvacZone', false, StartState );
+
+		ChallengeTemplateManager = class'X2ChallengeTemplateManager'.static.GetChallengeTemplateManager( );
+
+		AlertForceSelector = X2ChallengeAlertForce( GetChallengeTemplate( Challenge_AlertForceLevelSelector, class'X2ChallengeAlertForce', ChallengeTemplateManager ) );
+		class'X2ChallengeAlertForce'.static.SelectAlertAndForceLevels( AlertForceSelector, HeadquartersStateObject, AlertLevel, ForceLevel );
+		ChallengeData.AlertForceLevelSelectorName = AlertForceSelector.DataName;
+
+		BattleDataState.SetAlertLevel( AlertLevel );
+		BattleDataState.SetForceLevel( ForceLevel );
+
+		EnemyForcesSelector = X2ChallengeEnemyForces( GetChallengeTemplate( Challenge_EnemyForcesSelector, class'X2ChallengeEnemyForces', ChallengeTemplateManager ) );
+		ChallengeData.EnemyForcesSelectorName = EnemyForcesSelector.DataName;
+		class'X2ChallengeEnemyForces'.static.SelectEnemyForces( EnemyForcesSelector, ChallengeMissionSite, BattleDataState, StartState );
+
+		History.AddGameStateToHistory( StartState );
+
+		Pres.TacticalStartState = StartState;
+
+		//History.WriteHistoryToFile( "SaveData_Dev/", "ChallengeStartState_" @ LeaderBoardSuffix );
+	}
+
+	function AddRandomSoldiers( XComGameState StartState, XComGameState_Player XComPlayerState, XComGameState_HeadquartersXCom HeadquartersStateObject, XComGameState_ChallengeData ChallengeData )
+	{
+		local XGCharacterGenerator CharacterGenerator;
+		local int SoldierCount, AlienCount;
+		local int SoldierIndex;
+		local X2ChallengeTemplateManager ChallengeTemplateManager;
+		local X2ChallengeSquadSize SquadSizeSelector;
+		local X2ChallengeSoldierClass ClassSelector;
+		local X2ChallengeSquadAlien AlienSelector;
+		local X2ChallengeSoldierRank RankSelector;
+		local X2ChallengeArmor ArmorSelector;
+		local X2ChallengePrimaryWeapon PrimaryWeaponSelector;
+		local X2ChallengeSecondaryWeapon SecondaryWeaponSelector;
+		local X2ChallengeUtility UtilityItemSelector;
+		local array<name> ClassNames;
+		local XComGameState_Unit BuildUnit;
+		local TSoldier Soldier;
+		local X2CharacterTemplate CharTemplate;
+		local X2SoldierClassTemplate ClassTemplate;
+		local array<XComGameState_Unit> XComUnits;
+		local name RequiredLoadout;
+
+		ChallengeTemplateManager = class'X2ChallengeTemplateManager'.static.GetChallengeTemplateManager( );
+
+		SquadSizeSelector = X2ChallengeSquadSize( GetChallengeTemplate( Challenge_SquadSize, class'X2ChallengeSquadSize', ChallengeTemplateManager ) );
+		class'X2ChallengeSquadSize'.static.SelectSquadSize( SquadSizeSelector, SoldierCount, AlienCount );
+
+		ClassSelector = X2ChallengeSoldierClass( GetChallengeTemplate( Challenge_ClassSelector, class'X2ChallengeSoldierClass', ChallengeTemplateManager ) );
+		ClassNames = class'X2ChallengeSoldierClass'.static.SelectSoldierClasses( ClassSelector, SoldierCount );
+
+		CharTemplate = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager( ).FindCharacterTemplate( 'Soldier' );
+		`assert(CharTemplate != none);
+		CharacterGenerator = `XCOMGRI.Spawn( CharTemplate.CharacterGeneratorClass );
+		`assert(CharacterGenerator != None);
+
+		for (SoldierIndex = 0; SoldierIndex < SoldierCount; ++SoldierIndex)
+		{
+			ClassTemplate = class'X2SoldierClassTemplateManager'.static.GetSoldierClassTemplateManager( ).FindSoldierClassTemplate( ClassNames[SoldierIndex] );
+			`assert(ClassTemplate != none);
+
+			BuildUnit = CharTemplate.CreateInstanceFromTemplate( StartState );
+			BuildUnit.SetSoldierClassTemplate( ClassTemplate.DataName );
+			BuildUnit.SetControllingPlayer( XComPlayerState.GetReference( ) );
+
+			// Randomly roll what the character looks like
+			Soldier = CharacterGenerator.CreateTSoldier( );
+			BuildUnit.SetTAppearance( Soldier.kAppearance );
+			BuildUnit.SetCharacterName( Soldier.strFirstName, Soldier.strLastName, Soldier.strNickName );
+			BuildUnit.SetCountry( Soldier.nmCountry );
+			if (!BuildUnit.HasBackground( ))
+				BuildUnit.GenerateBackground( );
+
+			BuildUnit = XComGameState_Unit( StartState.AddStateObject( BuildUnit ) );
+
+			HeadquartersStateObject.Squad.AddItem( BuildUnit.GetReference( ) );
+			XComUnits.AddItem( BuildUnit );
+		}
+
+		RankSelector = X2ChallengeSoldierRank( GetChallengeTemplate( Challenge_RankSelector, class'X2ChallengeSoldierRank', ChallengeTemplateManager ) );
+		class'X2ChallengeSoldierRank'.static.SelectSoldierRanks( RankSelector, XComUnits, StartState );
+
+		ArmorSelector = X2ChallengeArmor( GetChallengeTemplate( Challenge_ArmorSelector, class'X2ChallengeArmor', ChallengeTemplateManager ) );
+		class'X2ChallengeArmor'.static.SelectSoldierArmor( ArmorSelector, XComUnits, StartState );
+
+		PrimaryWeaponSelector = X2ChallengePrimaryWeapon( GetChallengeTemplate( Challenge_PrimaryWeaponSelector, class'X2ChallengePrimaryWeapon', ChallengeTemplateManager ) );
+		class'X2ChallengePrimaryWeapon'.static.SelectSoldierPrimaryWeapon( PrimaryWeaponSelector, XComUnits, StartState );
+
+		SecondaryWeaponSelector = X2ChallengeSecondaryWeapon( GetChallengeTemplate( Challenge_SecondaryWeaponSelector, class'X2ChallengeSecondaryWeapon', ChallengeTemplateManager ) );
+		class'X2ChallengeSecondaryWeapon'.static.SelectSoldierSecondaryWeapon( SecondaryWeaponSelector, XComUnits, StartState );
+
+		UtilityItemSelector = X2ChallengeUtility( GetChallengeTemplate( Challenge_UtilityItemSelector, class'X2ChallengeUtility', ChallengeTemplateManager ) );
+		class'X2ChallengeUtility'.static.SelectSoldierUtilityItems( UtilityItemSelector, XComUnits, StartState );
+
+		//  Always apply the template's required loadout. XPad's and whatnot
+		for (SoldierIndex = 0; SoldierIndex < SoldierCount; ++SoldierIndex)
+		{
+			RequiredLoadout = CharTemplate.RequiredLoadout;
+			if (RequiredLoadout != '')
+				XComUnits[SoldierIndex].ApplyInventoryLoadout( StartState, RequiredLoadout );
+		}
+
+		CharacterGenerator.Destroy( );
+
+		if (AlienCount > 0)
+		{
+			AlienSelector = X2ChallengeSquadAlien( GetChallengeTemplate( Challenge_AlienSelector, class'X2ChallengeSquadAlien', ChallengeTemplateManager ) );
+			ClassNames = class'X2ChallengeSquadAlien'.static.SelectAlienTypes( AlienSelector, AlienCount );
+
+			for (SoldierIndex = 0; SoldierIndex < AlienCount; ++SoldierIndex )
+			{
+				CharTemplate = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager( ).FindCharacterTemplate( ClassNames[SoldierIndex] );
+				`assert(CharTemplate != none);
+
+				BuildUnit = CharTemplate.CreateInstanceFromTemplate( StartState );
+				BuildUnit.SetControllingPlayer( XComPlayerState.GetReference( ) );
+				BuildUnit.ApplyInventoryLoadout( StartState );
+
+				BuildUnit = XComGameState_Unit( StartState.AddStateObject( BuildUnit ) );
+				HeadquartersStateObject.Squad.AddItem( BuildUnit.GetReference( ) );
+			}
+		}
+
+		ChallengeData.SquadSizeSelectorName = SquadSizeSelector.DataName;
+		ChallengeData.ClassSelectorName = ClassSelector.DataName;
+		ChallengeData.AlienSelectorName = AlienSelector.DataName;
+		ChallengeData.RankSelectorName = RankSelector.DataName;
+		ChallengeData.ArmorSelectorName = ArmorSelector.DataName;
+		ChallengeData.PrimaryWeaponSelectorName = PrimaryWeaponSelector.DataName;
+		ChallengeData.SecondaryWeaponSelectorName = SecondaryWeaponSelector.DataName;
+		ChallengeData.UtilityItemSelectorName = UtilityItemSelector.DataName;
+	}
+
+	function SetupMissionSite( XComGameState StartState, XComGameState_BattleData OldBattleData )
+	{
+		local XComGameState_Continent Continent;
+		local XComGameState_WorldRegion Region;
+
+		local X2StrategyElementTemplateManager StratMgr;
+		local array<X2StrategyElementTemplate> ContinentDefinitions;
+		local X2ContinentTemplate RandContinentTemplate;
+		local X2WorldRegionTemplate RandRegionTemplate;
+
+		local int RandContinent, RandRegion;
+		local Vector CenterLoc, RegionExtents;
+
+		local int Index;
+		local string MissionType;
+
+		if (BattleDataState.m_iMissionType < 0)
+		{
+			Index = `SYNC_RAND( class'XComGameState_Analytics'.default.ChallengeModeScoringTable.Length );
+			MissionType = string( class'XComGameState_Analytics'.default.ChallengeModeScoringTable[ Index ].MissionType );
+			BattleDataState.m_iMissionType = TacticalMissionManager.arrMissions.Find( 'sType', MissionType );
+		}
+
+		StratMgr = class'X2StrategyElementTemplateManager'.static.GetStrategyElementTemplateManager( );
+		ContinentDefinitions = StratMgr.GetAllTemplatesOfClass( class'X2ContinentTemplate' );
+
+		RandContinent = `SYNC_RAND(ContinentDefinitions.Length);
+		RandContinentTemplate = X2ContinentTemplate( ContinentDefinitions[ RandContinent ] );
+
+		RandRegion = `SYNC_RAND( RandContinentTemplate.Regions.Length );
+		RandRegionTemplate = X2WorldRegionTemplate( StratMgr.FindStrategyElementTemplate( RandContinentTemplate.Regions[ RandRegion ] ) );
+
+		Continent = XComGameState_Continent( StartState.CreateStateObject( class'XComGameState_Continent' ) );
+		Continent.OnCreation( RandContinentTemplate );
+		StartState.AddStateObject( Continent );
+
+		Region = XComGameState_WorldRegion( StartState.CreateStateObject( class'XComGameState_WorldRegion' ) );
+		Region.OnCreation( RandRegionTemplate );
+		StartState.AddStateObject( Region );
+
+		Continent.AssignRegions( StartState );
+
+		// Choose random location from the region
+		RegionExtents.X = (RandRegionTemplate.Bounds[ 0 ].fRight - RandRegionTemplate.Bounds[ 0 ].fLeft) / 2.0f;
+		RegionExtents.Y = (RandRegionTemplate.Bounds[ 0 ].fBottom - RandRegionTemplate.Bounds[ 0 ].fTop) / 2.0f;
+		CenterLoc.x = RandRegionTemplate.Bounds[ 0 ].fLeft + RegionExtents.X;
+		CenterLoc.y = RandRegionTemplate.Bounds[ 0 ].fTop + RegionExtents.Y;
+
+		ChallengeMissionSite = XComGameState_MissionSite( StartState.CreateStateObject( class'XComGameState_MissionSite' ) );
+		ChallengeMissionSite.Location = CenterLoc + (`SYNC_VRAND() * RegionExtents);
+		ChallengeMissionSite.Continent.ObjectID = Continent.ObjectID;
+		ChallengeMissionSite.Region.ObjectID = Region.ObjectID;
+
+		ChallengeMissionSite.GeneratedMission.MissionID = ChallengeMissionSite.ObjectID;
+		ChallengeMissionSite.GeneratedMission.Mission = `TACTICALMISSIONMGR.arrMissions[ BattleDataState.m_iMissionType ];
+		ChallengeMissionSite.GeneratedMission.LevelSeed = BattleDataState.iLevelSeed;
+		ChallengeMissionSite.GeneratedMission.BattleOpName = BattleDataState.m_strOpName;
+		ChallengeMissionSite.GeneratedMission.BattleDesc = "ChallengeMode";
+		ChallengeMissionSite.GeneratedMission.MissionQuestItemTemplate = BattleDataState.m_nQuestItem;
+
+		BattleDataState.m_iMissionID = ChallengeMissionSite.ObjectID;
+
+		StartState.AddStateObject( ChallengeMissionSite );
 	}
 
 	simulated event EndState(name NextStateName)
@@ -1083,6 +1503,14 @@ state GeneratingMap
 				BattleDataState.MapData.Biome = "";
 			}
 		}
+
+		if (ChallengeMissionSite != none)
+		{
+			ChallengeMissionSite.GeneratedMission.Plot = SelectedPlotDef;
+
+			if (BattleDataState.MapData.Biome != "")
+				ChallengeMissionSite.GeneratedMission.Biome = `PARCELMGR.GetBiomeDefinition( BattleDataState.MapData.Biome );
+		}
 	}
 
 	simulated event Tick( float fDeltaT )
@@ -1157,6 +1585,7 @@ Begin:
 	Button_StartBattle.SetDisabled(false);
 	Button_ChooseSquadLoadout.SetDisabled(false);
 	Button_RerollSpawnPoint.SetDisabled(false);
+	Button_StartChallenge.SetDisabled(false);
 	
 	if( !WorldInfo.IsPlayInEditor() )
 	{

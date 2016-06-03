@@ -8,6 +8,12 @@
 
 class UICharacterPool extends UIScreen;
 
+
+enum EUI_CharPool_Options
+{
+	eUICP_Usage,
+};
+
 //----------------------------------------------------------------------------
 // MEMBERS
 
@@ -47,7 +53,16 @@ var localized string m_strNoCharacters;
 var localized string m_strNothingSelected;
 var localized string m_strEverythingSelected;
 
+var localized string m_strUsage_Desc;
+var localized string m_strUsage_Tooltip;
+
+var localized string m_arrTypes[ECharacterPoolSelectionMode]  <BoundEnum = ECharacterPoolSelectionMode>;
+var int m_iCurrentUsage;
+
 var array<XComGameState_Unit> SelectedCharacters;
+var UIList OptionsList; 
+
+const NUM_OptionsListITEMS = 1;
 
 //----------------------------------------------------------------------------
 // FUNCTIONS
@@ -62,10 +77,11 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	// ---------------------------------------------------------
 
 	// Create Container
-	Container = Spawn(class'UIPanel', self).InitPanel('').SetPosition(30, 110).SetSize(600, 800);
+	Container = Spawn(class'UIPanel', self).InitPanel('').SetPosition(30, 70).SetSize(600, 850);
 
 	// Create BG
 	BG = Spawn(class'UIBGBox', Container).InitBG('', 0, 0, Container.width, Container.height);
+	BG.SetAlpha( 80 );
 
 	RunningY = 10;
 	RunningYBottom = Container.Height - 10;
@@ -91,6 +107,11 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	RunningY += ImportButton.Height + 10;
 
 	//Create bottom buttons
+	OptionsList = Spawn(class'UIList', Container);
+	OptionsList.InitList('OptionsListMC', 10, RunningYBottom - class'UIMechaListItem'.default.Height, Container.Width - 20, 300, , false);
+
+	RunningYBottom -= class'UIMechaListItem'.default.Height + 10;
+
 	ExportButton = Spawn(class'UIButton', Container);
 	ExportButton.ResizeToText = true;
 	ExportButton.InitButton('', m_strExportSelection, OnButtonCallback, eUIButtonStyle_HOTLINK_BUTTON);
@@ -126,7 +147,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	BG.ProcessMouseEvents(List.OnChildMouseEvent);
 	List.bStickyHighlight = true;
 
-	// ---------------------------------------------------------
+	// --------------------------------------------------------
 
 	NavHelp = Spawn(class'UINavigationHelp', self).InitNavHelp();
 	NavHelp.AddBackButton(OnCancel);
@@ -134,6 +155,13 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	// ---------------------------------------------------------
 
 	CharacterPoolMgr = CharacterPoolManager(`XENGINE.GetCharacterPoolManager());
+
+	// Subtract one b/c NONE first option is skipped when generating the list
+	m_iCurrentUsage = (`XPROFILESETTINGS.Data.m_eCharPoolUsage - 1);
+
+	// ---------------------------------------------------------
+	
+	CreateOptionsList();
 
 	// ---------------------------------------------------------
 	
@@ -146,6 +174,34 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	WorldInfo.RemoteEventListeners.AddItem(self);
 	SetTimer(2.0, false, nameof(ForceShow));
 }
+
+function CreateOptionsList()
+{
+	local int i;
+	local UIMechaListItem ListItem; 
+
+	
+	// list needs to be created backwards for depth sorting
+	for( i = NUM_OptionsListITEMS - 1; i >= 0; i-- )
+	{
+		ListItem = Spawn(class'UIMechaListItem', OptionsList.itemContainer);
+		ListItem.bAnimateOnInit = false;
+		ListItem.InitListItem();
+		ListItem.SetY(i * class'UIMechaListItem'.default.Height);
+	}
+
+	// ------------------------------------------------------------------------
+	// Random vs. Pool usage dropdown: 
+	ListItem = UIMechaListItem(OptionsList.GetItem(eUICP_Usage));
+	ListItem.UpdateDataDropdown(m_strUsage_Desc, GetCharacterPoolDropdownLabels(), m_iCurrentUsage, UpdateCharacterPoolUsage);
+	ListItem.BG.SetTooltipText(m_strUsage_Tooltip, , , 10, , , , 0.0f);
+	
+	ListItem.Dropdown.SetSelected(m_iCurrentUsage);
+
+	// ------------------------------------------------------------------------
+
+}
+
 
 simulated function OnCreateButtonSizeRealized()
 {
@@ -214,8 +270,7 @@ simulated function UpdateDisplay()
 	
 	for( i = 0; i < NumCharacters; i++ )
 	{
-		UIMechaListItem(List.GetItem(i)).UpdateDataCheckbox(
-			class'UIUtilities_Text'.static.GetColoredText(CharacterNames[i], eUIState_Normal), 
+		UIMechaListItem(List.GetItem(i)).UpdateDataCheckbox(CharacterNames[i], 
 			"",
 			SelectedCharacters.Find(GetSoldierInSlot(i)) != INDEX_NONE, 
 			SelectSoldier, 
@@ -310,7 +365,7 @@ simulated function OnButtonCallback(UIButton kButton)
 simulated function OnCancel()
 {
 	XComShellPresentationLayer(Movie.Pres).GetCamera().GotoState( 'CinematicView' );
-	SetTimer(2.0, false, nameof(CloseScreen));
+	SetTimer(3.0, false, nameof(CloseScreen));
 	`XCOMGRI.DoRemoteEvent('ReturnToShell');
 	AnimateOut();
 }
@@ -463,6 +518,31 @@ simulated public function DeleteSoldiersDialogueCallback(eUIAction eAction)
 	CharacterPoolMgr.SaveCharacterPool();
 	UpdateDisplay();
 }
+
+public function array<string> GetCharacterPoolDropdownLabels()
+{
+	local array<string> arrCharacterPoolTypesForDropdown;
+	local int i;
+
+	for( i = 1; i < eCPSM_MAX; ++i )
+	{
+		arrCharacterPoolTypesForDropdown.AddItem(m_arrTypes[i]);
+	}
+
+	return arrCharacterPoolTypesForDropdown;
+}
+
+public function UpdateCharacterPoolUsage(UIDropdown DropdownControl)
+{
+	m_iCurrentUsage = DropdownControl.SelectedItem;
+
+	// Need to add one b/c we skip the NONE first option in the enum list
+	`XPROFILESETTINGS.Data.m_eCharPoolUsage = ECharacterPoolSelectionMode(m_iCurrentUsage + 1);
+	`ONLINEEVENTMGR.SaveProfileSettings();
+
+	Movie.Pres.PlayUISound(eSUISound_MenuSelect);
+}
+
 
 //==============================================================================
 

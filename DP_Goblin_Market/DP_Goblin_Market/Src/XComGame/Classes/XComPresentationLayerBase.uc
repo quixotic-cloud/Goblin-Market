@@ -1469,7 +1469,7 @@ simulated function InitializeCustomizeManager(optional XComGameState_Unit Unit, 
 
 	if(m_kCustomizeManager == None)
 	{
-		m_kCustomizeManager = new(self) class'XComCharacterCustomization';
+		m_kCustomizeManager = new(self) Unit.GetMyTemplate().CustomizationManagerClass;
 	}
 
 	TopArmoryScreen = UIArmory(ScreenStack.GetLastInstanceOf(class'UIArmory'));
@@ -1506,7 +1506,7 @@ reliable client function UICharacterPool()
 reliable client function UICustomize_Menu(XComGameState_Unit Unit, Actor ActorPawn, optional XComGameState CheckGameState)
 {
 	InitializeCustomizeManager(Unit, CheckGameState);
-	ScreenStack.Push(Spawn(class'UICustomize_Menu', self), Get3DMovie());
+	ScreenStack.Push(Spawn(Unit.GetMyTemplate().UICustomizationMenuClass, self), Get3DMovie());
 }
 
 reliable client function UIMPShell_UnitEditor(X2MPShellManager ShellManager, XComGameState loadoutState, XComGameState_Unit Unit)
@@ -1518,13 +1518,13 @@ reliable client function UIMPShell_UnitEditor(X2MPShellManager ShellManager, XCo
 	editorScreen.InitUnitEditorScreen(ShellManager, Unit);
 }
 
-reliable client function UICustomize_Info()
+reliable client function UICustomize_Info(optional XComGameState_Unit Unit)
 {
-	ScreenStack.Push(Spawn(class'UICustomize_Info', self), Get3DMovie());
+	ScreenStack.Push(Spawn(Unit.GetMyTemplate().UICustomizationInfoClass, self), Get3DMovie());
 }
-reliable client function UICustomize_Props()
+reliable client function UICustomize_Props(optional XComGameState_Unit Unit)
 {
-	ScreenStack.Push(Spawn(class'UICustomize_Props', self), Get3DMovie());
+	ScreenStack.Push(Spawn(Unit.GetMyTemplate().UICustomizationPropsClass, self), Get3DMovie());
 }
 
 reliable client function UICustomize_Trait( string _Title, 
@@ -1597,6 +1597,15 @@ function UIIronMan()
 
 	TargetMovie = XComShellPresentationLayer(self) == none ? Get2DMovie() : Get3DMovie();
 	ScreenStack.Push(Spawn(class'UIChooseIronMan', self), TargetMovie);
+}
+
+//-------------------------------------------------------------------
+function UIShellNarrativeContent()
+{
+	local UIMovie TargetMovie;
+
+	TargetMovie = XComShellPresentationLayer(self) == none ? Get2DMovie() : Get3DMovie();
+	ScreenStack.Push(Spawn(class'UIShellNarrativeContent', self), TargetMovie);
 }
 
 //-------------------------------------------------------------------
@@ -2307,6 +2316,16 @@ function StopDistort()
 simulated function Notify(string Notice, optional string ImagePath = "") 
 {
 	m_kEventNotices.Notify(Notice, ImagePath);
+}
+
+simulated function ClickPathUnderMouse( optional bool bDebugLogs = false )
+{
+	Get2DMovie().ClickPathUnderMouse(bDebugLogs);
+}
+
+simulated function ClickPathUnderMouse3D( optional bool bDebugLogs = false )
+{
+	Get3DMovie().ClickPathUnderMouse(bDebugLogs);
 }
 
 DefaultProperties

@@ -44,6 +44,7 @@ const FXS_DPAD_LEFT		    = 356;
 //const DPAD_UP_LEFT	    = 357;
 
 const FXS_ANY_INPUT         = 360; //Used as a marker for any input 
+const FXS_BUTTON_A_STEAM    = 361; //Used as a marker for any input 
 
 const FXS_VIRTUAL_LSTICK_UP	    = 370;
 const FXS_VIRTUAL_LSTICK_DOWN   = 371;
@@ -241,7 +242,7 @@ const ICON_PC_LEFTMOUSE4    = "PC_mouseLeft4";
 const ICON_PC_LEFTMOUSE5    = "PC_mouseLeft5";
 
 
-static function string HTML( string sIcon, optional int imgDimensions = 30, optional int vspaceOffset=0 )
+static function string HTML( string sIcon, optional int imgDimensions = 18, optional int vspaceOffset=-3 )
 {
 	return( "<img src='" $ sIcon $ "' align='baseline' vspace='"$vspaceOffset$"' width='"$imgDimensions$"' height='"$imgDimensions$"'>" );
 }
@@ -267,7 +268,8 @@ static function string InsertGamepadIcons(string sSource)
 {
 	local string sResult;
 
-	// TODO: Add all gamepad icons
+	//TODO: Import Steam icons, and look those up if steam controller is active. 
+
 	sResult = Repl(sSource, "%LS", class'UIUtilities_Input'.static.HTML(class'UIUtilities_Input'.const.ICON_LSTICK));
 	sResult = Repl(sResult, "%RS", class'UIUtilities_Input'.static.HTML(class'UIUtilities_Input'.const.ICON_RSTICK));
 	sResult = Repl(sResult, "%A", class'UIUtilities_Input'.static.HTML(GetAdvanceButtonIcon()));
@@ -372,8 +374,15 @@ static function string InsertPCIcons(string sSource)
 {
 	local string sResult;
 
+	sResult = sSource; 
+
+	if( `XENGINE.m_SteamControllerManager.IsSteamControllerActive() )
+	{
+		sResult = InsertSteamIcons(sResult);
+	}
+
 	// TODO: Add all gamepad icons
-	sResult = Repl(sSource, "%LM4", class'UIUtilities_Input'.static.HTML_MESSENGER(class'UIUtilities_Input'.const.ICON_PC_LEFTMOUSE4));
+	sResult = Repl(sResult, "%LM4", class'UIUtilities_Input'.static.HTML_MESSENGER(class'UIUtilities_Input'.const.ICON_PC_LEFTMOUSE4));
 	sResult = Repl(sResult, "%LM5", class'UIUtilities_Input'.static.HTML_MESSENGER(class'UIUtilities_Input'.const.ICON_PC_LEFTMOUSE5));
 	sResult = Repl(sResult, HTML_KEYMAP(class'XComKeybindingData'.default.m_arrLocalizedKeyNames[eLKN_LeftMouseButton]), class'UIUtilities_Text'.static.InjectImage(class'UIUtilities_Input'.const.ICON_PC_LEFTMOUSE, 40, 20, 0));
 	sResult = Repl(sResult, "%KEY:LMB%", class'UIUtilities_Text'.static.InjectImage(class'UIUtilities_Input'.const.ICON_PC_LEFTMOUSE, 40, 20, 0));
@@ -388,6 +397,55 @@ static function string InsertPCIcons(string sSource)
 
 	return sResult;
 }
+
+
+static function string InsertSteamIcons(string sSource) 
+{
+	local string sResult, SteamIcon;
+	local XComSteamControllerManager SteamMgr; 
+	local int IconSize; 
+
+	IconSize = 24; 
+
+	sResult = sSource; 
+	SteamMgr = `XENGINE.m_SteamControllerManager; 
+	
+	//RMB eKC_Tactical, eTBC_Path
+	SteamIcon = "steam_"$SteamMgr.GetSteamControllerActionOrigin(eKC_Tactical, eTBC_Path);
+	sResult = Repl(sResult, MarkForKeybinding(class'XComKeybindingData'.default.m_arrLocalizedKeyNames[eLKN_RightMouseButton]), class'UIUtilities_Text'.static.InjectImage(SteamIcon, IconSize, IconSize, 0));
+
+	//LMB eKC_Tactical, eTBC_EnterShotHUD_Confirm
+	SteamIcon = "steam_"$SteamMgr.GetSteamControllerActionOrigin(eKC_Tactical, eTBC_EnterShotHUD_Confirm);
+	sResult = Repl(sResult, MarkForKeybinding(class'XComKeybindingData'.default.m_arrLocalizedKeyNames[eLKN_LeftMouseButton]), class'UIUtilities_Text'.static.InjectImage(SteamIcon, IconSize, IconSize, 0));
+
+	//Q eKC_Tactical, eTBC_CamRotateLeft
+	SteamIcon = "steam_"$SteamMgr.GetSteamControllerActionOrigin(eKC_Tactical, eTBC_CamRotateLeft);
+	sResult = Repl(sResult, MarkForKeybinding("Q"), class'UIUtilities_Text'.static.InjectImage(SteamIcon, IconSize, IconSize, 0));
+
+	//E eKC_Tactical, eTBC_CamRotateRight 
+	SteamIcon = "steam_"$SteamMgr.GetSteamControllerActionOrigin(eKC_Tactical, eTBC_CamRotateRight);
+	sResult = Repl(sResult, MarkForKeybinding("E"), class'UIUtilities_Text'.static.InjectImage(SteamIcon, IconSize, IconSize, 0));
+
+	//TAB eKC_Tactical, eTBC_NextUnit 
+	SteamIcon = "steam_"$SteamMgr.GetSteamControllerActionOrigin(eKC_Tactical, eTBC_NextUnit);
+	sResult = Repl(sResult, MarkForKeybinding(class'XComKeybindingData'.default.m_arrLocalizedKeyNames[eLKN_Tab]), class'UIUtilities_Text'.static.InjectImage(SteamIcon, IconSize, IconSize, 0));
+
+	//ENTER eKC_General, eGBC_Confirm
+	SteamIcon = "steam_"$SteamMgr.GetSteamControllerActionOrigin(eKC_General, eGBC_Confirm);
+	sResult = Repl(sResult, MarkForKeybinding(class'XComKeybindingData'.default.m_arrLocalizedKeyNames[eLKN_Enter]), class'UIUtilities_Text'.static.InjectImage(SteamIcon, IconSize, IconSize, 0));
+	
+	//P eKC_Tactical,  eTBC_Interact 
+	SteamIcon = "steam_"$ SteamMgr.GetSteamControllerActionOrigin(eKC_Tactical, eTBC_Interact);
+	sResult = Repl(sResult, MarkForKeybinding("P"), class'UIUtilities_Text'.static.InjectImage(SteamIcon, IconSize, IconSize, 0));
+
+	return sResult;
+}
+
+static function string MarkForKeybinding(string Source)
+{
+	return "%KEY:" $ Source $"%";
+}
+
 static function string GetAdvanceButtonIcon()
 {
 	if( IsAdvanceButtonSwapActive() ) //TODO: get Korean setting 

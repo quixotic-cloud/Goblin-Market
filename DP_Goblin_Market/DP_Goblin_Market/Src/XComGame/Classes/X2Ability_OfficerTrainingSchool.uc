@@ -33,6 +33,7 @@ static function X2AbilityTemplate LightningStrike()
 	local X2AbilityTemplate                 Template;
 	local X2Effect_PersistentStatChange     StatEffect;
 	local X2Condition_UnitProperty          ConcealedCondition;
+	local X2AbilityTrigger_EventListener    Trigger;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'LightningStrike');
 
@@ -43,8 +44,13 @@ static function X2AbilityTemplate LightningStrike()
 
 	Template.AbilityToHitCalc = default.DeadEye;
 	Template.AbilityTargetStyle = default.SelfTarget;
-	Template.AbilityTriggers.AddItem(default.UnitPostBeginPlayTrigger);
-
+	
+	Trigger = new class'X2AbilityTrigger_EventListener';
+	Trigger.ListenerData.Deferral = ELD_OnStateSubmitted;
+	Trigger.ListenerData.EventID = 'StartOfMatchConcealment';
+	Trigger.ListenerData.Filter = eFilter_Player;
+	Trigger.ListenerData.EventFn = class'XComGameState_Ability'.static.AbilityTriggerEventListener_Self;
+	Template.AbilityTriggers.AddItem(Trigger);
 
 	ConcealedCondition = new class'X2Condition_UnitProperty';
 	ConcealedCondition.ExcludeFriendlyToSource = false;

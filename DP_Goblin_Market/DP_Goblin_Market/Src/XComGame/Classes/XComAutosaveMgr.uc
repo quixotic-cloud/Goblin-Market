@@ -116,7 +116,7 @@ function DoAutosave(delegate<XComOnlineEventMgr.WriteSaveGameComplete> AutoSaveC
 				}
 			}
 
-			if (arrTacticalSaves.Length < MAX_TACTICAL_AUTOSAVES)
+			if( arrTacticalSaves.Length < MAX_TACTICAL_AUTOSAVES || `CHEATMGR.bShouldAutosaveBeforeEveryAction )
 			{
 				iSaveSlot = GetNextSaveID();
 				`log("Less than the max number of tactial autosaves, using new save slot" @ iSaveSlot,,'XCom_Online');

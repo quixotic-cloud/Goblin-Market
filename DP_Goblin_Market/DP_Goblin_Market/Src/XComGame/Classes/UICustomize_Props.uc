@@ -34,6 +34,12 @@ var localized string m_strScars;
 var localized string m_strClearButton;
 var localized string m_strFacePaint;
 
+//Left arm / right arm selection
+var localized string m_strLeftArm;
+var localized string m_strRightArm;
+var localized string m_strLeftArmDeco;
+var localized string m_strRightArmDeco;
+
 //----------------------------------------------------------------------------
 // FUNCTIONS
 
@@ -43,6 +49,8 @@ simulated function UpdateData()
 	local bool bHasOptions, bIsObstructed;
 	local EUIState ColorState;	
 	local int currentSel;
+	local bool bCanSelectArmDeco;
+	local bool bCanSelectDualArms;
 	currentSel = List.SelectedIndex;
 	
 	super.UpdateData();
@@ -52,25 +60,47 @@ simulated function UpdateData()
 	// HELMET
 	//-----------------------------------------------------------------------------------------
 	GetListItem(i++)
-		.UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strHelmet, ColorState), CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Helmet, ColorState, FontSize),CustomizeHelmet)
+		.UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Helmet) $ m_strHelmet, CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Helmet, ColorState, FontSize), CustomizeHelmet)
 		.SetDisabled(bIsSuperSoldier, m_strIsSuperSoldier);
 
 	// ARMS
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strArms, eUIState_Normal),
-		CustomizeManager.FormatCategoryDisplay( eUICustomizeCat_Arms,, FontSize ), CustomizeArms);
+	bCanSelectDualArms = CustomizeManager.HasPartsForPartType("Arms", `XCOMGAME.SharedBodyPartFilter.FilterByTorsoAndArmorMatch);
+	GetListItem(i++, !bCanSelectDualArms, m_strIncompatibleStatus).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Arms) $ m_strArms,
+																				   CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Arms, bCanSelectDualArms ? eUIState_Normal : eUIState_Disabled, FontSize), CustomizeArms, true);
+
+	if(CustomizeManager.HasPartsForPartType("LeftArm", `XCOMGAME.SharedBodyPartFilter.FilterByTorsoAndArmorMatch))
+	{
+		//If they have parts for left arm, we assume that right arm parts are available too.
+		GetListItem(i++).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_LeftArm) $ m_strLeftArm,
+										 CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_LeftArm, , FontSize), CustomizeLeftArm, true);
+
+		GetListItem(i++).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_RightArm) $ m_strRightArm,
+										 CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_RightArm, , FontSize), CustomizeRightArm, true);
+				
+		//Only show these options if there is no dual arm selection
+		bCanSelectArmDeco = Unit.kAppearance.nmArms == '' && CustomizeManager.HasPartsForPartType("LeftArmDeco", `XCOMGAME.SharedBodyPartFilter.FilterByTorsoAndArmorMatch);
+		GetListItem(i++, !bCanSelectArmDeco, m_strIncompatibleStatus).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_LeftArmDeco) $ m_strLeftArmDeco,
+																					  CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_LeftArmDeco, bCanSelectArmDeco ? eUIState_Normal : eUIState_Disabled, FontSize), CustomizeLeftArmDeco, true);
+
+		GetListItem(i++, !bCanSelectArmDeco, m_strIncompatibleStatus).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_RightArmDeco) $ m_strRightArmDeco,
+																					  CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_RightArmDeco, bCanSelectArmDeco ? eUIState_Normal : eUIState_Disabled, FontSize), CustomizeRightArmDeco, true);
+	}
 
 	// LEGS
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strLegs, eUIState_Normal),
-		CustomizeManager.FormatCategoryDisplay( eUICustomizeCat_Legs,, FontSize ), CustomizeLegs);
+	if(CustomizeManager.HasPartsForPartType("Legs", `XCOMGAME.SharedBodyPartFilter.FilterByTorsoAndArmorMatch))
+	{
+		GetListItem(i++).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Legs) $ m_strLegs,
+										 CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Legs, , FontSize), CustomizeLegs);
+	}
 
 	// TORSO
 	//-----------------------------------------------------------------------------------------
 	bHasOptions = CustomizeManager.HasMultipleCustomizationOptions(eUICustomizeCat_Torso);
 	ColorState = bHasOptions ? eUIState_Normal : eUIState_Disabled;
 
-	GetListItem(i++, !bHasOptions, m_strNoVariations).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strTorso, ColorState),
+	GetListItem(i++, !bHasOptions, m_strNoVariations).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Torso) $ m_strTorso,
 		CustomizeManager.FormatCategoryDisplay( eUICustomizeCat_Torso, ColorState, FontSize ), CustomizeTorso);
 	
 	// UPPER FACE PROPS
@@ -78,7 +108,7 @@ simulated function UpdateData()
 	bIsObstructed = XComHumanPawn(CustomizeManager.ActorPawn).HelmetContent.bHideUpperFacialProps;
 	ColorState = bIsObstructed ? eUIState_Disabled : eUIState_Normal;
 
-	GetListItem(i++, bIsObstructed, m_strRemoveHelmet).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strUpperFaceProps, ColorState),
+	GetListItem(i++, bIsObstructed, m_strRemoveHelmet).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_FaceDecorationUpper) $ m_strUpperFaceProps,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_FaceDecorationUpper, ColorState, FontSize), CustomizeUpperFaceProps);
 
 	// LOWER FACE PROPS
@@ -86,7 +116,7 @@ simulated function UpdateData()
 	bIsObstructed = XComHumanPawn(CustomizeManager.ActorPawn).HelmetContent.bHideLowerFacialProps;
 	ColorState = bIsObstructed ? eUIState_Disabled : eUIState_Normal;
 
-	GetListItem(i++, bIsObstructed, m_strRemoveHelmet).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strLowerFaceProps, ColorState),
+	GetListItem(i++, bIsObstructed, m_strRemoveHelmet).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_FaceDecorationLower) $ m_strLowerFaceProps,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_FaceDecorationLower, ColorState, FontSize), CustomizeLowerFaceProps);
 
 	// DISABLE VETERAN OPTIONS
@@ -94,49 +124,49 @@ simulated function UpdateData()
 
 	// ARMOR PATTERN (VETERAN ONLY)
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strArmorPattern, ColorState),
+	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_ArmorPatterns) $ m_strArmorPattern,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_ArmorPatterns, ColorState, FontSize), CustomizeArmorPattern);
 
 	// WEAPON PATTERN
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strWeaponPattern, eUIState_Normal),
+	GetListItem(i++).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_WeaponPatterns) $ m_strWeaponPattern,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_WeaponPatterns, eUIState_Normal, FontSize), CustomizeWeaponPattern);
 
 	// FACE PAINT
 	//-----------------------------------------------------------------------------------------
 
 	//Check whether any face paint is available...	
-	if(CustomizeManager.HasPartsForPartType("Facepaint"))
+	if(CustomizeManager.HasPartsForPartType("Facepaint", `XCOMGAME.SharedBodyPartFilter.FilterAny))
 	{
-		GetListItem(i++).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strFacePaint, eUIState_Normal),
+		GetListItem(i++).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_FacePaint) $ m_strFacePaint,
 										 CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_FacePaint, eUIState_Normal, FontSize), CustomizeFacePaint);
 	}
 
 	// TATOOS (VETERAN ONLY)
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strTattoosLeft, ColorState),
+	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_LeftArmTattoos) $ m_strTattoosLeft,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_LeftArmTattoos, ColorState, FontSize), CustomizeLeftArmTattoos);
 
-	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strTattoosRight, ColorState),
+	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_RightArmTattoos) $ m_strTattoosRight,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_RightArmTattoos, ColorState, FontSize), CustomizeRightArmTattoos);
 
 	// TATTOO COLOR (VETERAN ONLY)
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++, bDisableVeteranOptions).UpdateDataColorChip(class'UIUtilities_Text'.static.GetColoredText(m_strTattooColor, ColorState),										 
+	GetListItem(i++, bDisableVeteranOptions).UpdateDataColorChip(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_TattooColor) $ m_strTattooColor,
 		CustomizeManager.GetCurrentDisplayColorHTML(eUICustomizeCat_TattooColor), TattooColorSelector);
 
 	// SCARS (VETERAN ONLY)
 	//-----------------------------------------------------------------------------------------
-	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(class'UIUtilities_Text'.static.GetColoredText(m_strScars, ColorState),
+	GetListItem(i++, bDisableVeteranOptions).UpdateDataValue(CustomizeManager.CheckForAttentionIcon(eUICustomizeCat_Scars) $ m_strScars,
 		CustomizeManager.FormatCategoryDisplay(eUICustomizeCat_Scars, ColorState, FontSize), CustomizeScars);
 
 	if (currentSel > -1 && currentSel < List.ItemCount)
 	{
-		List.Navigator.SetSelected(GetListItem(currentSel));
+		List.Navigator.SetSelected(List.GetItem(currentSel));
 	}
 	else
 	{
-		List.Navigator.SetSelected(GetListItem(0));
+		List.Navigator.SetSelected(List.GetItem(0));
 	}
 }
 
@@ -146,6 +176,7 @@ reliable client function TattooColorSelector()
 	CustomizeManager.UpdateCamera(eUICustomizeCat_TattooColor);
 	ColorSelector = GetColorSelector(CustomizeManager.GetColorList(eUICustomizeCat_TattooColor),
 		PreviewTattooColor, SetTattooColor, int(CustomizeManager.GetCategoryDisplay(eUICustomizeCat_TattooColor)));
+	CustomizeManager.AccessedCategoryCheckDLC(eUICustomizeCat_TattooColor);
 }
 function PreviewTattooColor(int iColorIndex)
 {
@@ -261,6 +292,51 @@ simulated function ChangeArms(UIList _list, int itemIndex)
 {
 	CustomizeManager.OnCategoryValueChange(eUICustomizeCat_Arms, 0, itemIndex);
 }
+
+simulated function CustomizeLeftArm()
+{
+	CustomizeManager.UpdateCamera();
+	Movie.Pres.UICustomize_Trait(m_strLeftArm, "", CustomizeManager.GetCategoryList(eUICustomizeCat_LeftArm),
+		ChangeLeftArm, ChangeLeftArm, CanCycleTo, CustomizeManager.GetCategoryIndex(eUICustomizeCat_LeftArm));
+}
+simulated function ChangeLeftArm(UIList _list, int itemIndex)
+{
+	CustomizeManager.OnCategoryValueChange(eUICustomizeCat_LeftArm, 0, itemIndex);
+}
+
+simulated function CustomizeRightArm()
+{
+	CustomizeManager.UpdateCamera();
+	Movie.Pres.UICustomize_Trait(m_strRightArm, "", CustomizeManager.GetCategoryList(eUICustomizeCat_RightArm),
+								 ChangeRightArm, ChangeRightArm, CanCycleTo, CustomizeManager.GetCategoryIndex(eUICustomizeCat_RightArm));
+}
+simulated function ChangeRightArm(UIList _list, int itemIndex)
+{
+	CustomizeManager.OnCategoryValueChange(eUICustomizeCat_RightArm, 0, itemIndex);
+}
+
+simulated function CustomizeLeftArmDeco()
+{
+	CustomizeManager.UpdateCamera();
+	Movie.Pres.UICustomize_Trait(m_strLeftArmDeco, "", CustomizeManager.GetCategoryList(eUICustomizeCat_LeftArmDeco),
+								 ChangeLeftArmDeco, ChangeLeftArmDeco, CanCycleTo, CustomizeManager.GetCategoryIndex(eUICustomizeCat_LeftArmDeco));
+}
+simulated function ChangeLeftArmDeco(UIList _list, int itemIndex)
+{
+	CustomizeManager.OnCategoryValueChange(eUICustomizeCat_LeftArmDeco, 0, itemIndex);
+}
+
+simulated function CustomizeRightArmDeco()
+{
+	CustomizeManager.UpdateCamera();
+	Movie.Pres.UICustomize_Trait(m_strRightArmDeco, "", CustomizeManager.GetCategoryList(eUICustomizeCat_RightArmDeco),
+								 ChangeRightArmDeco, ChangeRightArmDeco, CanCycleTo, CustomizeManager.GetCategoryIndex(eUICustomizeCat_RightArmDeco));
+}
+simulated function ChangeRightArmDeco(UIList _list, int itemIndex)
+{
+	CustomizeManager.OnCategoryValueChange(eUICustomizeCat_RightArmDeco, 0, itemIndex);
+}
+
 // --------------------------------------------------------------------------
 simulated function CustomizeTorso()
 {

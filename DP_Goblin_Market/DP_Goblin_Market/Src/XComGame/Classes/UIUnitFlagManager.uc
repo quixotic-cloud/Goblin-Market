@@ -511,7 +511,7 @@ simulated function SetAbilityDamagePreview(UIUnitFlag kFlag, XComGameState_Abili
 		possibleHPDamage = MaxDamageValue.Damage - possibleShieldDamage;
 	}
 
-	if (!AbilityState.DamageIgnoresArmor() && FlagUnit != none)
+	if (possibleHPDamage > 0 && !AbilityState.DamageIgnoresArmor() && FlagUnit != none)
 		possibleHPDamage -= max(0,FlagUnit.GetArmorMitigationForUnitFlag() - MaxDamageValue.Pierce);
 
 	kFlag.SetShieldPointsPreview( possibleShieldDamage );

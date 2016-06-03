@@ -130,6 +130,22 @@ private simulated function array<XComLevelActor> GetLevelActorsWithTag(name TagN
 	return ActorsWithTag;
 }
 
+simulated function array<XComLevelActor> GetLevelActorsWithLayer(name LayerName)
+{
+	local XComLevelActor TheActor;
+	local array<XComLevelActor> ActorsWithLayer;
+
+	foreach WorldInfo.AllActors(class'XComLevelActor', TheActor)
+	{
+		if( TheActor != none && TheActor.Layer ==LayerName)
+		{
+			ActorsWithLayer.AddItem(TheActor);
+		}
+	}
+
+	return ActorsWithLayer;
+}
+
 private function DoSetFacilityBuildPreviewVisibility(int MapIndex, name TemplateName, bool bVisible)
 {
 	local XComLevelActor TheActor;
@@ -375,17 +391,29 @@ static function name GetFlyInRemoteEventName(XComGameState_FacilityXCom Facility
 
 function SetAvengerCapVisibility(bool bVisible)
 {
+	local DirectionalLight	DLight;
 	`MAPS.SetStreamingLevelVisible(AvengerCap_Level, bVisible);
+
+	foreach AllActors(class'DirectionalLight', DLight)
+	{
+		if (DLight != none)
+		{
+			DLight.LightComponent.CastDynamicShadows = bVisible;
+			DLight.ReattachComponent(DLight.LightComponent);
+		}
+	}
 }
 
 function SetPostMissionSequenceVisibility(bool bVisible)
 {	
 	`MAPS.SetStreamingLevelVisible(PostMissionSequence_Level, bVisible);
+	`XENGINE.SetEnableAllLightsInLevel(PostMissionSequence_Level.LoadedLevel, bVisible);
 }
 
 function SetPreMissionSequenceVisibility(bool bVisible)
 {
 	`MAPS.SetStreamingLevelVisible(PreMissionSequence_Level, bVisible);
+	`XENGINE.SetEnableAllLightsInLevel(PreMissionSequence_Level.LoadedLevel, bVisible);
 }
 
 simulated function OnEnvMapUpdated(name LevelPackageName, optional LevelStreaming LevelStreamedIn = new class'LevelStreaming')
@@ -993,6 +1021,26 @@ function RemoveRoom(int Index)
 	`MAPS.RemoveStreamingMap(vLoc);
 }
 
+function UpdateFacilityProps()
+{
+	local XComGameState_HeadquartersXCom XComHQ;
+	local int idx;
+	local XComGameStateHistory History;
+	local XComGameState_FacilityXCom Facility;
+
+	History = `XCOMHISTORY;
+
+	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+
+	for( idx = 0; idx < XComHQ.Rooms.Length; idx++ )
+	{
+		Facility = XComHQ.GetRoom(idx).GetFacility();
+		if( Facility != none && Facility.GetMyTemplate().UpdateFacilityPropsFn != none )
+		{
+			Facility.GetMyTemplate().UpdateFacilityPropsFn(Facility.GetReference(), self);
+		}
+	}
+}
 
 DefaultProperties
 {

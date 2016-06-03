@@ -16,6 +16,7 @@ var config int MAX_UNTOUCHABLE;
 var config int REAPER_COOLDOWN;
 var config int INSTINCT_DMG;
 var config int RAPIDFIRE_AIM;
+var config int RUNANDGUN_COOLDOWN;
 
 var name SwordSliceName;
 
@@ -227,7 +228,7 @@ static function X2AbilityTemplate RunAndGunAbility(Name AbilityName)
 	Template.AbilityConfirmSound = "TacticalUI_Activate_Ability_Run_N_Gun";
 
 	Cooldown = new class'X2AbilityCooldown';
-	Cooldown.iNumTurns = 4;
+	Cooldown.iNumTurns = default.RUNANDGUN_COOLDOWN;
 	Template.AbilityCooldown = Cooldown;
 
 	ActionPointCost = new class'X2AbilityCost_ActionPoints';
@@ -565,7 +566,7 @@ static function X2AbilityTemplate BladestormAttack()
 
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
-	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildVisualizationFn = BladeStorm_BuildVisualization;
 	Template.bShowActivation = true;
 
 	return Template;
@@ -602,6 +603,43 @@ static function EventListenerReturn BladestormConcealmentListener(Object EventDa
 	
 	BladestormState.AbilityTriggerAgainstSingleTarget(ConcealmentBrokenUnit.ConcealmentBrokenByUnitRef, false);
 	return ELR_NoInterrupt;
+}
+
+simulated function BladeStorm_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+{
+	local XComGameStateContext_Ability AbilityContext;
+	local XComGameStateContext Context;
+	local int TrackIndex, ActionIndex;
+	local XComGameStateHistory History;
+	local X2Action_EnterCover EnterCoverAction;
+	local XGUnit SourceUnit;
+
+	History = `XCOMHISTORY;
+
+	// Build the first shot of Bladestorm's visualization
+	TypicalAbility_BuildVisualization(VisualizeGameState, OutVisualizationTracks);	
+
+	Context = VisualizeGameState.GetContext();
+	AbilityContext = XComGameStateContext_Ability(Context);
+	SourceUnit = XGUnit(History.GetVisualizer(AbilityContext.InputContext.SourceObject.ObjectID));
+
+	for( TrackIndex = 0; TrackIndex < OutVisualizationTracks.Length; ++TrackIndex )
+	{
+		// Find the SourceUnit's track
+		if( SourceUnit == OutVisualizationTracks[TrackIndex].TrackActor )
+		{
+			//Look for the EnteringCover action for the ranger and prevent the delay from happening
+			for( ActionIndex = 0; ActionIndex < OutVisualizationTracks[TrackIndex].TrackActions.Length; ++ActionIndex )
+			{
+				EnterCoverAction = X2Action_EnterCover(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+				if( EnterCoverAction != none )
+				{
+					EnterCoverAction.bInstantEnterCover = true;
+					break;
+				}
+			}
+		}
+	}
 }
 
 static function X2AbilityTemplate DeepCover()
@@ -683,6 +721,7 @@ static function X2AbilityTemplate RapidFire()
 	Template.AssociatedPassives.AddItem('HoloTargeting');
 	Template.AddTargetEffect(class'X2Ability_GrenadierAbilitySet'.static.ShredderDamageEffect());
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	Template.AbilityTriggers.AddItem(default.PlayerInputTrigger);
 
@@ -691,20 +730,75 @@ static function X2AbilityTemplate RapidFire()
 	Template.eAbilityIconBehaviorHUD = eAbilityIconBehavior_AlwaysShow;
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_rapidfire";
 	Template.AbilityConfirmSound = "TacticalUI_ActivateAbility";
-	Template.CinescriptCameraType = "StandardGunFiring";
-	Template.TargetingMethod = class'X2TargetingMethod_OverTheShoulder';
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
-	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildVisualizationFn = RapidFire1_BuildVisualization;
 	Template.BuildInterruptGameStateFn = TypicalAbility_BuildInterruptGameState;
 
 	Template.AdditionalAbilities.AddItem('RapidFire2');
 	Template.PostActivationEvents.AddItem('RapidFire2');
 
 	Template.bCrossClassEligible = true;
-	Template.bPreventsTargetTeleport = true;
 
 	return Template;
+}
+
+simulated function RapidFire1_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+{
+	local XComGameStateContext_Ability AbilityContext;
+	local XComGameStateContext Context;
+	local XComGameStateContext_Ability TestAbilityContext;
+	local int EventChainIndex, TrackIndex, ActionIndex;
+	local XComGameStateHistory History;
+	local X2Action_EnterCover EnterCoverAction;
+	local X2Action_EndCinescriptCamera EndCinescriptCameraAction;
+
+	// Build the first shot of Rapid Fire's visualization
+	TypicalAbility_BuildVisualization(VisualizeGameState, OutVisualizationTracks);
+
+	Context = VisualizeGameState.GetContext();
+	AbilityContext = XComGameStateContext_Ability(Context);
+
+	if( AbilityContext.EventChainStartIndex != 0 )
+	{
+		History = `XCOMHISTORY;
+
+		// This GameState is part of a chain, which means there may be a second shot for rapid fire
+		for( EventChainIndex = AbilityContext.EventChainStartIndex; !Context.bLastEventInChain; ++EventChainIndex )
+		{
+			Context = History.GetGameStateFromHistory(EventChainIndex).GetContext();
+
+			TestAbilityContext = XComGameStateContext_Ability(Context);
+
+			if( TestAbilityContext.InputContext.AbilityTemplateName == 'RapidFire2' &&
+				TestAbilityContext.InputContext.SourceObject.ObjectID == AbilityContext.InputContext.SourceObject.ObjectID &&
+				TestAbilityContext.InputContext.PrimaryTarget.ObjectID == AbilityContext.InputContext.PrimaryTarget.ObjectID )
+			{
+				// Found a RapidFire2 visualization
+				for( TrackIndex = 0; TrackIndex < OutVisualizationTracks.Length; ++TrackIndex )
+				{
+					if( OutVisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == AbilityContext.InputContext.SourceObject.ObjectID)
+					{
+						// Found the Source track
+						break;
+					}
+				}
+
+				for( ActionIndex = OutVisualizationTracks[TrackIndex].TrackActions.Length - 1; ActionIndex >= 0; --ActionIndex )
+				{
+					EnterCoverAction = X2Action_EnterCover(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+					EndCinescriptCameraAction = X2Action_EndCinescriptCamera(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+					if ( (EnterCoverAction != none) ||
+						 (EndCinescriptCameraAction != none) )
+					{
+						OutVisualizationTracks[TrackIndex].TrackActions.Remove(ActionIndex, 1);
+					}
+				}
+
+				break;
+			}
+		}
+	}
 }
 
 static function X2AbilityTemplate RapidFire2()
@@ -736,6 +830,7 @@ static function X2AbilityTemplate RapidFire2()
 	Template.AssociatedPassives.AddItem('HoloTargeting');
 	Template.AddTargetEffect(class'X2Ability_GrenadierAbilitySet'.static.ShredderDamageEffect());
 	Template.bAllowAmmoEffects = true;
+	Template.bAllowBonusWeaponEffects = true;
 
 	Trigger = new class'X2AbilityTrigger_EventListener';
 	Trigger.ListenerData.Deferral = ELD_OnStateSubmitted;
@@ -748,13 +843,48 @@ static function X2AbilityTemplate RapidFire2()
 	Template.AbilitySourceName = 'eAbilitySource_Perk';
 	Template.eAbilityIconBehaviorHUD = eAbilityIconBehavior_NeverShow;
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_rapidfire";
-	Template.CinescriptCameraType = "StandardGunFiring";
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
-	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.BuildVisualizationFn = RapidFire2_BuildVisualization;
+	
 	Template.bShowActivation = true;
 
 	return Template;
+}
+
+simulated function RapidFire2_BuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+{
+	local XComGameStateContext Context;
+	local XComGameStateContext_Ability AbilityContext;
+	local int TrackIndex, ActionIndex;
+	local X2Action_ExitCover ExitCoverAction;
+	local X2Action_StartCinescriptCamera StartCinescriptCameraAction;
+
+	// Build the first shot of Rapid Fire's visualization
+	TypicalAbility_BuildVisualization(VisualizeGameState, OutVisualizationTracks);
+
+	Context = VisualizeGameState.GetContext();
+	AbilityContext = XComGameStateContext_Ability(Context);
+
+	for( TrackIndex = 0; TrackIndex < OutVisualizationTracks.Length; ++TrackIndex )
+	{
+		if( OutVisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == AbilityContext.InputContext.SourceObject.ObjectID)
+		{
+			// Found the Source track
+			break;
+		}
+	}
+
+	for( ActionIndex = OutVisualizationTracks[TrackIndex].TrackActions.Length - 1; ActionIndex >= 0; --ActionIndex )
+	{
+		ExitCoverAction = X2Action_ExitCover(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+		StartCinescriptCameraAction = X2Action_StartCinescriptCamera(OutVisualizationTracks[TrackIndex].TrackActions[ActionIndex]);
+		if ( (ExitCoverAction != none) ||
+				(StartCinescriptCameraAction != none) )
+		{
+			OutVisualizationTracks[TrackIndex].TrackActions.Remove(ActionIndex, 1);
+		}
+	}
 }
 
 static function SuperKillRestrictions(X2AbilityTemplate Template, name ThisSuperKill)

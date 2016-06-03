@@ -478,11 +478,10 @@ simulated function OnRemoved()
 {
 	super.OnRemoved();
 	
-	`XCOMGRI.DoRemoteEvent('CIN_UnhideArmoryStaff'); //Show the armory staff now that we are done
-
 	// Only destroy the pawn when all UIArmory screens are closed
 	if(ActorPawn != none)
 	{
+		`XCOMGRI.DoRemoteEvent('CIN_UnhideArmoryStaff'); //Show the armory staff now that we are done
 		if(bIsIn3D) Movie.Pres.Get3DMovie().HideDisplay(DisplayTag);
 		ReleasePawn();
 	}

@@ -279,21 +279,18 @@ simulated function bool RawInputHandler(Name Key, int ActionMask, bool bCtrl, bo
 	else
 		kBind = m_arrBindings[m_iKeySlotBeingBound].PrimaryBind;
 
-	// If we are replacing a bind, first remove it.
-	if(kBind.Name != '')
+	
+	// Remove it from all player inputs if it's a General or Shared Command
+	if(m_eBindingCategory == eKC_General || SharedCommands.Find(kBind.Command) != INDEX_NONE)
 	{
-		// Remove it from all player inputs if it's a General or Shared Command
-		if(m_eBindingCategory == eKC_General || SharedCommands.Find(kBind.Command) != INDEX_NONE)
+		foreach WorldInfo.AllControllers(class'PlayerController', kPlayerController)
 		{
-			foreach WorldInfo.AllControllers(class'PlayerController', kPlayerController)
-			{
-				RemoveBind(kPlayerController.PlayerInput, kBind, ChangedInputs);
-			}
+			RemoveBind(kPlayerController.PlayerInput, kBind, ChangedInputs);
 		}
-		else
-		{
-			RemoveBind(GetPlayerInput(), kBind, ChangedInputs);
-		}
+	}
+	else
+	{
+		RemoveBind(GetPlayerInput(), kBind, ChangedInputs);
 	}
 
 	// Update the new bind and add it to the bind list.
@@ -542,45 +539,49 @@ function DisplayConflictingKeyDialog()
 function OnDisplayConflictingKeyDialog(eUIAction eAction)
 {
 	local PlayerInput kPlayerInput;
+	local PlayerController kPlayerController;
 	local KeyBind kBind;
 
 	if (eAction == eUIAction_Accept)
 	{
-		kPlayerInput = GetPlayerInput();
+		foreach WorldInfo.AllControllers(class'PlayerController', kPlayerController)
+		{
+			kPlayerInput = kPlayerController.PlayerInput;
+		
+			if(m_arrDirtyPlayerInputs.Find(kPlayerInput) == INDEX_NONE)
+				m_arrDirtyPlayerInputs.AddItem(kPlayerInput);
 
-		if(m_arrDirtyPlayerInputs.Find(kPlayerInput) == INDEX_NONE)
-			m_arrDirtyPlayerInputs.AddItem(kPlayerInput);
+			// Remove the conflicting key
+			if(m_arrBindings[m_iKeySlotConflicting].PrimaryBind.Name == m_kCachedKeyBeingBound.Name)
+				kBind = m_arrBindings[m_iKeySlotConflicting].PrimaryBind;
+			else
+				kBind = m_arrBindings[m_iKeySlotConflicting].SecondaryBind;
 
-		// Remove the conflicting key
-		if(m_arrBindings[m_iKeySlotConflicting].PrimaryBind.Name == m_kCachedKeyBeingBound.Name)
-			kBind = m_arrBindings[m_iKeySlotConflicting].PrimaryBind;
-		else
-			kBind = m_arrBindings[m_iKeySlotConflicting].SecondaryBind;
+			if(kBind.Name != '')
+				kPlayerInput.RemoveBind(kBind.Name, kBind.Command, kBind.bSecondaryBinding);
+			// --
 
-		if(kBind.Name != '')
-			kPlayerInput.RemoveBind(kBind.Name, kBind.Command, kBind.bSecondaryBinding);
-		// --
+			// Remove the key that was on the slot being bound previously (if any)
+			if(m_bSecondaryKeyBeingBound)
+				kBind = m_arrBindings[m_iKeySlotBeingBound].SecondaryBind;
+			else
+				kBind = m_arrBindings[m_iKeySlotBeingBound].PrimaryBind;
 
-		// Remove the key that was on the slot being bound previously (if any)
-		if(m_bSecondaryKeyBeingBound)
-			kBind = m_arrBindings[m_iKeySlotBeingBound].SecondaryBind;
-		else
-			kBind = m_arrBindings[m_iKeySlotBeingBound].PrimaryBind;
+			if(kBind.Name != '')
+				kPlayerInput.RemoveBind(kBind.Name, kBind.Command, m_bSecondaryKeyBeingBound);
+			//--
 
-		if(kBind.Name != '')
-			kPlayerInput.RemoveBind(kBind.Name, kBind.Command, m_bSecondaryKeyBeingBound);
-		//--
+			if(m_bSecondaryKeyBeingBound)
+				m_arrBindings[m_iKeySlotBeingBound].SecondaryBind = m_kCachedKeyBeingBound;
+			else
+				m_arrBindings[m_iKeySlotBeingBound].PrimaryBind = m_kCachedKeyBeingBound;
 
-		if(m_bSecondaryKeyBeingBound)
-			m_arrBindings[m_iKeySlotBeingBound].SecondaryBind = m_kCachedKeyBeingBound;
-		else
-			m_arrBindings[m_iKeySlotBeingBound].PrimaryBind = m_kCachedKeyBeingBound;
-
-		kPlayerInput.AddBind(m_kCachedKeyBeingBound);
+			kPlayerInput.AddBind(m_kCachedKeyBeingBound);
+		}
 
 		AS_DeactivateSlot(m_iKeySlotBeingBound, m_bSecondaryKeyBeingBound);
 		AS_SetNewKey(m_iKeySlotBeingBound, m_bSecondaryKeyBeingBound, m_kKeybindingData.GetKeyString(m_kCachedKeyBeingBound));
-		AS_ClearSlot(m_iKeySlotConflicting, !IsKeyPrimaryBinding(m_iKeySlotConflicting, m_kCachedKeyBeingBound.Name));			
+		AS_ClearSlot(m_iKeySlotConflicting, !IsKeyPrimaryBinding(m_iKeySlotConflicting, m_kCachedKeyBeingBound.Name));	
 	}
 	else
 	{

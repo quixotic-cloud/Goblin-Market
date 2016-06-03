@@ -20,6 +20,10 @@ var localized string m_strCivilianSaved;
 
 var config float PodIdleTalkDistanceInUnits;
 
+// Cache all ladder tiles, so we can avoid these during civilian movement.
+var array<TTile> LadderTiles;
+var bool bLadderTilesInitialized;
+
 // Set max distance from pods to spawn civilians at 15 meters.
 const MAX_SPAWN_DIST_FROM_PODS=960;
 
@@ -134,6 +138,26 @@ simulated function InitTurn()
 {
 	UpdateCachedSquad();
 }
+
+function Init(bool bLoading = false)
+{
+	super.Init(bLoading);
+	InitLadderTiles( true );
+}
+
+function InitLadderTiles( bool bForceReset = false )
+{
+	local XComWorldData WorldData;
+	if( !bLadderTilesInitialized || bForceReset )
+	{
+		WorldData = `XWORLD;
+		LadderTiles.Length = 0;
+		WorldData.CollectLadderLandingTiles(LadderTiles);
+		bLadderTilesInitialized = true;
+	}
+}
+
+native function bool IsInLadderArea(vector vLocation);
 
 function AddToMoveList(XGUnit UnitToMove)
 {

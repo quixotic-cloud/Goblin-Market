@@ -128,6 +128,11 @@ function UpdateTargetLocation(float DeltaTime)
 	}
 }
 
+function bool AllowMouseConfirm()
+{
+	return Action.bFreeAim;
+}
+
 function NextTarget();
 function PrevTarget();
 

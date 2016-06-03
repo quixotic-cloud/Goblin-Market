@@ -251,7 +251,7 @@ simulated native function int GetSightRadius();
 simulated native function PawnPerformPhysics(float deltaTime);
 
 // Cover
-simulated native final function Vector GetGameplayLocationForCoverQueries() const;
+simulated native final function Vector GetGameplayLocationForCoverQueries(optional int HistoryIndex = -1) const;
 simulated native final function SetCoverDirectionIndex(int index);
 simulated native final function int GetCoverDirectionIndex();
 simulated native final function bool IsInCover();
@@ -260,7 +260,7 @@ simulated native final function bool IsFlankedByLoc(Vector Loc) const;
 simulated native final function float GetBestFlankingDot(Vector Loc) const;
 simulated native final function Vector GetCoverDirection(optional int index=-1) const; // MHU - Index of -1 means just use CurrentCornerCoverIndex 
 simulated native final function Vector GetShieldLocation(optional int index=-1) const;
-simulated native final function ECoverType GetCoverType(optional int index=-1) const;
+simulated native final function ECoverType GetCoverType(optional int index=-1, optional int HistoryIndex = -1) const;
 simulated native final function bool GetClosestCoverPoint(float SampleRadius, out XComCoverPoint Point, optional out float Distance, optional bool bTypeStanding=false) const;
 simulated native final function XComCoverPoint GetCoverPoint(optional bool UsePawnLocation = false) const; // If false it uses the GetGameplayLocationForCoverQueries function
 simulated native final private function FindCoverActors(const out XComCoverPoint CoverPoint);
@@ -748,6 +748,7 @@ simulated function DebugWeaponAnims(Canvas kCanvas, bool DisplayHistory, Vector 
 	local XComGameState_Item CurrentInventoryItem;
 	local XGWeapon CurrentWeapon;
 	local XComAnimatedWeapon AnimatedWeapon;
+	local XComWeapon WeaponEntity;
 	local int NumInventoryItems;
 	local int ScanInventoryItems;
 
@@ -762,12 +763,17 @@ simulated function DebugWeaponAnims(Canvas kCanvas, bool DisplayHistory, Vector 
 		if (CurrentWeapon != None)
 		{
 			AnimatedWeapon = XComAnimatedWeapon(CurrentWeapon.m_kEntity);
+			WeaponEntity = XComWeapon(CurrentWeapon.m_kEntity);
 			if (AnimatedWeapon != None)
 			{
 				kCanvas.SetPos(vScreenPos.X, (vScreenPos.Y += 15.0f));
 				kCanvas.DrawText("Weapon:");
 				kCanvas.SetPos(vScreenPos.X, (vScreenPos.Y += 15.0f));
 				AnimatedWeapon.GetAnimTreeController().DebugAnims(kCanvas, DisplayHistory, None, vScreenPos);
+			}
+			else if( WeaponEntity != None )
+			{
+				WeaponEntity.DebugAnims(kCanvas, DisplayHistory, None, vScreenPos);
 			}
 		}
 	}
@@ -978,7 +984,7 @@ simulated event bool GetStepOutCoverInfo(Actor ActorTarget, const out Vector Tar
 		GetDirectionInfoForPosition(TargetLoc, UseCoverDirectionIndex, UsePeekSide, bCanSeeFromDefault, RequiresLean, RequireVisibility, HistoryIndex);
 	}
 
-	CoverType = GetCoverType();
+	CoverType = GetCoverType(UseCoverDirectionIndex, HistoryIndex);
 
 	ToTarget = Normal(TargetLoc - Location);
 	DotProduct = NoZDot(ToTarget, vector(Rotation));
@@ -1108,11 +1114,14 @@ event OnRemovedFromVisualizerTrack()
 function TimedGoToIdle()
 {
 	local X2Action CurrentAction;
+	local bool ShouldResume;
 
 	CurrentAction = `XCOMVISUALIZATIONMGR.GetCurrentTrackActionForVisualizer(self);
-	if( CurrentAction == None || CurrentAction.bCompleted == true )
+	ShouldResume = (IsAlive() || GetIsAliveInVisualizer()) && !GetVisualizedGameState().IsIncapacitated();
+	if( (CurrentAction == None || CurrentAction.bCompleted == true) && ShouldResume )
 	{
 		IdleStateMachine.Resume();
+		ResetWeaponsToDefaultSockets();
 	}
 }
 
@@ -1129,6 +1138,67 @@ event SetTimeDilation(float TimeDilation, optional bool bComingFromDeath/*=false
 
 	//`log("Setting TimeDilation :"@self@"-"@CustomTimeDilation);
 	//ScriptTrace();
+}
+
+simulated function ResetWeaponsToDefaultSockets()
+{
+	local XGInventory kInventory;
+	local XGInventoryItem kItemToEquip;
+	local Attachment Attach;
+	local SkeletalMeshComponent SkeletalMesh;
+	local array<Attachment> ToBeDetached;
+	local int NumAttachments;
+	local int scan;
+	local name PrimarySocketName;
+	local name SecondarySocketName;
+
+	kInventory = GetInventory();
+
+	//Removing any attachment on the primary and secondary Weapon socket if any exist
+	if( kInventory.m_kPrimaryWeapon != none && XComWeapon(kInventory.m_kPrimaryWeapon.m_kEntity) != none)
+	{
+		PrimarySocketName = XComWeapon(kInventory.m_kPrimaryWeapon.m_kEntity).DefaultSocket;
+	}
+	if( kInventory.m_kSecondaryWeapon != none && XComWeapon(kInventory.m_kSecondaryWeapon.m_kEntity) != none)
+	{
+		SecondarySocketName = XComWeapon(kInventory.m_kSecondaryWeapon.m_kEntity).DefaultSocket;
+	}
+
+	SkeletalMesh = GetPawn().Mesh;
+	NumAttachments = SkeletalMesh.Attachments.Length;
+	for( scan = 0; scan < NumAttachments; ++scan )
+	{
+		Attach = SkeletalMesh.Attachments[scan];
+		if( Attach.Component == none || Attach.SocketName == '' )
+		{
+			continue;
+		}
+
+		if( Attach.SocketName == PrimarySocketName || Attach.SocketName == SecondarySocketName )
+		{
+			ToBeDetached.AddItem(Attach);
+		}
+	}
+	foreach ToBeDetached(Attach)
+	{
+		SkeletalMesh.DetachComponent(Attach.Component);
+	}
+
+	//using same logic as per ApplyLoadoutFromGameState to then equip the Original weapons
+	if( kInventory.m_kSecondaryWeapon != none )
+	{
+		kInventory.PresEquip(kInventory.m_kSecondaryWeapon, true);
+	}
+
+	if( kInventory.m_kPrimaryWeapon != none )
+		kItemToEquip = kInventory.m_kPrimaryWeapon;
+	else if( kInventory.m_kSecondaryWeapon != none )
+		kItemToEquip = kInventory.m_kSecondaryWeapon;
+
+	if( kItemToEquip != none )
+	{
+		kInventory.EquipItem(kItemToEquip, true, true);
+	}
 }
 
 native function UpdateShootLocationForLargeUnit( StateObjectReference Shooter, out vector ShootAtLocation );
@@ -1470,6 +1540,53 @@ function AddBlazingPinionsProjectile(vector SourceLocation, vector TargetLocatio
 	}
 }
 
+// This method is called by the animation system when an AnimNotify_FireDecalProjectile is hit 
+// This is used usually for for melee or other animation driven attacks that do not use a weapon
+// to place an impact decal into the world.
+event OnAnimTriggerDecal(XComAnimNotify_TriggerDecal Notify)
+{
+	local X2Action CurrentAction;
+
+	CurrentAction = `XCOMVISUALIZATIONMGR.GetCurrentTrackActionForVisualizer(self);
+	CurrentAction.OnAnimNotify(Notify);
+
+	if( CurrentFireAction != none )
+	{
+		CurrentFireAction.NotifyApplyDecal(Notify);
+	}
+}
+
+function AddDecalProjectile(vector StartLocation, vector EndLocation, XComGameStateContext_Ability AbilityContext)
+{
+	local XComWeapon WeaponEntity;
+	local X2UnifiedProjectile NewProjectile;
+	local AnimNotify_FireWeaponVolley FireVolleyNotify;
+
+	//The archetypes for the projectiles come from the weapon entity archetype
+	if( CurrentPerkAction != none )
+	{
+		WeaponEntity = CurrentPerkAction.GetPerkWeapon();
+	}
+
+	if( WeaponEntity == none )
+	{
+		// If there is no perk weapon use the current weapon as a default
+		WeaponEntity = XComWeapon(GetPawn().Weapon);
+	}
+
+	if( WeaponEntity != none )
+	{
+		FireVolleyNotify = new class'AnimNotify_FireWeaponVolley';
+		FireVolleyNotify.NumShots = 1;
+		FireVolleyNotify.ShotInterval = 0.3f;
+		FireVolleyNotify.bCosmeticVolley = true;
+
+		NewProjectile = class'WorldInfo'.static.GetWorldInfo().Spawn(class'X2UnifiedProjectile', , , , , WeaponEntity.DefaultProjectileTemplate);
+		NewProjectile.ConfigureNewProjectileCosmetic(FireVolleyNotify, AbilityContext, , , CurrentFireAction, StartLocation, EndLocation, true);
+		NewProjectile.GotoState('Executing');
+	}
+}
+
 //This method is called by the animation system when an AnimNotify_FireWeaponVolley is hit 
 event OnEndVolleyConstants( AnimNotify_EndVolleyConstants Notify )
 {
@@ -1513,7 +1630,7 @@ simulated function SetForceVisibility(EForceVisibilitySetting InForceVisibility)
 //************************************
 //
 
-native function XComGameState_AIGroup GetAIGroupState();
+native function XComGameState_AIGroup GetAIGroupState( int HistoryIndex=INDEX_NONE );
 //=======================================================================================
 
 function bool HasOverrideDeathAnim(out Name DeathAnim)

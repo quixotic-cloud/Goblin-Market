@@ -200,6 +200,8 @@ event OnRemoteEvent(name RemoteEventName)
 			}
 		}
 
+		`GAME.GetGeoscape().m_kBase.UpdateFacilityProps();
+
 		`GAME.GetGeoscape().m_kBase.m_kCrewMgr.PopulateBaseRoomsWithCrew();
 	}
 	else if(RemoteEventName == 'PostM_ShowSoldiers')
@@ -515,6 +517,15 @@ simulated function ClearPawns()
 			`HQPRES.GetUIPawnMgr().ReleasePawn(self, UnitPawn.ObjectID);
 		}
 	}
+
+	foreach UnitPawnsCinematic(UnitPawn)
+	{
+		if (UnitPawn != none)
+		{
+			UnitPawn.Destroy();
+		}
+	}
+
 }
 
 simulated function ResetUnitLocations()

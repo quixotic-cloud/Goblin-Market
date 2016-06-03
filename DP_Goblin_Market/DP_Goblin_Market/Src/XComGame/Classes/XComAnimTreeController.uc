@@ -23,6 +23,7 @@ var private AnimNodeAimOffset				HeadEyesAimNode;
 var private AnimNodeAimOffset				HeadAimNode;
 var private AnimNodeAimOffset				EyesAimNode;
 var private AnimNodeAimOffset				EyelidsAimNode;
+
 // General 
 var private bool AllowNewAnimations;
 var private init array<XComAnimTreeController> ChildControllers; // Animations will be played on itself and its children
@@ -45,6 +46,7 @@ native function float ComputeAnimationRMADistance(Name AnimName);
 native function bool CanPlayAnimation(Name AnimName, optional bool SearchAnimName = true);
 native function SetAllowNewAnimations(bool Allow);
 native function bool GetAllowNewAnimations();
+native function DisplayRelevantAnimNodes(AnimNode NodeToTraverse, float Weight, Canvas kCanvas, out Array<AnimNodeSequence> AlreadyDisplayedSequences, out Array<AnimNodeBlendBase> AlreadyDisplayedParents, out Vector vScreenPos);
 
 // OpenCloseStateNode
 native function bool IsOpenClosedStateClosed();
@@ -83,6 +85,7 @@ native function bool GetRootAtom(AnimSequence AnimSeq, float AnimTime, out BoneA
 
 // StandingAimOffsetNode
 native function SetStandingAimOffsetNodeProfile(Name Profile);
+native function Name GetStandingAimOffsetNodeProfile();
 
 // HeadNode - unique heads are created with additive blends from a ref head
 native function SetHeadAnim(Name HeadAnim);
@@ -99,7 +102,6 @@ private:
 	void SetAnim(UAnimNodeSequence* Anim, FName AnimName);
 	void SetBlendTarget(UAnimNodeBlend* BlendNode, FLOAT BlendTarget, FLOAT BlendTime);
 	void SetActiveProfileByName(UAnimNodeAimOffset* AnimAimOffset, FName Profile);
-	void DisplayRelevantAnimNodes (UAnimNode* NodeToTraverse, FLOAT Weight, UCanvas* kCanvas, TArray<UAnimNodeSequence*>& AlreadyDisplayedSequences, TArray<UAnimNodeBlendBase*>& AlreadyDisplayedParents, FVector& vScreenPos);
 	FName FindRandomAnimMatchingName(FName AnimName);
 };
 

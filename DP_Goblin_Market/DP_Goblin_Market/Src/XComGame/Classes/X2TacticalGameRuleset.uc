@@ -8,7 +8,7 @@
 //  Copyright (c) 2016 Firaxis Games, Inc. All rights reserved.
 //---------------------------------------------------------------------------------------
 class X2TacticalGameRuleset extends X2GameRuleset 
-	dependson(X2GameRulesetVisibilityManager, X2TacticalGameRulesetDataStructures)
+	dependson(X2GameRulesetVisibilityManager, X2TacticalGameRulesetDataStructures, XComGameState_BattleData)
 	config(GameCore)
 	native(Core);
 
@@ -71,6 +71,10 @@ var config array<string> ForceLoadCinematicMaps;                // Any maps requ
 var config array<string> arrHeightFogAdjustedPlots;				// any maps required to adjust heightfog actor properties through a remote event.
 var config float DepletedAvatarHealthMod;                       // the health mod applied to the first avatar spawned in as a result of skulljacking the codex
 var config bool ActionsBlockAbilityActivation;					// the default setting for whether or not X2Actions block ability activation (can be overridden on a per-action basis)
+var config float ZipModeMoveSpeed;								// in zip mode, all movement related animations are played at this speed
+var config float ZipModeTrivialAnimSpeed;						// in zip mode, all trivial animations (like step outs) are played at this speed
+var config float ZipModeDelayModifier;							// in zip mode, all action delays are modified by this value
+var config float ZipModeDoomVisModifier;						// in zip mode, the doom visualization timers are modified by this value
 //****************************************
 
 var int LastNeutralReactionEventChainIndex; // Last event chain index to prevent multiple civilian reactions from same event. Also used for simultaneous civilian movement.
@@ -672,7 +676,7 @@ simulated function StateObjectReference InitAbilityForUnit(X2AbilityTemplate Abi
 		UnitVisualizer = XGUnit(Unit.GetVisualizer());
 		if (UnitVisualizer != none)
 		{
-			UnitVisualizer.GetPawn().AppendAbilityPerks( AbilityTemplate.DataName );
+			UnitVisualizer.GetPawn().AppendAbilityPerks( AbilityTemplate.DataName, , AbilityTemplate.GetPerkAssociationName() );
 			UnitVisualizer.GetPawn().StartPersistentPawnPerkFX( AbilityTemplate.DataName );
 		}
 	}
@@ -718,9 +722,14 @@ simulated function InitializeUnitAbilities(XComGameState NewGameState, XComGameS
 }
 
 simulated function StartStateInitializeUnitAbilities(XComGameState StartState)
-{		
+{	
+	local XComGameStateHistory History;
+	local XComGameState_BattleData BattleData;
 	local XComGameState_Unit UnitState;
 	local X2ItemTemplate MissionItemTemplate;
+
+	History = `XCOMHISTORY;
+	BattleData = XComGameState_BattleData(History.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
 
 	// Select the mission item for the current mission (may be None)
 	MissionItemTemplate = GetMissionItemTemplate();
@@ -729,9 +738,15 @@ simulated function StartStateInitializeUnitAbilities(XComGameState StartState)
 
 	foreach StartState.IterateByClassType(class'XComGameState_Unit', UnitState)
 	{
-		// update the mission items for this XCom unit
 		if( UnitState.GetTeam() == eTeam_XCom )
 		{
+			if(BattleData.DirectTransferInfo.IsDirectMissionTransfer)
+			{
+				// XCom's abilities will have also transferred over, and do not need to be reapplied
+				continue;
+			}
+
+			// update the mission items for this XCom unit
 			UpdateMissionItemsForUnit(MissionItemTemplate, UnitState, StartState);
 		}
 
@@ -842,7 +857,7 @@ function ApplyStartOfMatchConditions()
 		{
 			if( PlayerState.GetTeam() == eTeam_XCom )
 			{
-				PlayerState.SetSquadConcealment(true);
+				PlayerState.SetSquadConcealment(true, 'StartOfMatchConcealment');
 			}
 		}
 	}
@@ -1237,7 +1252,7 @@ function EventListenerReturn HandleAdditionalFalling(Object EventData, Object Ev
 	{
 		DeadUnit = XComGameState_Unit( History.GetGameStateForObjectID( UnitRef.ObjectID ) );
 
-		if( DeadUnit != none )
+		if( DeadUnit != none && !WorldData.IsTileOutOfRange(DeadUnit.TileLocation) )
 		{
 			if ((XGUnit(DeadUnit.GetVisualizer()).GetPawn().RagdollFlag == ERagdoll_Never) && DeadUnit.bFallingApplied)
 			{
@@ -1253,7 +1268,7 @@ function EventListenerReturn HandleAdditionalFalling(Object EventData, Object Ev
 
 	foreach History.IterateByClassType( class'XComGameState_LootDrop', Loot )
 	{
-		if (!WorldData.IsFloorTile( Loot.TileLocation ))
+		if (!WorldData.IsTileOutOfRange(DeadUnit.TileLocation) && !WorldData.IsFloorTile( Loot.TileLocation ))
 		{
 			if (NewGameState == none)
 			{
@@ -1303,6 +1318,7 @@ simulated function bool CanToggleWetness()
 			XComTacticalController(WorldInfo.GetALocalPlayerController()).WeatherControl().SetStormIntensity(LightRain, 0, 0, 0);			
 			break;
 		case "Facility":
+		case "DerelictFacility":
 			XComTacticalController(WorldInfo.GetALocalPlayerController()).WeatherControl().SetStormIntensity(NoStorm, 0, 0, 0);
 			break;
 		default:
@@ -1358,12 +1374,51 @@ simulated function EnvironmentLightingRemoteEvents()
 	}
 }
 
+// Call after abilities are initialized in post begin play, which may adjust stats.
+// This function restores all transferred units' stats to their pre-transfer values, 
+// to help maintain the illusion of one continuous mission
+simulated private function RestoreDirectTransferUnitStats()
+{
+	local XComGameState NewGameState;
+	local XComGameState_BattleData BattleData;
+	local DirectTransferInformation_UnitStats UnitStats;
+	local XComGameState_Unit UnitState;
+
+	BattleData = XComGameState_BattleData(CachedHistory.GetSingleGameStateObjectForClass(class'XComGameState_BattleData'));
+	if(!BattleData.DirectTransferInfo.IsDirectMissionTransfer)
+	{
+		return;
+	}
+
+	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Restore Transfer Unit Stats");
+
+	foreach BattleData.DirectTransferInfo.TransferredUnitStats(UnitStats)
+	{
+		UnitState = XComGameState_Unit(NewGameState.CreateStateObject(class'XComGameState_Unit', UnitStats.UnitStateRef.ObjectID));
+		UnitState.SetCurrentStat(eStat_HP, UnitStats.HP);
+		UnitState.AddShreddedValue(UnitStats.ArmorShred);
+		NewGameState.AddStateObject(UnitState);
+	}
+
+	SubmitGameState(NewGameState);
+}
+
 simulated function BeginTacticalPlay()
 {
 	local XComGameState_BaseObject ObjectState, NewObjectState;
+	local XComGameState_Ability AbilityState;
 	local XComGameState NewGameState;
 
 	bTacticalGameInPlay = true;
+
+	// have any abilities that are post play activated start up
+	foreach CachedHistory.IterateByClassType(class'XComGameState_Ability', AbilityState)
+	{
+		if(AbilityState.OwnerStateObject.ObjectID > 0)
+		{
+			AbilityState.CheckForPostBeginPlayActivation();
+		}
+	}
 
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Begin Tactical Play");
 
@@ -1375,9 +1430,17 @@ simulated function BeginTacticalPlay()
 		NewObjectState.BeginTacticalPlay();
 	}
 
+	// if we're playing a challenge, don't do much encounter vo
+	if (CachedHistory.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) != none)
+	{
+		`CHEATMGR.DisableFirstEncounterVO = true;
+	}
+
 	`XEVENTMGR.TriggerEvent('OnTacticalBeginPlay', self, , NewGameState);
 
 	SubmitGameState(NewGameState);
+
+	RestoreDirectTransferUnitStats();
 }
 
 simulated function EndTacticalPlay()
@@ -1650,6 +1713,7 @@ function StartStatePositionUnits()
 simulated function InitVolumes()
 {
 	local XComBuildingVolume kVolume;
+	local XComMegaBuildingVolume kMegaVolume;
 
 	foreach WorldInfo.AllActors(class 'XComBuildingVolume', kVolume)
 	{
@@ -1657,6 +1721,16 @@ simulated function InitVolumes()
 		{
 			kVolume.CacheBuildingVolumeInChildrenFloorVolumes();
 			kVolume.CacheFloorCenterAndExtent();
+		}
+	}
+
+	foreach WorldInfo.AllActors(class 'XComMegaBuildingVolume', kMegaVolume)
+	{
+		if (kMegaVolume != none)
+		{
+			kMegaVolume.InitInLevel();
+			kMegaVolume.CacheBuildingVolumeInChildrenFloorVolumes();
+			kMegaVolume.CacheFloorCenterAndExtent();
 		}
 	}
 }
@@ -1753,6 +1827,11 @@ simulated state CreateTacticalGame
 					CosmeticUnit.kAppearance.iArmorTint = OwningUnitState.kAppearance.iWeaponTint;
 					CosmeticUnit.kAppearance.iArmorTintSecondary = OwningUnitState.kAppearance.iArmorTintSecondary;
 					XGUnit(CosmeticUnit.GetVisualizer()).GetPawn().SetAppearance(CosmeticUnit.kAppearance);
+
+					if (OwningUnitState.GetMyTemplate().OnCosmeticUnitCreatedFn != None)
+					{
+						OwningUnitState.GetMyTemplate().OnCosmeticUnitCreatedFn(CosmeticUnit, OwningUnitState, IterateItemState, StartState);
+					}
 				}
 			}
 		}
@@ -1889,7 +1968,7 @@ simulated state CreateTacticalGame
 		//True if we didn't seamless travel here, and the mission type wanted a skyranger travel ( ie. no avenger defense or other special mission type )
 		bSkyrangerTravel = !`XCOMGAME.m_bSeamlessTraveled && (MissionState == None || MissionState.GetMissionSource().bRequiresSkyrangerTravel);
 				
-		return bValidMapLaunchType && bSkyrangerTravel;
+		return bValidMapLaunchType && bSkyrangerTravel && !BattleData.DirectTransferInfo.IsDirectMissionTransfer;
 	}
 
 	simulated function CreateMapActorGameStates()
@@ -1979,7 +2058,7 @@ simulated state CreateTacticalGame
 		// Spawn additional units ( such as cosmetic units like the Gremlin )
 		StartStateSpawnCosmeticUnits(StartState);
 
-		//Add new game oject states to the start state.
+		//Add new game object states to the start state.
 		//*************************************************************************	
 		StartStateCreateXpManager(StartState);
 		StartStateInitializeUnitAbilities(StartState);      //Examine each unit's start state, and add ability state objects as needed
@@ -2033,6 +2112,8 @@ Begin:
 				
 		XComPlayerController(Pres.Owner).NotifyStartTacticalSeamlessLoad();
 
+		WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(TRUE);
+
 		//Let the dropship settle in
 		Sleep(1.0f);
 
@@ -2040,6 +2121,8 @@ Begin:
 		Pres.UIStopMovie();
 		Pres.HideLoadingScreen();
 		class'WorldInfo'.static.GetWorldInfo().GetALocalPlayerController().ClientSetCameraFade(false);
+
+		WorldInfo.MyLocalEnvMapManager.SetEnableCaptures(FALSE);
 	}
 	else
 	{
@@ -2578,12 +2661,13 @@ simulated state PostCreateTacticalGame
 			`assert( CachedHistory.GetStartState() == none );
 
 			if (BattleData != none)
+			{
 				BattleData.bIntendedForReloadLevel = false;
+			}
 	}
 
 	simulated event EndState(Name NextStateName)
 	{
-		BeginTacticalPlay();
 		VisibilityMgr.ActorVisibilityMgr.OnVisualizationIdle(); //Force all visualizers to update their visualization state
 	}
 
@@ -2653,7 +2737,6 @@ simulated state CreateChallengeGame
 
 	simulated event EndState(Name NextStateName)
 	{
-		BeginTacticalPlay();
 		VisibilityMgr.ActorVisibilityMgr.OnVisualizationIdle(); //Force all visualizers to update their visualization state
 	}
 
@@ -2884,22 +2967,27 @@ simulated state TurnPhase_StartTimer
 {
 	simulated event BeginState(name PreviousStateName)
 	{
+		local Object ThisObj;
+
 		`PRES.UIChallengeStartTimerMessage();
+
+		ThisObj = self;
+		`XEVENTMGR.RegisterForEvent( ThisObj, 'MissionObjectiveMarkedFailed', OnChallengeObjectiveFailed, ELD_OnStateSubmitted );
 	}
 
 	simulated event EndState(Name NextStateName)
 	{
-		local XComChallengeModeManager ChallengeModeManager;
 		local XComGameState_TimerData Timer;
 
-		ChallengeModeManager = `CHALLENGEMODE_MGR;
 		Timer = XComGameState_TimerData(`XCOMHISTORY.GetSingleGameStateObjectForClass(class'XComGameState_TimerData', true));
 		if (Timer != none && !`ONLINEEVENTMGR.bInitiateValidationAfterLoad)
 		{
 			//Reset the timer game state object to the desired time limit and begin the countdown.
-			Timer.SetRealTimeTimer(ChallengeModeManager.GetSelectedChallengeTimeLimit());
+			Timer.ResetTimer();
 		}
 		`XANALYTICS.Init();
+
+		`ONLINEEVENTMGR.bIsChallengeModeGame = true;
 	}
 
 Begin:
@@ -2908,6 +2996,23 @@ Begin:
 		sleep(0.0);
 	}
 	GotoState(GetNextTurnPhase(GetStateName()));
+}
+
+function EventListenerReturn OnChallengeObjectiveFailed( Object EventData, Object EventSource, XComGameState GameState, Name EventID )
+{
+	local XComGameState_Player PlayerState;
+	local XComGameState_TimerData TimerState;
+	local XGPlayer Player;
+
+	PlayerState = XComGameState_Player( CachedHistory.GetGameStateForObjectID( GetLocalClientPlayerObjectID() ) );
+	Player = XGPlayer( PlayerState.GetVisualizer( ) );
+
+	EndBattle( Player );
+
+	TimerState = XComGameState_TimerData( CachedHistory.GetSingleGameStateObjectForClass( class'XComGameState_TimerData' ) );
+	TimerState.bStopTime = true;
+
+	return ELR_InterruptEventAndListeners;
 }
 
 /// <summary>
@@ -2924,18 +3029,24 @@ simulated state TurnPhase_Begin
 	{
 		local XComGameState_Ability AbilityState, NewAbilityState;
 		local XComGameState_Player  PlayerState, NewPlayerState;
-		local XComGameState_Unit NewUnitState;
+		local XComGameState_Unit UnitState, NewUnitState;
+		local bool TickCooldown;
 
 		if (!bLoadingSavedGame)
 		{
 			foreach CachedHistory.IterateByClassType(class'XComGameState_Ability', AbilityState)
 			{
-				if( AbilityState.iCooldown > 0 || AbilityState.TurnsUntilAbilityExpires > 0 )
+				// some units tick their cooldowns per action instead of per turn, skip them.
+				UnitState = XComGameState_Unit(CachedHistory.GetGameStateForObjectID(AbilityState.OwnerStateObject.ObjectID));
+				`assert(UnitState != none);
+				TickCooldown = AbilityState.iCooldown > 0 && !UnitState.GetMyTemplate().bManualCooldownTick;
+
+				if( TickCooldown || AbilityState.TurnsUntilAbilityExpires > 0 )
 				{
 					NewAbilityState = XComGameState_Ability(NewPhaseState.CreateStateObject(class'XComGameState_Ability', AbilityState.ObjectID));//Create a new state object on NewPhaseState for AbilityState
 					NewPhaseState.AddStateObject(NewAbilityState);
 
-					if( AbilityState.iCooldown > 0 )
+					if( TickCooldown )
 					{
 						NewAbilityState.iCooldown--;
 					}
@@ -3001,8 +3112,12 @@ simulated function bool UnitActionPlayerIsRemote()
 function bool RulesetShouldAutosave()
 {
 	local XComGameState_Player PlayerState;
+	local XComGameState_ChallengeData ChallengeData;
+
 	PlayerState = XComGameState_Player(CachedHistory.GetGameStateForObjectID(CachedUnitActionPlayerRef.ObjectID));
-	return !bSkipAutosaveAfterLoad && !HasTacticalGameEnded() &&!PlayerState.IsAIPlayer() && !`REPLAY.bInReplay && `TUTORIAL == none;
+	ChallengeData = XComGameState_ChallengeData(CachedHistory.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true));
+
+	return !bSkipAutosaveAfterLoad && !HasTacticalGameEnded() &&!PlayerState.IsAIPlayer() && !`REPLAY.bInReplay && `TUTORIAL == none && ChallengeData == none;
 }
 
 /// <summary>
@@ -3115,6 +3230,8 @@ simulated state TurnPhase_UnitActions
 		local X2EventManager EventManager;
 		local XComGameState NewGameState;
 		local XGPlayer PlayerStateVisualizer;
+		local XComGameState_ChallengeData ChallengeData;
+		local XComGameState_TimerData TimerState;
 
 		EventManager = `XEVENTMGR;
 		BattleData = XComGameState_BattleData(CachedHistory.GetGameStateForObjectID(CachedBattleDataRef.ObjectID));
@@ -3150,6 +3267,13 @@ simulated state TurnPhase_UnitActions
 				SubmitGameStateContext(Context);
 			}
 
+			ChallengeData = XComGameState_ChallengeData( CachedHistory.GetSingleGameStateObjectForClass( class'XComGameState_ChallengeData', true ) );
+			if ((ChallengeData != none) && !UnitActionPlayerIsAI( ))
+			{
+				TimerState = XComGameState_TimerData( CachedHistory.GetSingleGameStateObjectForClass( class'XComGameState_TimerData' ) );
+				TimerState.bStopTime = false;
+			}
+
 			//Uncomment if there are persistent lines you want to refresh each turn
 			//WorldInfo.FlushPersistentDebugLines();
 
@@ -3164,6 +3288,8 @@ simulated state TurnPhase_UnitActions
 		local XComGameStateContext_TacticalGameRule Context;
 		local XComGameState_Player PlayerState;
 		local X2EventManager EventManager;
+		local XComGameState_ChallengeData ChallengeData;
+		local XComGameState_TimerData TimerState;
 
 		EventManager = `XEVENTMGR;
 		if( UnitActionPlayerIndex > -1 )
@@ -3182,6 +3308,14 @@ simulated state TurnPhase_UnitActions
 				Context = class'XComGameStateContext_TacticalGameRule'.static.BuildContextFromGameRule(eGameRule_PlayerTurnEnd);
 				Context.PlayerRef = CachedUnitActionPlayerRef;				
 				SubmitGameStateContext(Context);
+			}
+
+
+			ChallengeData = XComGameState_ChallengeData( CachedHistory.GetSingleGameStateObjectForClass( class'XComGameState_ChallengeData', true ) );
+			if ((ChallengeData != none) && !UnitActionPlayerIsAI( ))
+			{
+				TimerState = XComGameState_TimerData( CachedHistory.GetSingleGameStateObjectForClass( class'XComGameState_TimerData' ) );
+				TimerState.bStopTime = true;
 			}
 		}
 	}
@@ -3347,6 +3481,9 @@ simulated state TurnPhase_UnitActions
 		local XComGameState_Player PlayerState;
 		local XGAIPlayer AIPlayer;
 		local int fTimeOut;
+		local XComGameState_ChallengeData ChallengeData;
+		local XComGameState_TimerData TimerState;
+		local XGPlayer Player;
 
 		//rmcfall - if the AI player takes longer than 25 seconds to make a decision a blocking error has occurred in its logic. Skip its turn to avoid a hang.
 		//This logic is redundant to turn skipping logic in the behaviors, and is intended as a last resort
@@ -3370,6 +3507,19 @@ simulated state TurnPhase_UnitActions
 				AIPlayer.OnTimedOut();
 				class'XGAIPlayer'.static.DumpAILog();
 				AIPlayer.EndTurn(ePlayerEndTurnType_AI);
+			}
+		}
+
+		ChallengeData = XComGameState_ChallengeData( CachedHistory.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) );
+		if ((ChallengeData != none) && !UnitActionPlayerIsAI() && !WaitingForVisualizer())
+		{
+			TimerState = XComGameState_TimerData( CachedHistory.GetSingleGameStateObjectForClass(class'XComGameState_TimerData') );
+			if (TimerState.GetCurrentTime() <= 0)
+			{
+				PlayerState = XComGameState_Player( CachedHistory.GetGameStateForObjectID( CachedUnitActionPlayerRef.ObjectID ) );
+				Player = XGPlayer(PlayerState.GetVisualizer());
+
+				EndBattle( Player );
 			}
 		}
 	}
@@ -3426,9 +3576,12 @@ Begin:
 
 			CachedHistory.CheckNoPendingGameStates();
 
+			if( `CHEATMGR.bShouldAutosaveBeforeEveryAction )
+			{
+				`AUTOSAVEMGR.DoAutosave();
+			}
 			sleep(0.0);
 		}
-		bSkipRemainingTurnActivty = false;
 
 		`SETLOC("Checking for Tactical Game Ended");
 		//Perform fail safe checking for whether the tactical battle is over
@@ -3440,6 +3593,10 @@ Begin:
 			sleep(0.0);
 		}
 
+		// Moved to clear the SkipRemainingTurnActivty flag until after the visualizer finishes.  Prevents an exploit where
+		// the end/back button is spammed during the player's final action. Previously the Skip flag was set to true 
+		// while visualizing the action, after the flag was already cleared, causing the subsequent AI turn to get skipped.
+		bSkipRemainingTurnActivty = false;
 		`SETLOC("Going to the Next Player");
 	}
 	until( !NextPlayer() ); //NextPlayer returns false when the UnitActionPlayerIndex has reached the end of PlayerTurnOrder in the BattleData state.
@@ -3524,6 +3681,9 @@ simulated state EndTacticalGame
 	simulated event BeginState(name PreviousStateName)
 	{
 		local XGPlayer ActivePlayer;
+		local XComGameState_ChallengeData ChallengeData;
+
+		ChallengeData = XComGameState_ChallengeData( CachedHistory.GetSingleGameStateObjectForClass( class'XComGameState_ChallengeData', true ) );
 
 		// make sure that no controllers are active
 		if(CachedUnitActionPlayerRef.ObjectID > 0) 
@@ -3535,12 +3695,20 @@ simulated state EndTacticalGame
 		//Show the UI summary screen before we clean up the tactical game
 		if(!bPromptForRestart && !`REPLAY.bInTutorial && !IsFinalMission())
 		{
-			`PRES.UIMissionSummaryScreen();			
+			if (ChallengeData == none)
+			{
+				`PRES.UIMissionSummaryScreen( );
+			}
+			else
+			{
+				`PRES.UIChallengeModeSummaryScreen( );
+			}
+
 			`XTACTICALSOUNDMGR.StartEndBattleMusic();
 		}
 
 		//The tutorial is just a replay that the player clicks through by performing the actions in the replay. 
-		if(!`REPLAY.bInTutorial)
+		if(!`REPLAY.bInTutorial && (ChallengeData == none))
 		{			
 			CleanupTacticalMission();
 			EndTacticalPlay();
@@ -3784,6 +3952,9 @@ simulated function name GetNextTurnPhase(name CurrentState, optional name Defaul
 		LastState = GetLastStateNameFromHistory();
 		return (LastState == '' || LastState == 'LoadTacticalGame') ? 'TurnPhase_UnitActions' : GetNextTurnPhase(LastState, 'TurnPhase_UnitActions');
 	case 'PostCreateTacticalGame':
+		if (CachedHistory.GetSingleGameStateObjectForClass(class'XComGameState_ChallengeData', true) != none)
+			return 'TurnPhase_StartTimer';
+
 		return 'TurnPhase_Begin';
 	case 'TurnPhase_Begin':		
 		return 'TurnPhase_UnitActions';

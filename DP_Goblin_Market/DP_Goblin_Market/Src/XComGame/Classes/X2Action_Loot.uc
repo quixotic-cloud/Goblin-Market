@@ -25,6 +25,7 @@ var Lootable					OldLootableObjectState;
 var Lootable					NewLootableObjectState;
 
 var XComGameState_Unit			OldUnitState;
+var AnimNodeSequence			PlayingSequence;
 
 //*************************************
 
@@ -70,7 +71,7 @@ function Init(const out VisualizationTrack InTrack)
 	`assert(UnitState != none);
 
 	NewHistoryIndex = InTrack.StateObject_NewState.GetParentGameState().HistoryIndex;
-	OldHistoryIndex = InTrack.StateObject_OldState.GetParentGameState().HistoryIndex;
+	OldHistoryIndex = NewHistoryIndex - 1;
 	OldUnitState = XComGameState_Unit(InTrack.StateObject_OldState);
 
 	OldLootableObjectState = Lootable(History.GetGameStateForObjectID(LootableObjectID, , OldHistoryIndex));
@@ -152,7 +153,16 @@ Begin:
 
 	// Start looting anim
 	Params.AnimName = 'HL_LootBodyStart';
-	FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
+	Params.PlayRate = GetNonCriticalAnimationSpeed();
+	PlayingSequence = UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params);
+	if( Track.TrackActor.CustomTimeDilation < 1.0 )
+	{
+		Sleep(PlayingSequence.AnimSeq.SequenceLength * PlayingSequence.Rate * Track.TrackActor.CustomTimeDilation);
+	}
+	else
+	{
+		FinishAnim(PlayingSequence);
+	}
 
 	// Loop while the UI is displayed
 	Params.AnimName = 'HL_LootLoop';
@@ -179,7 +189,16 @@ Begin:
 
 	Params.AnimName = 'HL_LootStop';
 	Params.Looping = false;
-	FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
+	Params.PlayRate = GetNonCriticalAnimationSpeed();
+	PlayingSequence = UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params);
+	if( Track.TrackActor.CustomTimeDilation < 1.0 )
+	{
+		Sleep(PlayingSequence.AnimSeq.SequenceLength * PlayingSequence.Rate * Track.TrackActor.CustomTimeDilation);
+	}
+	else
+	{
+		FinishAnim(PlayingSequence);
+	}
 
 	Unit.UnitSpeak('LootCaptured');
 

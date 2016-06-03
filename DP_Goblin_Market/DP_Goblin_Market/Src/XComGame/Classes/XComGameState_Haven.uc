@@ -71,7 +71,7 @@ function bool Update(XComGameState NewGameState)
 	bUpdated = false;
 
 	// Do not trigger anything while the Avenger or Skyranger are flying, or if another popup is already being presented
-	if (ResHQ.bIntelMode && StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.HasInstanceOf(class'UIAlert'))
+	if (ResHQ.bIntelMode && StrategyMap != none && StrategyMap.m_eUIState != eSMS_Flight && !`HQPRES.ScreenStack.IsCurrentClass(class'UIAlert'))
 	{
 		if (IsScanComplete())
 		{

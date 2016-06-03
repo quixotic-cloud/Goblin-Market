@@ -139,7 +139,7 @@ function ParsePathSetParameters(const out vector InDestination, float InDistance
 	Distance = InDistance;
 	NewDirection = InNewDirection;
 	bShouldSkipStop = ShouldSkipStop;
-	AnimationRateModifier = MoveSpeedModifier;
+	AnimationRateModifier = MoveSpeedModifier * GetMoveAnimationSpeed();
 }
 
 simulated function SetupNextMoveIsEndMove()

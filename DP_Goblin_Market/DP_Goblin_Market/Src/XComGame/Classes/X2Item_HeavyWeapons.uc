@@ -121,6 +121,7 @@ static function X2WeaponTemplate RocketLauncher()
 
 	Template.CanBeBuilt = false;
 	Template.StartingItem = true;
+	Template.bInfiniteItem = true;
 		
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RangeLabel, , default.ROCKETLAUNCHER_RANGE);
 	Template.SetUIStatMarkup(class'XLocalizedData'.default.RadiusLabel, , default.ROCKETLAUNCHER_RADIUS);

@@ -24,5 +24,6 @@ Begin:
 
 defaultproperties
 {
+	bCauseTimeDilationWhenInterrupting = true
 }
 

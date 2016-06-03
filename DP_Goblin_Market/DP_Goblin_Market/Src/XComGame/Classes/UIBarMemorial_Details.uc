@@ -40,6 +40,7 @@ var public UIStatList StatListBasic;
 var UIScrollingText EpitaphTitle;
 var UIScrollingText EpitaphText;
 var public UIButton EpitaphButton;
+var UIButton PoolButton;
 
 var X2ImageCaptureManager ImageCaptureMgr;
 
@@ -57,6 +58,9 @@ var localized string m_strUnknownCause;
 var localized string m_strFriendlyFire;
 var localized string m_strFalling;
 var localized string m_strExploding;
+var localized string m_strPoolButtonText;
+var localized string m_strPoolConfirmTitle;
+var localized string m_strPoolConfirmBody;
 
 simulated function InitMemorial(StateObjectReference UnitRef)
 {
@@ -112,6 +116,8 @@ simulated function InitMemorial(StateObjectReference UnitRef)
 	
 	EpitaphButton = Spawn(class'UIButton', self).InitButton('EpitaphButton', m_strEpitaphButton, OnSetEpitaph);
 	EpitaphButton.SetPosition((Width - EpitaphButton.Width) / 2, ((BGBox.Y + BGBox.Height) - EpitaphButton.Height) - PADDING_BOTTOM - 10);
+	PoolButton = Spawn(class'UIButton', self).InitButton('PoolButton', m_strPoolButtonText, OnPoolButton);
+	PoolButton.SetPosition(23 + PADDING_LEFT, EpitaphButton.Y);
 
 	DeadIdx = XComHQ.DeadCrew.Find('ObjectID', UnitReference.ObjectID);
 	`assert(DeadIdx != -1);
@@ -164,6 +170,34 @@ simulated function OnNewEpitaphSet(string newText)
 {
 	SetEpitaphText(newText);
 	PopulateEpitaphText();
+}
+
+simulated function OnPoolButton(UIButton Button)
+{
+	local TDialogueBoxData kDialogData;
+	local CharacterPoolManager PoolMgr;
+	local XComGameState_Unit UnitState, PoolUnitState;
+
+	PoolMgr = `CHARACTERPOOLMGR;
+	UnitState = XComGameState_Unit(History.GetGameStateForObjectID(UnitReference.ObjectID));
+	//  create soldier using the pool function so we have a clean slate to work with
+	PoolUnitState = PoolMgr.CreateSoldier(UnitState.GetMyTemplateName());
+	//  copy appearance, name, country of origin, et cetera
+	PoolUnitState.SetTAppearance(UnitState.kAppearance);
+	PoolUnitState.SetCharacterName(UnitState.GetFirstName(), UnitState.GetLastName(), UnitState.GetNickName(true));
+	PoolUnitState.SetCountry(UnitState.GetCountry());
+	PoolUnitState.SetBackground(UnitState.GetBackground());
+	PoolUnitState.SetSoldierClassTemplate(UnitState.GetSoldierClassTemplateName());
+	PoolUnitState.PoolTimestamp = class'X2StrategyGameRulesetDataStructures'.static.GetSystemDateTimeString();
+	//  save to the pool
+	PoolMgr.CharacterPool.AddItem(PoolUnitState);
+	PoolMgr.SaveCharacterPool();
+	//  let the user know it worked
+	kDialogData.eType = eDialog_Normal;
+	kDialogData.strTitle = default.m_strPoolConfirmTitle;
+	kDialogData.strText = default.m_strPoolConfirmBody;
+	kDialogData.strAccept = class'UIUtilities_Text'.default.m_strGenericAccept;
+	Movie.Pres.UIRaiseDialog(kDialogData);
 }
 
 simulated function XComLevelActor GetLevelActor(name TagName)

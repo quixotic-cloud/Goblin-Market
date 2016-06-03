@@ -145,7 +145,7 @@ Begin:
 	}
 
 	// Dramatic pause / give the camera a moment to settle
-	Sleep(1.5);
+	Sleep(1.5 * GetDelayModifier());
 
 	ShowNoiseIndicator();	
 		
@@ -168,7 +168,7 @@ Begin:
 		FinishAnim(PlayingAnim);
 
 		// keep the camera looking this way for a few moments
-		Sleep(1.0);
+		Sleep(1.0 * GetDelayModifier());
 	}
 
 	NoiseIndicatorMesh.SetHidden(true);

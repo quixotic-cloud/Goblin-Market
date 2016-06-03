@@ -19,6 +19,10 @@ static function array<X2DataTemplate> CreateTemplates()
 	Templates.AddItem(PurePassive('WallSmash', "img:///UILibrary_PerkIcons.UIPerk_andromedon_wallsmash"));
 	//Templates.AddItem(PurePassive('ShellLauncher', "img:///UILibrary_PerkIcons.UIPerk_andromedon_shelllauncher"));
 
+	// MP Versions of Abilities
+	Templates.AddItem(CreateSwitchToRobotMPAbility());
+	Templates.AddItem(CreateBigDamnPunchMPAbility());
+
 	return Templates;
 }
 
@@ -278,6 +282,7 @@ static function X2DataTemplate CreateBigDamnPunchAbility()
 	local X2AbilityMultiTarget_Radius RadiusMultiTarget;
 	local X2Effect_Knockback KnockbackEffect;
 	local X2AbilityTarget_MovingMelee MeleeTarget;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'BigDamnPunch');
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_muton_punch"; // TODO: Change this icon
@@ -303,7 +308,10 @@ static function X2DataTemplate CreateBigDamnPunchAbility()
 	UnitPropertyCondition = new class'X2Condition_UnitProperty';
 	UnitPropertyCondition.ExcludeDead = true;
 	Template.AbilityShooterConditions.AddItem(UnitPropertyCondition);
-	Template.AddShooterEffectExclusions();
+	
+	// Punch may be used if disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	UnitPropertyCondition = new class'X2Condition_UnitProperty';
 	UnitPropertyCondition.ExcludeDead = true;
@@ -343,5 +351,148 @@ static function X2DataTemplate CreateBigDamnPunchAbility()
 	Template.Hostility = eHostility_Offensive;
 	Template.BuildInterruptGameStateFn = TypicalAbility_BuildInterruptGameState;
 	
+	return Template;
+}
+
+// #######################################################################################
+// -------------------- MP Abilities -----------------------------------------------------
+// #######################################################################################
+
+static function X2AbilityTemplate CreateSwitchToRobotMPAbility()
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityTrigger_EventListener EventListener;
+	local X2Condition_UnitValue UnitValue;
+	local X2Effect_SetUnitValue SetUnitValEffect;
+	local X2Effect_SwitchToRobot SwitchToRobotEffect;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'SwitchToRobotMP');
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_andromedon_robotbattlesuit"; // TODO: This needs to be changed
+	Template.MP_PerkOverride = 'SwitchToRobot';
+
+	Template.bDontDisplayInAbilitySummary = true;
+	Template.AbilitySourceName = 'eAbilitySource_Standard';
+	Template.eAbilityIconBehaviorHUD = EAbilityIconBehavior_NeverShow;
+	Template.Hostility = eHostility_Neutral;
+
+	// This ability is only valid if there has not been another death explosion on the unit
+	UnitValue = new class'X2Condition_UnitValue';
+	UnitValue.AddCheckValue('InRobotMode', 1, eCheck_LessThan);
+	Template.AbilityShooterConditions.AddItem(UnitValue);
+
+	// This ability fires when the Andromedon dies
+	EventListener = new class'X2AbilityTrigger_EventListener';
+	EventListener.ListenerData.Deferral = ELD_OnStateSubmitted;
+	EventListener.ListenerData.EventID = 'UnitDied';
+	EventListener.ListenerData.Filter = eFilter_Unit;
+	EventListener.ListenerData.EventFn = class'XComGameState_Ability'.static.AbilityTriggerEventListener_Self_VisualizeInGameState;
+	EventListener.ListenerData.Priority = 45; //This ability must get triggered after the rest of the on-death listeners (namely, after mind-control effects get removed)
+	Template.AbilityTriggers.AddItem(EventListener);
+
+	// Targets the Andromedon unit so it can be replaced by the andromedon robot;
+	Template.AbilityTargetStyle = default.SelfTarget;
+
+	// Add dead eye to guarantee the explosion occurs
+	Template.AbilityToHitCalc = default.DeadEye;
+
+	// The target will now be turned into a robot
+	SwitchToRobotEffect = new class'X2Effect_SwitchToRobot';
+	SwitchToRobotEffect.UnitToSpawnName = 'AndromedonRobotMP';
+	SwitchToRobotEffect.BuildPersistentEffect(1);
+	Template.AddTargetEffect(SwitchToRobotEffect);
+
+	// Once this ability is fired, set the InRobotMode Unit Value so it will not happen again
+	SetUnitValEffect = new class'X2Effect_SetUnitValue';
+	SetUnitValEffect.UnitName = 'InRobotMode';
+	SetUnitValEffect.NewValueToSet = 1;
+	SetUnitValEffect.CleanupType = eCleanup_Never;
+	Template.AddTargetEffect(SetUnitValEffect);
+
+	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
+	Template.BuildVisualizationFn = SwitchToRobot_BuildVisualization;
+	Template.VisualizationTrackInsertedFn = SwitchToRobot_VisualizationTrackInsert;
+
+	return Template;
+}
+
+// For the robot
+static function X2DataTemplate CreateBigDamnPunchMPAbility()
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityCost_ActionPoints ActionPointCost;
+	local X2AbilityToHitCalc_StandardMelee MeleeHitCalc;
+	local X2Condition_UnitProperty UnitPropertyCondition;
+	local X2Effect_ApplyWeaponDamage PhysicalDamageEffect;
+	local X2AbilityMultiTarget_Radius RadiusMultiTarget;
+	//local X2Effect_Knockback KnockbackEffect;
+	local X2AbilityTarget_MovingMelee MeleeTarget;
+	local array<name> SkipExclusions;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, 'BigDamnPunchMP');
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_muton_punch"; // TODO: Change this icon
+	Template.MP_PerkOverride = 'BigDamnPunch';
+
+	Template.AbilitySourceName = 'eAbilitySource_Standard';
+	Template.Hostility = eHostility_Offensive;
+
+	ActionPointCost = new class'X2AbilityCost_ActionPoints';
+	ActionPointCost.iNumPoints = 1;
+	ActionPointCost.bConsumeAllPoints = true;
+	Template.AbilityCosts.AddItem(ActionPointCost);
+
+	MeleeTarget = new class'X2AbilityTarget_MovingMelee';
+	Template.AbilityTargetStyle = MeleeTarget;
+
+	Template.TargetingMethod = class'X2TargetingMethod_MeleePath';
+
+	MeleeHitCalc = new class'X2AbilityToHitCalc_StandardMelee';
+	MeleeHitCalc.BuiltInHitMod = default.BIG_DAMN_PUNCH_MELEE_MODIFIER;
+	Template.AbilityToHitCalc = MeleeHitCalc;
+
+	UnitPropertyCondition = new class'X2Condition_UnitProperty';
+	UnitPropertyCondition.ExcludeDead = true;
+	Template.AbilityShooterConditions.AddItem(UnitPropertyCondition);
+	
+	// Punch may be used if disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
+
+	UnitPropertyCondition = new class'X2Condition_UnitProperty';
+	UnitPropertyCondition.ExcludeDead = true;
+	UnitPropertyCondition.ExcludeFriendlyToSource = true;
+	Template.AbilityTargetConditions.AddItem(UnitPropertyCondition);
+
+	Template.AbilityTargetConditions.AddItem(default.MeleeVisibilityCondition);
+
+	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
+	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.ANDROMEDONROBOTMP_MELEEATTACK_BASEDAMAGE;
+	PhysicalDamageEffect.EffectDamageValue.DamageType = 'Melee';
+	// This also deals environmental damage
+	PhysicalDamageEffect.EnvironmentalDamageAmount = default.BIG_DAMN_PUNCH_ENVIRONMENT_DAMAGE_AMOUNT;
+	Template.AddTargetEffect(PhysicalDamageEffect);
+
+	//KnockbackEffect = new class'X2Effect_Knockback';
+	//KnockbackEffect.KnockbackDistance = 5; //Knockback 5 meters
+	//Template.AddTargetEffect(KnockbackEffect);
+
+	// Radius target for the world damage
+	RadiusMultiTarget = new class'X2AbilityMultiTarget_Radius';
+	RadiusMultiTarget.fTargetRadius = default.BIG_DAMN_PUNCH_ENVIRONMENT_DAMAGE_RADIUS;
+	Template.AbilityMultiTargetStyle = RadiusMultiTarget;
+
+	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_PlayerInput');
+	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_EndOfMove');
+
+	Template.CustomFireAnim = 'FF_Melee';
+	Template.BuildNewGameStateFn = TypicalMoveEndAbility_BuildGameState;
+	Template.BuildInterruptGameStateFn = TypicalMoveEndAbility_BuildInterruptGameState;
+	Template.BuildVisualizationFn = TypicalAbility_BuildVisualization;
+	Template.CinescriptCameraType = "Andromedon_FistStrike";
+	Template.bOverrideMeleeDeath = true;
+
+	// This action is considered 'hostile' and can be interrupted!
+	Template.Hostility = eHostility_Offensive;
+	Template.BuildInterruptGameStateFn = TypicalAbility_BuildInterruptGameState;
+
 	return Template;
 }

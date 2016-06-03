@@ -234,10 +234,10 @@ simulated function bool OnAccept()
 			}
 			break;
 		case m_optRotateCameraLeft:
-			XComTacticalInput(kInput).DPad_Left(class'UIUtilities_Input'.const.FXS_ACTION_RELEASE);
+			XComTacticalInput(kInput).Key_E(class'UIUtilities_Input'.const.FXS_ACTION_RELEASE);
 			break;
 		case m_optRotateCameraRight:
-			XComTacticalInput(kInput).DPad_Right(class'UIUtilities_Input'.const.FXS_ACTION_RELEASE);
+			XComTacticalInput(kInput).Key_Q(class'UIUtilities_Input'.const.FXS_ACTION_RELEASE);
 			break;
 		default:			
 			ActivateCommandAbility(m_iCurrentSelection - 5);

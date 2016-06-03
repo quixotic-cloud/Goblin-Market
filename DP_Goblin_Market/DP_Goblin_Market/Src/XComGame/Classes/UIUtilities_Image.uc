@@ -139,6 +139,9 @@ const HTML_MicOn     = "mic_on";
 const HTML_MicOff    = "mic_off";
 const HTML_MicActive = "mic_active";
 
+const HTML_AnarchysChildrenIcon = "anarchy_icon";
+const HTML_HunterIcon = "hunter_icon";
+
 // ----------------------------------------------------------------------------------------
 
 /// <summary>
@@ -174,39 +177,31 @@ simulated static function string GetRankLabel(int iRank, optional bool bIsShiv =
 
 simulated static function string GetRankIcon(int iRank, name ClassName)
 {
+	local X2SoldierClassTemplate ClassTemplate;
 	local string strImageName;
 
-	if (ClassName == 'PsiOperative')
+	ClassTemplate = class'X2SoldierClassTemplateManager'.static.GetSoldierClassTemplateManager().FindSoldierClassTemplate(ClassName);
+	
+	if (ClassTemplate != none && ClassTemplate.RankIcons.Length > 0)
 	{
-		switch (iRank)
-		{
-		case 0: strImageName = "rank_rookie";			break;
-		case 1: strImageName = "psirank_initiate";		break;
-		case 2: strImageName = "psirank_acolyte";		break;
-		case 3: strImageName = "psirank_adept";			break;
-		case 4: strImageName = "psirank_disciple";		break;
-		case 5: strImageName = "psirank_mystic";		break;
-		case 6: strImageName = "psirank_warlock";		break;
-		case 7: strImageName = "psirank_magus";			break;
-		case 8: strImageName = "rank_fieldmarshall";	break;
-		}
+		strImageName = ClassTemplate.RankIcons[iRank];
 	}
 	else
 	{
 		switch (iRank)
 		{
-		case 0: strImageName = "rank_rookie";			break;
-		case 1: strImageName = "rank_squaddie";			break;
-		case 2: strImageName = "rank_lieutenant";		break;
-		case 3: strImageName = "rank_sergeant";			break;
-		case 4: strImageName = "rank_captain";			break;
-		case 5: strImageName = "rank_major";			break;
-		case 6: strImageName = "rank_colonel";		    break;
-		case 7: strImageName = "rank_commander";        break;
-		case 8: strImageName = "rank_fieldmarshall";    break;
+		case 0: strImageName = "UILibrary_Common.rank_rookie";			break;
+		case 1: strImageName = "UILibrary_Common.rank_squaddie";		break;
+		case 2: strImageName = "UILibrary_Common.rank_lieutenant";		break;
+		case 3: strImageName = "UILibrary_Common.rank_sergeant";		break;
+		case 4: strImageName = "UILibrary_Common.rank_captain";			break;
+		case 5: strImageName = "UILibrary_Common.rank_major";			break;
+		case 6: strImageName = "UILibrary_Common.rank_colonel";		    break;
+		case 7: strImageName = "UILibrary_Common.rank_commander";       break;
+		case 8: strImageName = "UILibrary_Common.rank_fieldmarshall";   break;
 		}
 	}
-	return "img:///UILibrary_Common." $ strImageName;
+	return "img:///" $ strImageName;
 }
 
 simulated static function string GetClassLabelFromTemplate(X2SoldierClassTemplate SoldierClassTemplate)

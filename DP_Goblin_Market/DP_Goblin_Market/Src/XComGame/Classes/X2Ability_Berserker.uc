@@ -22,6 +22,9 @@ static function array<X2DataTemplate> CreateTemplates()
 	Templates.AddItem(CreateMeleeResistanceAbility());
 	Templates.AddItem(CreateDevastatingPunchAbility());
 
+	// MP Versions of Abilities
+	Templates.AddItem(CreateDevastatingPunchAbilityMP());
+
 	return Templates;
 }
 
@@ -64,6 +67,7 @@ static function X2AbilityTemplate CreateTriggerRageAbility()
 	local X2AbilityTemplate Template;
 	local X2Effect_PersistentStatChange RageTriggeredPersistentEffect;
 	local X2Condition_UnitEffects RageTriggeredCondition;
+	local array<name> SkipExclusions;
 	
 	`CREATE_X2ABILITY_TEMPLATE(Template, 'TriggerRage');
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_beserk";
@@ -73,7 +77,10 @@ static function X2AbilityTemplate CreateTriggerRageAbility()
 	Template.Hostility = eHostility_Neutral;
 
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
+	
+	// Rage may trigger if the unit is burning
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_Placeholder');
 	Template.AbilityToHitCalc = default.DeadEye;
@@ -180,7 +187,7 @@ static function X2AbilityTemplate CreateMeleeResistanceAbility()
 	return Template;
 }
 
-static function X2AbilityTemplate CreateDevastatingPunchAbility(optional Name AbilityName = 'DevastatingPunch')
+static function X2AbilityTemplate CreateDevastatingPunchAbility(optional Name AbilityName = 'DevastatingPunch', int MovementRangeAdjustment=1)
 {
 	local X2AbilityTemplate Template;
 	local X2AbilityCost_ActionPoints ActionPointCost;
@@ -189,6 +196,7 @@ static function X2AbilityTemplate CreateDevastatingPunchAbility(optional Name Ab
 	local X2Effect_ImmediateAbilityActivation BrainDamageAbilityEffect;
 	local X2AbilityTarget_MovingMelee MeleeTarget;
 	local X2Effect_Knockback KnockbackEffect;
+	local array<name> SkipExclusions;
 
 	`CREATE_X2ABILITY_TEMPLATE(Template, AbilityName);
 	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_muton_punch";
@@ -206,7 +214,7 @@ static function X2AbilityTemplate CreateDevastatingPunchAbility(optional Name Ab
 	Template.AbilityToHitCalc = MeleeHitCalc;
 
 	MeleeTarget = new class'X2AbilityTarget_MovingMelee';
-	MeleeTarget.MovementRangeAdjustment = 1;
+	MeleeTarget.MovementRangeAdjustment = MovementRangeAdjustment;
 	Template.AbilityTargetStyle = MeleeTarget;
 	Template.TargetingMethod = class'X2TargetingMethod_MeleePath';
 
@@ -214,15 +222,14 @@ static function X2AbilityTemplate CreateDevastatingPunchAbility(optional Name Ab
 	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_EndOfMove');
 
 	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
-	Template.AddShooterEffectExclusions();
+	
+	// May punch if the unit is burning or disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
 
 	Template.AbilityTargetConditions.AddItem(new class'X2Condition_BerserkerDevastatingPunch');	
-	Template.AbilityTargetConditions.AddItem(default.GameplayVisibilityCondition);
-
-	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
-	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.BERSERKER_MELEEATTACK_BASEDAMAGE;
-	PhysicalDamageEffect.EffectDamageValue.DamageType = 'Melee';
-	Template.AddTargetEffect(PhysicalDamageEffect);
+	Template.AbilityTargetConditions.AddItem(default.MeleeVisibilityCondition);
 
 	//Impairing effects need to come before the damage. This is needed for proper visualization ordering.
 	//Effect on a successful melee attack is triggering the BrainDamage Ability
@@ -235,6 +242,11 @@ static function X2AbilityTemplate CreateDevastatingPunchAbility(optional Name Ab
 	BrainDamageAbilityEffect.bRemoveWhenTargetDies = true;
 	BrainDamageAbilityEffect.VisualizationFn = class'X2Ability_Impairing'.static.ImpairingAbilityEffectTriggeredVisualization;
 	Template.AddTargetEffect(BrainDamageAbilityEffect);
+
+	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
+	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.BERSERKER_MELEEATTACK_BASEDAMAGE;
+	PhysicalDamageEffect.EffectDamageValue.DamageType = 'Melee';
+	Template.AddTargetEffect(PhysicalDamageEffect);
 
 	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
 	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.BERSERKER_MELEEATTACK_MISSDAMAGE;
@@ -288,6 +300,95 @@ function DevastatingPunchAbility_BuildVisualization(XComGameState VisualizeGameS
 			OutVisualizationTracks.AddItem(BuildTrack);
 		}
 	}
+}
+
+// #######################################################################################
+// -------------------- MP Abilities -----------------------------------------------------
+// #######################################################################################
+
+static function X2AbilityTemplate CreateDevastatingPunchAbilityMP(optional Name AbilityName = 'DevastatingPunchMP')
+{
+	local X2AbilityTemplate Template;
+	local X2AbilityCost_ActionPoints ActionPointCost;
+	local X2AbilityToHitCalc_StandardMelee MeleeHitCalc;
+	local X2Effect_ApplyWeaponDamage PhysicalDamageEffect;
+	local X2Effect_ImmediateAbilityActivation BrainDamageAbilityEffect;
+	local X2AbilityTarget_MovingMelee MeleeTarget;
+	//local X2Effect_Knockback KnockbackEffect;
+	local array<name> SkipExclusions;
+
+	`CREATE_X2ABILITY_TEMPLATE(Template, AbilityName);
+	Template.IconImage = "img:///UILibrary_PerkIcons.UIPerk_muton_punch";
+	Template.Hostility = eHostility_Offensive;
+	Template.AbilitySourceName = 'eAbilitySource_Standard';
+	Template.MP_PerkOverride = 'DevastatingPunch';
+
+	Template.AdditionalAbilities.AddItem(class'X2Ability_Impairing'.default.ImpairingAbilityName);
+
+	ActionPointCost = new class'X2AbilityCost_ActionPoints';
+	ActionPointCost.iNumPoints = 1;
+	ActionPointCost.bConsumeAllPoints = true;
+	Template.AbilityCosts.AddItem(ActionPointCost);
+
+	MeleeHitCalc = new class'X2AbilityToHitCalc_StandardMelee';
+	Template.AbilityToHitCalc = MeleeHitCalc;
+
+	MeleeTarget = new class'X2AbilityTarget_MovingMelee';
+	Template.AbilityTargetStyle = MeleeTarget;
+	Template.TargetingMethod = class'X2TargetingMethod_MeleePath';
+
+	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_PlayerInput');
+	Template.AbilityTriggers.AddItem(new class'X2AbilityTrigger_EndOfMove');
+
+	Template.AbilityShooterConditions.AddItem(default.LivingShooterProperty);
+	
+	// May punch if the unit is burning or disoriented
+	SkipExclusions.AddItem(class'X2AbilityTemplateManager'.default.DisorientedName);
+	SkipExclusions.AddItem(class'X2StatusEffects'.default.BurningName);
+	Template.AddShooterEffectExclusions(SkipExclusions);
+
+	Template.AbilityTargetConditions.AddItem(new class'X2Condition_BerserkerDevastatingPunch');
+	Template.AbilityTargetConditions.AddItem(default.MeleeVisibilityCondition);
+
+	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
+	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.BERSERKERMP_MELEEATTACK_BASEDAMAGE;
+	PhysicalDamageEffect.EffectDamageValue.DamageType = 'Melee';
+	Template.AddTargetEffect(PhysicalDamageEffect);
+
+	//Impairing effects need to come before the damage. This is needed for proper visualization ordering.
+	//Effect on a successful melee attack is triggering the BrainDamage Ability
+	BrainDamageAbilityEffect = new class 'X2Effect_ImmediateAbilityActivation';
+	BrainDamageAbilityEffect.BuildPersistentEffect(1, false, true, , eGameRule_PlayerTurnBegin);
+	BrainDamageAbilityEffect.EffectName = 'ImmediateBrainDamage';
+	// NOTICE: For now StunLancer, Muton, and Berserker all use this ability. This may change.
+	BrainDamageAbilityEffect.AbilityName = class'X2Ability_Impairing'.default.ImpairingAbilityName;
+	BrainDamageAbilityEffect.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.GetMyLongDescription(), Template.IconImage, true, , Template.AbilitySourceName);
+	BrainDamageAbilityEffect.bRemoveWhenTargetDies = true;
+	BrainDamageAbilityEffect.VisualizationFn = class'X2Ability_Impairing'.static.ImpairingAbilityEffectTriggeredVisualization;
+	Template.AddTargetEffect(BrainDamageAbilityEffect);
+
+	PhysicalDamageEffect = new class'X2Effect_ApplyWeaponDamage';
+	PhysicalDamageEffect.EffectDamageValue = class'X2Item_DefaultWeapons'.default.BERSERKER_MELEEATTACK_MISSDAMAGE;
+	PhysicalDamageEffect.EffectDamageValue.DamageType = 'Melee';
+	PhysicalDamageEffect.bApplyOnHit = False;
+	PhysicalDamageEffect.bApplyOnMiss = True;
+	PhysicalDamageEffect.bIgnoreBaseDamage = True;
+	Template.AddTargetEffect(PhysicalDamageEffect);
+
+	//KnockbackEffect = new class'X2Effect_Knockback';
+	//KnockbackEffect.KnockbackDistance = 5; //Knockback 5 meters
+	//Template.AddTargetEffect(KnockbackEffect);
+
+	Template.CustomFireAnim = 'FF_Melee';
+	Template.bSkipMoveStop = true;
+	Template.bFrameEvenWhenUnitIsHidden = true;
+	Template.bOverrideMeleeDeath = true;
+	Template.BuildNewGameStateFn = TypicalMoveEndAbility_BuildGameState;
+	Template.BuildVisualizationFn = DevastatingPunchAbility_BuildVisualization;
+	Template.BuildInterruptGameStateFn = TypicalMoveEndAbility_BuildInterruptGameState;
+	Template.CinescriptCameraType = "Berserker_DevastatingPunch";
+
+	return Template;
 }
 
 defaultproperties

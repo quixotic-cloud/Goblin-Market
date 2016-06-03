@@ -129,27 +129,28 @@ static function X2DataTemplate CreateStunLancerImpairingEffectAbility()
 
 	// On hit effects
 	//  Stunned effect for 1 or 2 unblocked hit
-	DisorientedEffect = class'X2StatusEffects'.static.CreateDisorientedStatusEffect();
+	DisorientedEffect = class'X2StatusEffects'.static.CreateDisorientedStatusEffect(, , false);
 	DisorientedEffect.MinStatContestResult = 1;
 	DisorientedEffect.MaxStatContestResult = 2;
 	DisorientedEffect.bRemoveWhenSourceDies = false;
 	Template.AddTargetEffect(DisorientedEffect);
 
 	//  Stunned effect for 3 or 4 unblocked hit
-	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(1, 100);
+	StunnedEffect = class'X2StatusEffects'.static.CreateStunnedStatusEffect(1, 100, false);
 	StunnedEffect.MinStatContestResult = 3;
 	StunnedEffect.MaxStatContestResult = 4;
 	StunnedEffect.bRemoveWhenSourceDies = false;
 	Template.AddTargetEffect(StunnedEffect);
 
 	//  Unconscious effect for 5 unblocked hits
-	UnconsciousEffect = class'X2StatusEffects'.static.CreateUnconsciousStatusEffect(true);
+	UnconsciousEffect = class'X2StatusEffects'.static.CreateUnconsciousStatusEffect();
 	UnconsciousEffect.MinStatContestResult = 5;
 	UnconsciousEffect.MaxStatContestResult = 0;
 	UnconsciousEffect.bRemoveWhenSourceDies = false;
 	Template.AddTargetEffect(UnconsciousEffect);
 
 	Template.bSkipPerkActivationActions = true;
+	Template.bSkipPerkActivationActionsSync = false;
 	Template.bSkipFireAction = true;
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
 	Template.BuildVisualizationFn = StunLancerImpairing_BuildVisualization;
@@ -225,7 +226,7 @@ static function ImpairingAbilityEffectTriggeredVisualization(XComGameState Visua
 
 				for( j = 0; j < AbilityTemplate.AbilityTargetEffects.Length; ++j )
 				{
-					AbilityTemplate.AbilityTargetEffects[j].AddX2ActionsForVisualization(Context.AssociatedState, BuildTrack, TestAbilityContext.FindTargetEffectApplyResult(AbilityTemplate.AbilityTargetEffects[j]));
+					AbilityTemplate.AbilityTargetEffects[j].AddX2ActionsForVisualization(TestAbilityContext.AssociatedState, BuildTrack, TestAbilityContext.FindTargetEffectApplyResult(AbilityTemplate.AbilityTargetEffects[j]));
 				}
 
 				TargetVisualizerInterface = X2VisualizerInterface(BuildTrack.TrackActor);

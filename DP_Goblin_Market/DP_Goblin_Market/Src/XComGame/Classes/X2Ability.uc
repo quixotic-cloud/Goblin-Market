@@ -46,7 +46,7 @@ var int CounterattackDodgeUnitValue;
 
 //This method generates a miss location that attempts avoid hitting other units, obstacles near to the shooter, etc.
 native static function Vector FindOptimalMissLocation(XComGameStateContext AbilityContext, bool bDebug);
-
+native static function Vector GetTargetShootAtLocation(XComGameStateContext_Ability AbilityContext);
 static function UpdateTargetLocationsFromContext(XComGameStateContext_Ability AbilityContext)
 {
 	local XComGameStateHistory History;
@@ -56,6 +56,7 @@ static function UpdateTargetLocationsFromContext(XComGameStateContext_Ability Ab
 	local X2VisualizerInterface PrimaryTargetVisualizer;
 	local vector MissLocation;
 	local int TargetIndex;
+	local vector TargetShootAtLocation;
 
 	History = `XCOMHISTORY;
 
@@ -69,7 +70,8 @@ static function UpdateTargetLocationsFromContext(XComGameStateContext_Ability Ab
 		if(PrimaryTargetVisualizer != none)
 		{
 			//Always have a target location that matches the primary target
-			AbilityContext.InputContext.TargetLocations.AddItem(PrimaryTargetVisualizer.GetShootAtLocation(AbilityContext.ResultContext.HitResult, AbilityContext.InputContext.SourceObject));
+			TargetShootAtLocation = GetTargetShootAtLocation(AbilityContext);
+			AbilityContext.InputContext.TargetLocations.AddItem(TargetShootAtLocation);
 
 			//Here we set projectile hit locations. These locations MUST represent the stopping point of the projectile or else 
 			//severe issues will result in the projectile system.
@@ -478,7 +480,8 @@ static function TypicalAbility_FillOutGameState(XComGameState NewGameState)
 				AbilityTemplate.bUseLaunchedGrenadeEffects ? GrenadeTemplate.LaunchedGrenadeEffects : (AbilityTemplate.bUseThrownGrenadeEffects ? GrenadeTemplate.ThrownGrenadeEffects : AbilityTemplate.AbilityMultiTargetEffects), 
 				MultiTargetEffectResults, 
 				GrenadeTemplate == none ? AbilityTemplate.DataName : GrenadeTemplate.DataName, 
-				MultiTargetLookupType ))
+				MultiTargetLookupType ,
+				AbilityContext.ResultContext.MultiTargetEffectsOverrides[TargetIndex]))
 			{
 				AbilityContext.ResultContext.MultiTargetEffectResults[TargetIndex] = MultiTargetEffectResults;  //  copy results into dynamic array
 			}
@@ -577,7 +580,8 @@ static function bool ApplyEffectsToTarget( XComGameStateContext_Ability AbilityC
 												array<X2Effect> Effects,
 												out EffectResults EffectResults,
 												Name SourceTemplateName,
-												EffectTemplateLookupType EffectLookupType)
+												EffectTemplateLookupType EffectLookupType,
+												optional OverriddenEffectsByType TargetEffectsOverrides)
 {
 	local XComGameState_Unit UnitState, SourceUnit;
 	local EffectAppliedData ApplyData;
@@ -600,6 +604,7 @@ static function bool ApplyEffectsToTarget( XComGameStateContext_Ability AbilityC
 	ApplyData.AbilityResultContext.HitResult = Result;                      //  fixes result with multi target result so that effects don't have to dig into the multi target info
 	ApplyData.AbilityResultContext.ArmorMitigation = ArmorMitigated;        //  as above
 	ApplyData.AbilityResultContext.StatContestResult = StatContestResult;   //  as above
+	ApplyData.AbilityResultContext.TargetEffectsOverrides = TargetEffectsOverrides;   //  as above
 	ApplyData.AbilityStateObjectRef = kSourceAbility.GetReference();
 	ApplyData.SourceStateObjectRef = kSource.GetReference();
 	ApplyData.TargetStateObjectRef = kOriginalTarget.GetReference();	
@@ -692,7 +697,7 @@ function TypicalAbility_BuildVisualization(XComGameState VisualizeGameState, out
 	local VisualizationTrack        BuildTrack;
 	local VisualizationTrack        SourceTrack, InterruptTrack;
 	local int						TrackIndex;
-	local bool						bAlreadyAdded;
+	local bool						bAlreadyAdded, bInterruptTrackAlreadyAdded;
 	local XComGameStateHistory      History;
 	local X2Action_MoveTurn         MoveTurnAction;
 
@@ -711,6 +716,9 @@ function TypicalAbility_BuildVisualization(XComGameState VisualizeGameState, out
 	local X2Action FoundAction;
 	local X2Action_WaitForAbilityEffect WaitAction;
 	local bool bInterruptPath;
+
+	local X2Action_ExitCover ExitCoverAction;
+	local X2Action_Delay MoveDelay;
 		
 	History = `XCOMHISTORY;
 	Context = XComGameStateContext_Ability(VisualizeGameState.GetContext());
@@ -777,10 +785,8 @@ function TypicalAbility_BuildVisualization(XComGameState VisualizeGameState, out
 
 	if (!AbilityTemplate.bSkipFireAction)
 	{
-		if (!AbilityTemplate.bSkipExitCoverWhenFiring)
-		{
-			class'X2Action_ExitCover'.static.AddToVisualizationTrack(SourceTrack, Context);
-		}
+		ExitCoverAction = X2Action_ExitCover(class'X2Action_ExitCover'.static.AddToVisualizationTrack(SourceTrack, Context));
+		ExitCoverAction.bSkipExitCoverVisualization = AbilityTemplate.bSkipExitCoverWhenFiring;
 
 		// if this ability has a built in move, do it right before we do the fire action
 		if(Context.InputContext.MovementPaths.Length > 0)
@@ -856,6 +862,21 @@ function TypicalAbility_BuildVisualization(XComGameState VisualizeGameState, out
 			{
 				// note that we skip the stop animation since we'll be doing our own stop with the end of move attack
 				class'X2VisualizerHelpers'.static.ParsePath(Context, SourceTrack, OutVisualizationTracks, AbilityTemplate.bSkipMoveStop);
+
+				//  add paths for other units moving with us (e.g. gremlins moving with a move+attack ability)
+				if (Context.InputContext.MovementPaths.Length > 1)
+				{
+					for (TrackIndex = 1; TrackIndex < Context.InputContext.MovementPaths.Length; ++TrackIndex)
+					{
+						BuildTrack = EmptyTrack;
+						BuildTrack.StateObject_OldState = History.GetGameStateForObjectID(Context.InputContext.MovementPaths[TrackIndex].MovingUnitRef.ObjectID);
+						BuildTrack.StateObject_NewState = VisualizeGameState.GetGameStateForObjectID(Context.InputContext.MovementPaths[TrackIndex].MovingUnitRef.ObjectID);
+						MoveDelay = X2Action_Delay(class'X2Action_Delay'.static.AddToVisualizationTrack(BuildTrack, Context));
+						MoveDelay.Duration = class'X2Ability_DefaultAbilitySet'.default.TypicalMoveDelay;
+						class'X2VisualizerHelpers'.static.ParsePath(Context, BuildTrack, OutVisualizationTracks, AbilityTemplate.bSkipMoveStop);						
+						OutVisualizationTracks.AddItem(BuildTrack);
+					}
+				}
 			}
 
 			// add our fire action
@@ -1096,11 +1117,25 @@ function TypicalAbility_BuildVisualization(XComGameState VisualizeGameState, out
 
 			//Some abilities add the same target multiple times into the targets list - see if this is the case and avoid adding redundant tracks
 			bAlreadyAdded = false;
+			bInterruptTrackAlreadyAdded = false;
 			for( TrackIndex = 0; TrackIndex < OutVisualizationTracks.Length; ++TrackIndex )
 			{
 				if( OutVisualizationTracks[TrackIndex].StateObject_NewState.ObjectID == AbilityContext.MultiTargets[TargetIndex].ObjectID )
 				{
-					bAlreadyAdded = true;
+					if( (InterruptTrack != EmptyTrack) &&
+						(AbilityContext.MultiTargets[TargetIndex].ObjectID == InterruptTrack.StateObject_NewState.ObjectID) &&
+						!bInterruptTrackAlreadyAdded )
+					{
+						// This target may already be in the track due to the fact that it was an interrupting (counterattack)
+						// Make sure the MultiTarget effects are applied then.
+						// WHEN WE HAVE MORE TIME TO FIX, THIS SHOULD PROBABLY CHECK A LIST AGAINST WHAT HAS BEEN PUT IN BY THE LOOP.
+						// THESE TRACKS COULD BE IN THERE FOR OTHER REASONS BESIDES THIS MULTITARGET LOOP.
+						bInterruptTrackAlreadyAdded = true;
+					}
+					else
+					{
+						bAlreadyAdded = true;
+					}
 				}
 			}
 
@@ -1139,7 +1174,17 @@ function TypicalAbility_BuildVisualization(XComGameState VisualizeGameState, out
 				//Make the target wait until signaled by the shooter that the projectiles are hitting
 				if (!AbilityTemplate.bSkipFireAction && !bMultiSourceIsAlsoTarget)
 				{
-					class'X2Action_WaitForAbilityEffect'.static.AddToVisualizationTrack(BuildTrack, Context);
+					WaitAction = X2Action_WaitForAbilityEffect(class'X2Action_WaitForAbilityEffect'.static.AddToVisualizationTrack(BuildTrack, Context));
+
+					if( bInterruptTrackAlreadyAdded &&
+						(AbilityContext.MultiTargets[TargetIndex].ObjectID == InterruptTrack.StateObject_NewState.ObjectID) )
+					{
+						// This is the interrupting track and this wait needs to stop since the interruption would put an earlier
+						// wait in.
+						// AGAIN, WHEN WE HAVE MORE TIME TO FIX, THIS SHOULD PROBABLY BE MOVED TO THE WAIT ACTION
+						// MAKING SURE ANY WAIT IN THE TRACK STOPS.
+						WaitAction.bWaitingForActionMessage = true;
+					}
 				}
 		
 				//Add any X2Actions that are specific to this effect being applied. These actions would typically be instantaneous, showing UI world messages
@@ -1404,7 +1449,7 @@ static function XComGameState TypicalAbility_BuildInterruptGameState(XComGameSta
 	return NewGameState;
 }
 
-static function X2AbilityTemplate PurePassive(name TemplateName, optional string TemplateIconImage="img:///UILibrary_PerkIcons.UIPerk_standard", optional bool bCrossClassEligible=false, optional Name AbilitySourceName='eAbilitySource_Perk')
+static function X2AbilityTemplate PurePassive(name TemplateName, optional string TemplateIconImage="img:///UILibrary_PerkIcons.UIPerk_standard", optional bool bCrossClassEligible=false, optional Name AbilitySourceName='eAbilitySource_Perk', optional bool bDisplayInUI=true)
 {
 	local X2AbilityTemplate             Template;
 	local X2Effect_Persistent           PersistentEffect;
@@ -1424,7 +1469,7 @@ static function X2AbilityTemplate PurePassive(name TemplateName, optional string
 	//  This is a dummy effect so that an icon shows up in the UI.
 	PersistentEffect = new class'X2Effect_Persistent';
 	PersistentEffect.BuildPersistentEffect(1, true, false);
-	PersistentEffect.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.LocLongDescription, TemplateIconImage, true,, Template.AbilitySourceName);
+	PersistentEffect.SetDisplayInfo(ePerkBuff_Passive, Template.LocFriendlyName, Template.LocLongDescription, TemplateIconImage, bDisplayInUI,, Template.AbilitySourceName);
 	Template.AddTargetEffect(PersistentEffect);
 
 	Template.BuildNewGameStateFn = TypicalAbility_BuildGameState;
@@ -1543,6 +1588,7 @@ DefaultProperties
 		bIgnoreBaseDamage=true
 		DamageTag="Miss"
 		bAllowWeaponUpgrade=true
+		bAllowFreeKill=false
 	End Object
 	WeaponUpgradeMissDamage = DefaultWeaponUpgradeMissDamage;
 

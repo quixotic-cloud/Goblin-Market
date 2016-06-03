@@ -16,10 +16,12 @@ var() array<TTile>                        ValidActivationTiles;     // Certain a
 var() int                                 PanicEventValue;			// Defines strength of panic event for this ability or its effect.
 var() bool                                PanicFlamethrower;        // True only when flamethrower has triggered panic
 var() int								  TurnsUntilAbilityExpires; // If >0, after this many turns, this ability will be removed from the Unit that owns it (and become unavailable for use)
-
+var() private transient bool              HasBeenPostPlayInited;    // Safety to prevent multiple post play inits 
+	
 function InitAbilityForUnit(XComGameState_Unit OwnerUnit, XComGameState NewGameState)
 {
-	SetOwnerStateObject(OwnerUnit);
+	OwnerStateObject = OwnerUnit.GetReference();
+	CheckForPostBeginPlayActivation();
 	GetMyTemplate().InitAbilityForUnit(self, OwnerUnit, NewGameState);
 }
 
@@ -248,7 +250,14 @@ simulated function name CanActivateAbilityForObserverEvent(XComGameState_BaseObj
 	return 'AA_NoTargets';
 }
 
-simulated function name GatherAbilityTargets(out array<AvailableTarget> Targets, optional XComGameState_Unit OverrideOwnerState)
+event int GetShotBreakdownNative(AvailableTarget kTarget, out ShotBreakdown kBreakdown)
+{
+	return GetShotBreakdown(kTarget, kBreakdown);
+}
+
+//This function is native for performance reasons, the script code below describes its function
+simulated function native name GatherAbilityTargets(out array<AvailableTarget> Targets, optional XComGameState_Unit OverrideOwnerState);
+/*
 {
 	local int i, j;
 	local XComGameState_Unit kOwner;
@@ -346,6 +355,7 @@ simulated function int SortAvailableTargets(AvailableTarget TargetA, AvailableTa
 
 	return 1;
 }
+*/
 
 simulated function GatherAbilityTargetLocationsForLocation(const vector Location, const AvailableTarget Targets, out array<Vector> TargetLocations)
 {
@@ -1203,19 +1213,46 @@ function EventListenerReturn OnGameStateSubmitted(Object EventData, Object Event
 
 function SetOwnerStateObject(out XComGameState_Unit InGameStateUnit)
 {
+	// deprecated
+	`Redscreen("SetOwnerStateObject(): Deprecated!");
+}
+
+function CheckForPostBeginPlayActivation()
+{
+	local XComGameStateHistory History;
 	local Object ThisObj;
 	local X2EventManager EventManager;
+	local XComGameState_Unit UnitState;
 	local int Priority;
 
-	OwnerStateObject = InGameStateUnit.GetReference();
+	if(OwnerStateObject.ObjectID <= 0)
+	{
+		`Redscreen("CheckForPostBeginPlayActivation(): No unit has been set for this ability yet!");
+		return;
+	}
+
+	// only do these checks once
+	if(HasBeenPostPlayInited)
+	{
+		return;
+	}
+	HasBeenPostPlayInited = true;
 
 	if (IsAbilityTriggeredOnUnitPostBeginTacticalPlay(Priority))
 	{
 		EventManager = `XEVENTMGR;
 		ThisObj = self;
 
+		History = `XCOMHISTORY;
+		UnitState = XComGameState_Unit(History.GetGameStateForObjectID(OwnerStateObject.ObjectID));
+		if(UnitState == none)
+		{
+			`Redscreen("CheckForPostBeginPlayActivation(): Owning object is not a unit. This case needs to be handled.");
+			return;
+		}
+
 		// if the Owner unit is already in play, apply at earliest opportunity
-		if (InGameStateUnit.IsInPlay())
+		if (UnitState.IsInPlay())
 		{
 			if (`TACTICALRULES.TacticalGameIsInPlay())
 			{
@@ -1232,7 +1269,7 @@ function SetOwnerStateObject(out XComGameState_Unit InGameStateUnit)
 		// the Owner is not yet in play, register for notification when it enters play so this ability can be applied then
 		else
 		{
-			EventManager.RegisterForEvent(ThisObj, 'OnUnitBeginPlay', OnUnitBeginPlay, ELD_OnStateSubmitted, Priority, InGameStateUnit);
+			EventManager.RegisterForEvent(ThisObj, 'OnUnitBeginPlay', OnUnitBeginPlay, ELD_OnStateSubmitted, Priority, UnitState);
 		}
 	}
 }
@@ -1352,6 +1389,11 @@ function EventListenerReturn AbilityTriggerEventListener_EndOfMoveLoot(Object Ev
 
 function bool AbilityTriggerAgainstSingleTarget(StateObjectReference TargetRef, bool bMustHaveAdditionalTargets, optional int VisualizeIndex = -1, optional array<vector> TargetLocations)
 {
+	return AbilityTriggerAgainstSingleTarget_Static(ObjectID, OwnerStateObject, TargetRef, bMustHaveAdditionalTargets, VisualizeIndex, TargetLocations);
+}
+
+static function bool AbilityTriggerAgainstSingleTarget_Static(int AbilityID, StateObjectReference SourceRef, StateObjectReference TargetRef, bool bMustHaveAdditionalTargets, optional int VisualizeIndex = -1, optional array<vector> TargetLocations)
+{
 	local GameRulesCache_Unit UnitCache;
 	local int i, j;
 	local X2TacticalGameRuleset TacticalRules;
@@ -1359,11 +1401,11 @@ function bool AbilityTriggerAgainstSingleTarget(StateObjectReference TargetRef, 
 
 	TacticalRules = `TACTICALRULES;
 
-	if (TacticalRules.GetGameRulesCache_Unit(OwnerStateObject, UnitCache))
+	if (TacticalRules.GetGameRulesCache_Unit(SourceRef, UnitCache))
 	{
 		for (i = 0; i < UnitCache.AvailableActions.Length; ++i)
 		{
-			if (UnitCache.AvailableActions[i].AbilityObjectRef.ObjectID == ObjectID)
+			if (UnitCache.AvailableActions[i].AbilityObjectRef.ObjectID == AbilityID)
 			{
 				for (j = 0; j < UnitCache.AvailableActions[i].AvailableTargets.Length; ++j)
 				{
@@ -1732,7 +1774,9 @@ function EventListenerReturn EverVigilantTurnEndListener(Object EventData, Objec
 		GotValue = UnitState.GetUnitValue('NonMoveActionsThisTurn', NonMoveActionsThisTurn);
 		if (!GotValue || NonMoveActionsThisTurn.fValue == 0)
 		{
-			OverwatchRef = UnitState.FindAbility('Overwatch');
+			OverwatchRef = UnitState.FindAbility('PistolOverwatch');
+			if (OverwatchRef.ObjectID == 0)
+				OverwatchRef = UnitState.FindAbility('Overwatch');
 			OverwatchState = XComGameState_Ability(History.GetGameStateForObjectID(OverwatchRef.ObjectID));
 			if (OverwatchState != none)
 			{
@@ -2155,6 +2199,36 @@ function EventListenerReturn CheckMoveTriggersRadiusAndBand_Self(Object EventDat
 function EventListenerReturn CheckMoveTriggerGroupBandPassed(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
 {
 	AbilityTriggerIfGroupBandPassed(EventData, EventSource, GameState, EventID);
+
+	return ELR_NoInterrupt;
+}
+
+function EventListenerReturn AbilityTriggerEventListener_UnitSeesUnit(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
+{
+	local XComGameState_Unit ShooterUnit, TargetUnit, SourceUnit;
+	local XComGameStateHistory History;
+	local AvailableTarget Targets;
+	local AvailableAction CurrentAvailableAction;
+
+	History = `XCOMHISTORY;
+
+	SourceUnit = XComGameState_Unit(History.GetGameStateForObjectID(OwnerStateObject.ObjectID));
+	ShooterUnit = XComGameState_Unit(EventSource);
+	TargetUnit = XComGameState_Unit(EventData);
+
+	if (ShooterUnit == XComGameState_Unit(History.GetGameStateForObjectID(OwnerStateObject.ObjectID)))
+	{
+		CurrentAvailableAction.AvailableCode = CanActivateAbility(SourceUnit);
+
+		if (CurrentAvailableAction.AvailableCode == 'AA_Success')
+		{
+			Targets.PrimaryTarget = TargetUnit.GetReference();
+			CurrentAvailableAction.AvailableTargets.AddItem(Targets);
+			CurrentAvailableAction.AbilityObjectRef = GetReference();
+
+			class'XComGameStateContext_Ability'.static.ActivateAbility(CurrentAvailableAction, 0);
+		}
+	}
 
 	return ELR_NoInterrupt;
 }
@@ -2808,6 +2882,38 @@ function EventListenerReturn AbilityTriggerEventListener_WrathCannon(Object Even
 	return ELR_NoInterrupt;
 }
 
+function EventListenerReturn AbilityTriggerEventListener_DamagedByEnemyTeleport(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
+{
+	local XComGameState_Unit DamagedUnit, DamageSourceUnit;
+	local XComGameStateContext GameStateContext;
+	local XComGameStateContext_Ability AbilityContext;
+	local XComGameStateHistory History;
+
+	History = `XCOMHISTORY;
+
+	GameStateContext = GameState.GetContext();
+
+	AbilityContext = XComGameStateContext_Ability(GameStateContext);
+	if (AbilityContext != none)
+	{
+		DamagedUnit = XComGameState_Unit(EventData);
+		DamageSourceUnit = XComGameState_Unit(GameState.GetGameStateForObjectID(AbilityContext.InputContext.SourceObject.ObjectID));
+		if( DamageSourceUnit == none )
+		{
+			DamageSourceUnit = XComGameState_Unit(History.GetGameStateForObjectID(AbilityContext.InputContext.SourceObject.ObjectID));
+		}
+
+		// Check to see if the source of this ability damage is an enemy
+		if( DamagedUnit.IsFriendlyUnit(DamageSourceUnit) )
+		{
+			// Do not teleport if the damage is caused by a friendly unit
+			return ELR_NoInterrupt;
+		}
+	}
+
+	return AbilityTriggerEventListener_DamagedTeleport(EventData, EventSource, GameState, EventID);
+}
+
 function EventListenerReturn AbilityTriggerEventListener_DamagedTeleport(Object EventData, Object EventSource, XComGameState GameState, Name EventID)
 {
 	local XComGameState_Unit DamagedUnit, DamagedUnitPrevious, NewDamagedUnit;
@@ -2977,7 +3083,7 @@ function EventListenerReturn FacelessOnDeathListener(Object EventData, Object Ev
 }
 
 // From X2AbilityCost_ActionPoints - moved here so the delegate serializes properly
-simulated function DidNotConsumeAll_PostBuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
+simulated static function DidNotConsumeAll_PostBuildVisualization(XComGameState VisualizeGameState, out array<VisualizationTrack> OutVisualizationTracks)
 {
 	local XComGameStateContext_Ability AbilityContext;
 	local X2Action_PlaySoundAndFlyOver SoundAndFlyOver;

@@ -42,6 +42,8 @@ var private bool bHiddenAtStart;
 
 var private array<TTile> PathFocalTiles;
 
+var bool bLockFloorZ;       //  don't move up/down based on unit changing floors
+
 function Added()
 {
 	local array<PathPoint> MovementData;
@@ -131,7 +133,8 @@ function UpdateCamera(float DeltaTime)
 	local XCom3DCursor Cursor;
 	local Vector Delta;
 	local Vector TetherPoint;
-	local TTile FocalTile;
+	local TTile FocalTile, PawnFloorTile;
+	local Vector PawnFeet;
 
 	super.UpdateCamera(DeltaTime);
 
@@ -204,14 +207,23 @@ function UpdateCamera(float DeltaTime)
 	}
 	else
 	{
-		LookAtPoint = UnitPawn.GetFeetLocation() + Vector(CurrentLookAheadRotation) * LookAheadDistance;
-
-		// Snap us to the bottom of the floor the unit is in. Smooths out bumps and jumps in the path.
-		// But only do this if the unit isn't actively flying. It feels janky for flying units.
-		if(UnitPawn.Physics != PHYS_Flying)
+		if (bLockFloorZ)
 		{
-			Cursor = `CURSOR;
-			LookAtPoint.Z = Cursor.GetFloorMinZ(Cursor.WorldZToFloor(Unit.GetLocation()));
+			PawnFeet = UnitPawn.GetFeetLocation();
+			`XWORLD.GetFloorTileForPosition(PawnFeet, PawnFloorTile, true);
+			LookAtPoint = PawnFeet + Vector(CurrentLookAheadRotation) * LookAheadDistance;
+			LookAtPoint.Z = PawnFloorTile.Z;
+		}
+		else
+		{
+			LookAtPoint = UnitPawn.GetFeetLocation() + Vector(CurrentLookAheadRotation) * LookAheadDistance;
+			// Snap us to the bottom of the floor the unit is in. Smooths out bumps and jumps in the path.
+			// But only do this if the unit isn't actively flying. It feels janky for flying units.
+			if(UnitPawn.Physics != PHYS_Flying)
+			{
+				Cursor = `CURSOR;
+				LookAtPoint.Z = Cursor.GetFloorMinZ(Cursor.WorldZToFloor(Unit.GetLocation()));
+			}
 		}
 	}
 

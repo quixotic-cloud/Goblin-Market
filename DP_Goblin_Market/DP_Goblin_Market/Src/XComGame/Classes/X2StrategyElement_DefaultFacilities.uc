@@ -329,6 +329,7 @@ function string GetResearchQueueMessage(StateObjectReference FacilityRef)
 static function X2DataTemplate CreateHangarTemplate()
 {
 	local X2FacilityTemplate Template;
+	local AuxMapInfo MapInfo;
 
 	`CREATE_X2TEMPLATE(class'X2FacilityTemplate', Template, 'Hangar');
 	Template.iPower = -1;
@@ -338,11 +339,13 @@ static function X2DataTemplate CreateHangarTemplate()
 	Template.MapName = "AVG_Armory_A";
 	Template.AnimMapName = "AVG_Armory_A_Anim";
 	
-	Template.AuxMaps.Length = 2;
-	Template.AuxMaps[0].MapName = "CIN_SoldierIntros";
-	Template.AuxMaps[0].InitiallyVisible = true;
-	Template.AuxMaps[1].MapName = "AVG_Armory_CAP";
-	Template.AuxMaps[1].InitiallyVisible = false;
+	MapInfo.MapName = "CIN_SoldierIntros";
+	MapInfo.InitiallyVisible = true;
+	Template.AuxMaps.AddItem(MapInfo);
+
+	MapInfo.MapName = "AVG_Armory_CAP";
+	MapInfo.InitiallyVisible = false;
+	Template.AuxMaps.AddItem(MapInfo);
 
 	Template.FlyInRemoteEvent = '';
 	Template.strImage = "img:///UILibrary_StrategyImages.GeneMods.GeneMods_MimeticSkin";

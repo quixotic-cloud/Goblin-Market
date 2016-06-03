@@ -11,6 +11,18 @@ class SeqAct_GetPawnFromSaveData extends SequenceAction native(Level);
 
 var() name SoldierVariableName;
 
+/** Allows content creators to choose a specific solder by name. For use in marketing shots. */
+var() string ChosenSoldierName <DynamicList = "ChosenSoldier">;
+
+/** Allows content creators to choose a specific character template by name. For use in marketing shots. */
+var() name ChosenCharacterTemplate <DynamicList = "ChosenTemplate">;
+
+cpptext
+{
+public:
+	virtual void GetDynamicListValues(const FString& ListName, TArray<FString>& Values);
+}
+
 event Activated()
 {
 	local XComGameState SearchState;
@@ -40,10 +52,12 @@ event Activated()
 
 	local XComGameState_HeadquartersXCom XComHQ;
 	local int CrewIndex;
+	local string SoldierName;
 
-	//See if there is a game state from the saved data we can use.
-	SearchState = `XENGINE.LatestSaveState(TempHistory);
-	if(SearchState != none)
+	//See if there is a game state from the saved data we can use.	
+	SearchState = `ONLINEEVENTMGR.LatestSaveState(TempHistory);
+
+	if(SearchState != none && ChosenCharacterTemplate == '')
 	{
 		foreach TempHistory.IterateByClassType(class'XComGameState_HeadquartersXCom', XComHQ)
 		{
@@ -55,8 +69,19 @@ event Activated()
 			for(CrewIndex = 0; CrewIndex < XComHQ.Crew.Length; ++CrewIndex)
 			{
 				UnitState = XComGameState_Unit(TempHistory.GetGameStateForObjectID(XComHQ.Crew[CrewIndex].ObjectID));
+				
 				if(UnitState.IsASoldier() && UnitState.IsAlive()) //Only soldiers... that are alive
 				{
+					//Skip over this soldier if we are looking for a specific one
+					if(ChosenSoldierName != "")
+					{
+						SoldierName = UnitState.GetFirstName() @ UnitState.GetLastName();
+						if(ChosenSoldierName != SoldierName)
+						{
+							continue;
+						}
+					}
+
 					//We can only instance characters who's weapons are in SearchState. If the most recent saved game is from a tactical battle then
 					//that will limit the list of units to the units in the battle.
 					BuildItem = UnitState.GetItemInSlot(eInvSlot_PrimaryWeapon, SearchState);
@@ -78,8 +103,14 @@ event Activated()
 			}
 		}
 	}
-	
-	if(UnitStates.Length > 1)
+		
+	if(ChosenCharacterTemplate == '' && ChosenSoldierName != "" && UnitStates.Length > 0)
+	{
+		UnitState = UnitStates[0];
+		UnitPawn = UnitState.CreatePawn(none, Location, Rotation);
+		UnitPawn.CreateVisualInventoryAttachments(none, UnitState, SearchState, true);
+	}	
+	else if(ChosenCharacterTemplate == '' && UnitStates.Length > 1)
 	{
 		UnitStates.Sort(SortByKills);
 		MaxRand = Min(UnitStates.Length, 4); //Pick randomly from the top 4
@@ -96,7 +127,11 @@ event Activated()
 
 		CharTemplateMgr = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager();
 		`assert(CharTemplateMgr != none);
-		CharacterTemplate = CharTemplateMgr.FindCharacterTemplate('Soldier');
+		if(ChosenCharacterTemplate == '')
+		{
+			ChosenCharacterTemplate = 'Soldier';
+		}
+		CharacterTemplate = CharTemplateMgr.FindCharacterTemplate(ChosenCharacterTemplate);
 		`assert(CharacterTemplate != none);
 
 		//Make the unit from a template
@@ -105,11 +140,16 @@ event Activated()
 
 		//Fill in the unit's stats and appearance
 		NewUnitState.RandomizeStats();
-		CharGen = XComGameInfo(class'Engine'.static.GetCurrentWorldInfo().Game).m_CharacterGen;
-		CharacterGeneratorResult = CharGen.CreateTSoldier('Soldier');
-		NewUnitState.SetTAppearance(CharacterGeneratorResult.kAppearance);
-		NewUnitState.SetCharacterName(CharacterGeneratorResult.strFirstName, CharacterGeneratorResult.strLastName, CharacterGeneratorResult.strNickName);
-		NewUnitState.SetCountry(CharacterGeneratorResult.nmCountry);
+
+		if(CharacterTemplate.bAppearanceDefinesPawn)
+		{
+			CharGen = `XCOMGRI.Spawn(CharacterTemplate.CharacterGeneratorClass);
+			`assert(CharGen != None);
+			CharacterGeneratorResult = CharGen.CreateTSoldier('Soldier');
+			NewUnitState.SetTAppearance(CharacterGeneratorResult.kAppearance);
+			NewUnitState.SetCharacterName(CharacterGeneratorResult.strFirstName, CharacterGeneratorResult.strLastName, CharacterGeneratorResult.strNickName);
+			NewUnitState.SetCountry(CharacterGeneratorResult.nmCountry);
+		}
 
 		AddToGameState.AddStateObject(NewUnitState);
 		//*************************
@@ -176,7 +216,7 @@ private static function int SortByKills(XComGameState_Unit UnitA, XComGameState_
 
 defaultproperties
 {
-	ObjName="Get Pawn From Save Data"
-	ObjCategory="Kismet"
-	bCallHandler=false
+	ObjName = "Get Pawn From Save Data"
+	ObjCategory = "Kismet"
+	bCallHandler = false	
 }

@@ -48,7 +48,7 @@ simulated state Executing
 Begin:
 	DoCameraFade();
 
-	Sleep(FadeTime);
+	Sleep(FadeTime * GetDelayModifier());
 
 	CompleteAction();
 }

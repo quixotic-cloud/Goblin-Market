@@ -50,7 +50,7 @@ simulated protected function OnEffectAdded(const out EffectAppliedData ApplyEffe
 	if( kNewTargetDamageableState != none )
 	{
 		AppliedDamageTypes = DamageTypes;
-		iDamage = CalculateDamageAmount(ApplyEffectParameters, iMitigated, NewRupture, NewShred, AppliedDamageTypes, bAmmoBypassesShields);
+		iDamage = CalculateDamageAmount(ApplyEffectParameters, iMitigated, NewRupture, NewShred, AppliedDamageTypes, bAmmoBypassesShields, NewGameState);
 		bDoesDamageIgnoreShields = (bAmmoBypassesShields > 0) || bBypassShields;
 
 		if ((iDamage == 0) && (iMitigated == 0) && (NewRupture == 0) && (NewShred == 0))
@@ -463,7 +463,7 @@ simulated function GetDamagePreview(StateObjectReference TargetRef, XComGameStat
 }
 
 // Cannot pass bools as out params, so use an int. Zero is false, non-zero is true.
-simulated function int CalculateDamageAmount(const out EffectAppliedData ApplyEffectParameters, out int ArmorMitigation, out int NewRupture, out int NewShred, out array<Name> AppliedDamageTypes, out int bAmmoIgnoresShields)
+simulated function int CalculateDamageAmount(const out EffectAppliedData ApplyEffectParameters, out int ArmorMitigation, out int NewRupture, out int NewShred, out array<Name> AppliedDamageTypes, out int bAmmoIgnoresShields, optional XComGameState NewGameState)
 {
 	local int TotalDamage, WeaponDamage, DamageSpread, ArmorPiercing, EffectDmg, CritDamage;
 
@@ -652,7 +652,7 @@ simulated function int CalculateDamageAmount(const out EffectAppliedData ApplyEf
 		{
 			EffectState = XComGameState_Effect(History.GetGameStateForObjectID(EffectRef.ObjectID));
 			EffectTemplate = EffectState.GetX2Effect();
-			EffectDmg = EffectTemplate.GetAttackingDamageModifier(EffectState, kSourceUnit, kTarget, kAbility, ApplyEffectParameters, WeaponDamage);
+			EffectDmg = EffectTemplate.GetAttackingDamageModifier(EffectState, kSourceUnit, kTarget, kAbility, ApplyEffectParameters, WeaponDamage, NewGameState);
 			if (EffectDmg != 0)
 			{
 				WeaponDamage += EffectDmg;
@@ -820,6 +820,7 @@ simulated function AddX2ActionsForVisualization(XComGameState VisualizeGameState
 simulated function AddX2ActionsForVisualization_Tick(XComGameState VisualizeGameState, out VisualizationTrack BuildTrack, const int TickIndex, XComGameState_Effect EffectState)
 {
 	local X2Action_CameraLookAt LookAtAction;
+	local X2Action_Delay DelayAction;
 	local Actor UnitVisualizer;
 	local X2Action_ApplyWeaponDamageToUnit UnitAction;
 	local XComGameStateContext_TickEffect TickContext;
@@ -834,9 +835,9 @@ simulated function AddX2ActionsForVisualization_Tick(XComGameState VisualizeGame
 		UnitVisualizer = XComGameState_Unit(BuildTrack.StateObject_NewState).GetVisualizer();
 		LookAtAction = X2Action_CameraLookAt( class'X2Action_CameraLookAt'.static.CreateVisualizationAction( VisualizeGameState.GetContext(), BuildTrack.TrackActor ));
 		LookAtAction.LookAtActor = UnitVisualizer;
-		LookAtAction.BlockUntilFinished = true;
+		LookAtAction.BlockUntilActorOnScreen = true;
 		LookAtAction.UseTether = false;
-		LookAtAction.LookAtDuration = 0.0f;
+		LookAtAction.LookAtDuration = 2.0f;
 		LookAtAction.DesiredCameraPriority = eCameraPriority_GameActions;
 		BuildTrack.TrackActions.InsertItem(0, LookAtAction);
 
@@ -855,12 +856,10 @@ simulated function AddX2ActionsForVisualization_Tick(XComGameState VisualizeGame
 				UnitAction.AncestorEffect = TickedEffect.GetX2Effect();
 		}
 
-		LookAtAction = X2Action_CameraLookAt( class'X2Action_CameraLookAt'.static.CreateVisualizationAction( VisualizeGameState.GetContext() ));
-		LookAtAction.LookAtActor = UnitVisualizer;
-		LookAtAction.BlockUntilFinished = true;
-		LookAtAction.UseTether = false;
-		LookAtAction.LookAtDuration = 2.0f;
-		BuildTrack.TrackActions.AddItem(LookAtAction);
+		// the camera action is not longer blocking (but will hang out for a short duration), so add a delay function to 
+		// prevent further visualization from occuring
+		DelayAction = X2Action_Delay(class'X2Action_Delay'.static.AddToVisualizationTrack(BuildTrack, VisualizeGameState.GetContext()));
+		DelayAction.Duration = LookAtAction.LookAtDuration;
 	}
 	else if( BuildTrack.StateObject_NewState.IsA('XComGameState_EnvironmentDamage')
 			|| BuildTrack.StateObject_NewState.IsA('XComGameState_Destructible') )

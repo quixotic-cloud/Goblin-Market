@@ -71,6 +71,11 @@ function NotifyTargetsAbilityApplied()
 	}
 }
 
+function bool CheckInterrupted()
+{
+	return VisualizationBlockContext.InterruptionStatus == eInterruptionStatus_Interrupt;
+}
+
 simulated state Executing
 {
 	function AnimNodeSequence PlayBindAnim(XComUnitPawn PlayOnPawn, vector FaceDir)
@@ -99,7 +104,9 @@ simulated state Executing
 
 Begin:
 	//Wait for the idle state machine to return to idle
-	while(UnitPawn.m_kGameUnit.IdleStateMachine.IsEvaluatingStance() || PartnerUnitPawn.m_kGameUnit.IdleStateMachine.IsEvaluatingStance())
+	while( UnitPawn.m_kGameUnit.IdleStateMachine.IsEvaluatingStance() ||
+		   PartnerUnitPawn.m_kGameUnit.IdleStateMachine.IsEvaluatingStance() ||
+		   bInterrupted)
 	{
 		Sleep(0.01f);
 	}
@@ -131,4 +138,9 @@ Begin:
 	}
 
 	CompleteAction();
+}
+
+event bool BlocksAbilityActivation()
+{
+	return true;
 }

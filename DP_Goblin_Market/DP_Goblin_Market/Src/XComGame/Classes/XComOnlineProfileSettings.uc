@@ -134,10 +134,11 @@ static function AddDefaultSoldiersToStartState(XComGameState StartState, optiona
 			break;
 		}
 	}
-	CharacterGenerator = `XCOMGRI.Spawn(class'XGCharacterGenerator');
 
 	CharTemplate = class'X2CharacterTemplateManager'.static.GetCharacterTemplateManager().FindCharacterTemplate('Soldier');
 	`assert(CharTemplate != none);
+	CharacterGenerator = `XCOMGRI.Spawn(CharTemplate.CharacterGeneratorClass);
+	`assert(CharacterGenerator != none);
 
 	for (SoldierIndex = 0; SoldierIndex < class'X2StrategyGameRulesetDataStructures'.static.GetMaxSoldiersAllowedOnMission(); ++SoldierIndex)
 	{

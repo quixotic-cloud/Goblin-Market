@@ -561,7 +561,8 @@ function bt_status TargetScoreByScaledDistance()
 		{
 			strParam = String(m_ParamList[0]);
 			ScaleValue = float(strParam);
-			if (`TACTICALRULES.VisibilityMgr.GetVisibilityInfo(m_kUnitState.ObjectID, TargetUnitState.ObjectID, VisInfo))
+			if (`TACTICALRULES.VisibilityMgr.GetVisibilityInfo(m_kUnitState.ObjectID, TargetUnitState.ObjectID, VisInfo)
+				&& VisInfo.bClearLOS ) // DefaultTargetDist isn't valid if visibility check fails.
 			{
 				DistMeters = Sqrt(VisInfo.DefaultTargetDist);
 			}
@@ -773,6 +774,15 @@ function bt_status SelectAbility()
 		{
 			m_kBehavior.bSetDestinationWithAbility = false;
 		}
+
+		// Wait until next tick to execute the ability.
+		if( !m_kBehavior.WaitForExecuteAbility )
+		{
+			m_kBehavior.WaitForExecuteAbility = true;
+			return BTS_RUNNING;
+		}
+
+		m_kBehavior.WaitForExecuteAbility = false;
 		// Mark ability as selected.
 		m_kBehavior.m_strBTAbilitySelection = SplitNameParam;
 		

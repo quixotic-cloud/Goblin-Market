@@ -71,7 +71,7 @@ function Update(float DeltaTime)
 
 	// snap the evac origin to the tile the cursor is in
 	NewTargetLocation = Cursor.GetCursorFeetLocation();
-	CursorTile = WorldData.GetTileCoordinatesFromPosition(NewTargetLocation);
+	WorldData.GetFloorTileForPosition(NewTargetLocation, CursorTile);
 	NewTargetLocation = WorldData.GetPositionFromTileCoordinates(CursorTile);
 	NewTargetLocation.Z = WorldData.GetFloorZForPosition(NewTargetLocation);
 
@@ -81,7 +81,7 @@ function Update(float DeltaTime)
 		EvacZoneTarget.SetRotation( rot(0,0,1) );
 		CachedTargetLocation = NewTargetLocation;
 
-		EnoughTilesValid = ValidateEvacArea( CursorTile );
+		EnoughTilesValid = ValidateEvacArea( CursorTile, true );
 		if (EnoughTilesValid)
 		{
 			EvacZoneTarget.ShowGoodMesh( );
@@ -95,13 +95,18 @@ function Update(float DeltaTime)
 
 static native function bool ValidateEvacTile(const out TTile EvacLoc, out int IsOnFloor);
 
-static function bool ValidateEvacArea( const out TTile EvacCenterLoc )
+static function bool ValidateEvacArea( const out TTile EvacCenterLoc, bool IncludeSoldiers )
 {
 	local TTile EvacMin, EvacMax, TestTile;
 	local int NumTiles, NumValidTiles;
 	local int IsOnFloor;
 
 	class'XComGameState_EvacZone'.static.GetEvacMinMax2D( EvacCenterLoc, EvacMin, EvacMax );
+
+	if( IncludeSoldiers && EvacZoneContainsXComUnit(EvacMin, EvacMax) )
+	{
+		return false;
+	}
 
 	NumTiles = (EvacMax.X - EvacMin.X + 1) * (EvacMax.Y - EvacMin.Y + 1);
 
@@ -127,6 +132,40 @@ static function bool ValidateEvacArea( const out TTile EvacCenterLoc )
 	}
 
 	return (NumValidTiles / float( NumTiles )) >= default.NeededValidTileCoverage;
+}
+
+static function bool EvacZoneContainsXComUnit(const out TTile EvacMin, const out TTile EvacMax)
+{
+	local XComGameStateHistory History;
+	local XComGameState_HeadquartersXCom XComHQ;
+	local StateObjectReference SquadRef;
+	local XComGameState_Unit XComUnitState;
+	local TTile UnitTileLocation;
+
+	History = `XCOMHISTORY;
+	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+
+	foreach XComHQ.Squad(SquadRef)
+	{
+		XComUnitState = XComGameState_Unit(History.GetGameStateForObjectID(SquadRef.ObjectID));
+
+		if( !XComUnitState.bRemovedFromPlay )
+		{
+			XComUnitState.GetKeystoneVisibilityLocation(UnitTileLocation);
+
+			if( UnitTileLocation.X >= EvacMin.X &&
+			   UnitTileLocation.Y >= EvacMin.Y &&
+			   UnitTileLocation.Z >= EvacMin.Z &&
+			   UnitTileLocation.X <= EvacMax.X &&
+			   UnitTileLocation.Y <= EvacMax.Y &&
+			   UnitTileLocation.Z <= EvacMax.Z )
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 function GetTargetLocations(out array<Vector> TargetLocations)

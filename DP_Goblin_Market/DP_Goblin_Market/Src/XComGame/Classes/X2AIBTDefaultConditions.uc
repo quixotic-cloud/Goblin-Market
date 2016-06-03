@@ -735,11 +735,25 @@ static event bool FindBTConditionDelegate(name strName, optional out delegate<BT
 		return true;
 	break;
 
+	case 'HasBindableNeighborTile':
+		dOutFn = HasBindableNeighborTile;
+		return true;
+	break;
+
 	default:
 		`WARN("Unresolved behavior tree condition name with no delegate definition:"@strName);
 		break;
 	}
 	return false;
+}
+
+function bt_status HasBindableNeighborTile()
+{
+	if( class'X2Effect_GetOverHere'.static.HasBindableNeighborTile(m_kUnitState) )
+	{
+		return BTS_SUCCESS;
+	}
+	return BTS_FAILURE;
 }
 
 function bt_status IsTargetScamperInstigator()

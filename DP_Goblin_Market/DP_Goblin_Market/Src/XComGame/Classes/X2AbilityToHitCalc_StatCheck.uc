@@ -1,5 +1,16 @@
 class X2AbilityToHitCalc_StatCheck extends X2AbilityToHitCalc abstract;
 
+struct StatContestResultToEffectInfo
+{
+	var array<int> EffectIndices;
+};
+
+struct StatContestOverrideData
+{
+	var array<int> MultiTargetEffectsNumHits;
+	var array<StatContestResultToEffectInfo> StatContestResultToEffectInfos;
+};
+
 var int BaseValue;
 
 function int GetAttackValue(XComGameState_Ability kAbility, StateObjectReference TargetRef) { return -1; }
@@ -29,7 +40,10 @@ function string GetDefendString() { return class'XLocalizedData'.default.Defense
 
 function RollForAbilityHit(XComGameState_Ability kAbility, AvailableTarget kTarget, out AbilityResultContext ResultContext)
 {
-	local int MultiTargetIndex, AttackVal, DefendVal, TargetRoll, RandRoll;
+	local int MultiTargetIndex, AttackVal, DefendVal, TargetRoll, RandRoll, StatContestResultValue;
+	local OverriddenEffectsByType EmptyOverriddenByType;
+	local StatContestOverrideData StatContestOverrideInfo;
+	local X2AbilityTemplate AbilityTemplate;
 
 	`log("===RollForAbilityHit===",,'XCom_HitRolls');
 	`log("Ability:" @ kAbility.GetMyTemplateName() @ "Target:" @ kTarget.PrimaryTarget.ObjectID,,'XCom_HitRolls');
@@ -80,6 +94,13 @@ function RollForAbilityHit(XComGameState_Ability kAbility, AvailableTarget kTarg
 		ResultContext.StatContestResult = `CHEATMGR.iForcedRollValue;
 	}
 
+	// Set up the lookups to more quickly find the correct Effects values based on Tiers
+	StatContestOverrideInfo.MultiTargetEffectsNumHits.Length = 0;
+	StatContestOverrideInfo.StatContestResultToEffectInfos.Length = 0;
+
+	AbilityTemplate = kAbility.GetMyTemplate();
+	SetStatContestResultToEffectInfos(AbilityTemplate.AbilityMultiTargetEffects, GetHighestTierPossible(AbilityTemplate.AbilityMultiTargetEffects), StatContestOverrideInfo);
+
 	for (MultiTargetIndex = 0; MultiTargetIndex < kTarget.AdditionalTargets.Length; ++MultiTargetIndex)
 	{
 		`log("Roll against multi target" @ kTarget.AdditionalTargets[MultiTargetIndex].ObjectID,,'XCom_HitRolls');
@@ -103,7 +124,27 @@ function RollForAbilityHit(XComGameState_Ability kAbility, AvailableTarget kTarg
 		`log("Result:" @ ResultContext.HitResult,,'XCom_HitRolls');
 		if (class'XComGameStateContext_Ability'.static.IsHitResultHit(ResultContext.HitResult))
 		{
-			ResultContext.MultiTargetStatContestResult.AddItem(RollForEffectTier(kAbility, kTarget.AdditionalTargets[MultiTargetIndex], true));
+			StatContestResultValue = RollForEffectTier(kAbility, kTarget.AdditionalTargets[MultiTargetIndex], true);
+			ResultContext.MultiTargetStatContestResult.AddItem(StatContestResultValue);
+
+			if (ResultContext.MultiTargetEffectsOverrides.Length <= MultiTargetIndex)
+			{
+				// A new Override needs to be added
+				ResultContext.MultiTargetEffectsOverrides.AddItem(EmptyOverriddenByType);
+			}
+
+			// Check to see if this value needs to be changed
+			// Ignore if the StatContestResultValue is 0
+			// AND
+			// If there are no Effects that need to be Overridden
+			// AND
+			// This StatContestResultValue does not map to Effects that may be Overridden
+			if ((StatContestResultValue > 0) &&
+				(StatContestOverrideInfo.StatContestResultToEffectInfos.Length > StatContestResultValue) &&
+				(StatContestOverrideInfo.StatContestResultToEffectInfos[StatContestResultValue].EffectIndices.Length > 0))
+			{
+				DoStatContestResultOverrides(MultiTargetIndex, StatContestResultValue, kAbility, StatContestOverrideInfo, ResultContext);
+			}
 		}
 		else
 		{
@@ -199,6 +240,100 @@ protected function int GetHighestTierPossible(const array<X2Effect> TargetEffect
 			Highest = TargetEffects[Idx].MaxStatContestResult;
 	}
 	return Highest;
+}
+
+protected function SetStatContestResultToEffectInfos(const array<X2Effect> TargetEffects, int NumTiers, out StatContestOverrideData StatContestOverrideInfo)
+{
+	local int Idx, i;
+	local bool bFoundAMaxNumberAllowedEffect;
+
+	StatContestOverrideInfo.StatContestResultToEffectInfos.Length = NumTiers + 1;   // Just to make things easier, ignore the 0 index and use the StatResultContext values
+	bFoundAMaxNumberAllowedEffect = false;
+
+	StatContestOverrideInfo.MultiTargetEffectsNumHits.Length = 0;
+	for (Idx = 0; Idx < TargetEffects.Length; ++Idx)
+	{
+		// This section is used to store data that may be needed for MultiTargetEffects that have a limited number of hits allowed
+		// Ignore MinStatContestResults of 0
+		if ((TargetEffects[Idx].MinStatContestResult > 0) && (TargetEffects[Idx].MultiTargetStatContestInfo.MaxNumberAllowed > 0))
+		{
+			bFoundAMaxNumberAllowedEffect = true;
+
+			i = TargetEffects[Idx].MinStatContestResult;
+			StatContestOverrideInfo.StatContestResultToEffectInfos[i].EffectIndices.AddItem(Idx);
+
+			for (i = i + 1; i <= TargetEffects[Idx].MaxStatContestResult; ++i)
+			{
+				StatContestOverrideInfo.StatContestResultToEffectInfos[i].EffectIndices.AddItem(Idx);
+			}
+		}
+
+		// Zero out the NumHits for this Effect
+		StatContestOverrideInfo.MultiTargetEffectsNumHits.AddItem(0);
+	}
+
+	if (!bFoundAMaxNumberAllowedEffect)
+	{
+		// Clear the length since this is used to early out future checks
+		StatContestOverrideInfo.StatContestResultToEffectInfos.Length = 0;
+	}
+}
+
+protected function DoStatContestResultOverrides(int MultiTargetIndex, int StatContestResultValue, XComGameState_Ability kAbility, 
+												out StatContestOverrideData StatContestOverrideInfo, out AbilityResultContext ResultContext)
+{
+	local int Index, EffectIdx, ReplaceWithIdx;
+	local X2AbilityTemplate AbilityTemplate;
+	local bool bContinueLooking;
+	local int TypeIndex;
+	local OverriddenEffectsInfo NewOverrideInfo;
+
+	TypeIndex = ResultContext.MultiTargetEffectsOverrides[MultiTargetIndex].OverrideInfo.Find('OverrideType', 'EffectOverride_StatContest');
+	if (TypeIndex == INDEX_NONE)
+	{
+		TypeIndex = ResultContext.MultiTargetEffectsOverrides[MultiTargetIndex].OverrideInfo.Length;
+		NewOverrideInfo.OverrideType = 'EffectOverride_StatContest';
+		ResultContext.MultiTargetEffectsOverrides[MultiTargetIndex].OverrideInfo.AddItem(NewOverrideInfo);
+	}
+
+	AbilityTemplate = kAbility.GetMyTemplate();
+
+	for (Index = 0; Index < StatContestOverrideInfo.StatContestResultToEffectInfos[StatContestResultValue].EffectIndices.Length; ++Index)
+	{
+		// Loop over the Effects found at this StatContestResult and decide what effect should
+		// actually be applied
+		EffectIdx = StatContestOverrideInfo.StatContestResultToEffectInfos[StatContestResultValue].EffectIndices[Index];
+
+		ReplaceWithIdx = EffectIdx;
+		bContinueLooking = true;
+		while ((ReplaceWithIdx != INDEX_NONE) &&
+				(ReplaceWithIdx < StatContestOverrideInfo.MultiTargetEffectsNumHits.Length) &&
+				bContinueLooking)
+		{
+			++StatContestOverrideInfo.MultiTargetEffectsNumHits[ReplaceWithIdx];
+
+			// Continue Looking if the Effect has a MaxNumberAllowed (>0)
+			// AND
+			// That MaxNumberAllowed has been exceeded 
+			bContinueLooking = (AbilityTemplate.AbilityMultiTargetEffects[ReplaceWithIdx].MultiTargetStatContestInfo.MaxNumberAllowed > 0) &&
+							   (StatContestOverrideInfo.MultiTargetEffectsNumHits[ReplaceWithIdx] > AbilityTemplate.AbilityMultiTargetEffects[ReplaceWithIdx].MultiTargetStatContestInfo.MaxNumberAllowed);
+			if (bContinueLooking)
+			{
+				// The max number of this Effect is applied, change what Effect will actually get applied here
+				ReplaceWithIdx = AbilityTemplate.AbilityMultiTargetEffects[ReplaceWithIdx].MultiTargetStatContestInfo.EffectIdxToApplyOnMaxExceeded;
+			}
+		}
+
+		if (EffectIdx != ReplaceWithIdx)
+		{
+			// This MultiTarget Effect has been applied too many times and needs to be replaced
+			ResultContext.MultiTargetEffectsOverrides[MultiTargetIndex].OverrideInfo[TypeIndex].OverriddenEffects.AddItem(AbilityTemplate.AbilityMultiTargetEffects[EffectIdx]);
+			if (ReplaceWithIdx != INDEX_NONE)
+			{
+				ResultContext.MultiTargetEffectsOverrides[MultiTargetIndex].OverrideInfo[TypeIndex].OverriddingEffects.AddItem(AbilityTemplate.AbilityMultiTargetEffects[ReplaceWithIdx]);
+			}
+		}
+	}
 }
 
 DefaultProperties

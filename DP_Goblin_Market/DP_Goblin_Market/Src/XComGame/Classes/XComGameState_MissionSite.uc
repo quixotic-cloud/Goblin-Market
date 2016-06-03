@@ -146,14 +146,13 @@ function bool CacheSelectedMissionData(int ForceLevel, int AlertLevel)
 				continue;
 			}
 
-			TacticalMissionManager.GetConfigurableEncounter(EncounterInfo.EncounterID, Encounter);
+			TacticalMissionManager.GetConfigurableEncounter(EncounterInfo.EncounterID, Encounter, ForceLevel, AlertLevel, XComHQ);
 
-			if( Encounter.MinRequiredAlertLevel <= AlertLevel && Encounter.MaxRequiredAlertLevel >= AlertLevel &&
-			    Encounter.MinRequiredForceLevel <= ForceLevel && Encounter.MaxRequiredForceLevel >= ForceLevel )
+			if( Encounter.EncounterID != '' )
 			{
 				NewEncounter = EmptyEncounter;
 
-				NewEncounter.SelectedEncounterName = EncounterInfo.EncounterID;
+				NewEncounter.SelectedEncounterName = Encounter.EncounterID;
 
 				// select the group members who will fill out this encounter group
 				AlienLeaderWeight += SelectedMissionSchedule.AlienToAdventLeaderRatio;
@@ -750,7 +749,7 @@ function bool GetShadowChamberStrings()
 
 		foreach TemplatesToSpawn(TemplateToSpawn)
 		{
-			if( TemplateToSpawn.bIsCivilian )
+			if( TemplateToSpawn.bIsCivilian || TemplateToSpawn.bHideInShadowChamber )
 			{
 				continue;
 			}
@@ -961,7 +960,7 @@ function bool MakesDoom()
 
 protected function bool CanInteract()
 {
-	return true;
+	return Available;
 }
 
 //---------------------------------------------------------------------------------------
@@ -1121,6 +1120,7 @@ function SquadSelectionCompleted()
 
 function SquadSelectionCancelled()
 {
+	ClearIntelOptions();
 	InteractionComplete(true); // RTB after backing out of squad selection
 }
 
@@ -1145,7 +1145,7 @@ function ConfirmMission()
 		`XEVENTMGR.TriggerEvent('FinalMissionSquadSelected', , , NewGameState);
 	}
 	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
-
+	
 	// return the Skyranger to the Avenger upon returning from the mission
 	History = `XCOMHISTORY;
 	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
@@ -1167,8 +1167,30 @@ function ConfirmMission()
 	}
 }
 
+simulated function ClearIntelOptions()
+{
+	local XComGameStateHistory History;
+	local XComGameState NewGameState;
+	local XComGameState_HeadquartersXCom XComHQ;
+	local MissionIntelOption IntelOption;
+
+	History = `XCOMHISTORY;
+	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Buy Mission Intel Options");
+	XComHQ = XComGameState_HeadquartersXCom(History.GetSingleGameStateObjectForClass(class'XComGameState_HeadquartersXCom'));
+	XComHQ = XComGameState_HeadquartersXCom(NewGameState.CreateStateObject(class'XComGameState_HeadquartersXCom', XComHQ.ObjectID));
+	NewGameState.AddStateObject(XComHQ);
+
+	foreach PurchasedIntelOptions(IntelOption)
+	{
+		XComHQ.TacticalGameplayTags.RemoveItem(IntelOption.IntelRewardName);
+	}
+
+	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
+}
+
 function CancelMission()
 {
+	ClearIntelOptions();
 	ResumePsiOperativeTraining();
 
 	`XSTRATEGYSOUNDMGR.PlayGeoscapeMusic();

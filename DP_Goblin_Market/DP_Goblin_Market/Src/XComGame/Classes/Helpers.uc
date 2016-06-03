@@ -308,8 +308,131 @@ static function int GetNumCiviliansKilled(optional out int iTotal, optional bool
 	return iKilled;
 }
 
+static function int GetRemainingXComActionPoints(bool CheckSkipped, optional out array<StateObjectReference> UnitsWithActionPoints)
+{
+	local XComGameState_Unit UnitState;
+	local XComGameStateHistory History;
+	local int TotalPoints, Points;
+	History = `XCOMHISTORY;
+	foreach History.IterateByClassType(class'XComGameState_Unit', UnitState, , , )
+	{
+		if( UnitState.GetTeam() == eTeam_XCom 
+		   && UnitState.IsAbleToAct() 
+		   && !UnitState.bRemovedFromPlay
+		   && !UnitState.GetMyTemplate().bIsCosmetic )
+		{
+			if( CheckSkipped )
+			{
+				Points = UnitState.SkippedActionPoints.Length;
+			}
+			else
+			{
+				Points = UnitState.ActionPoints.Length;
+			}
+
+			if( Points > 0 )
+			{
+				TotalPoints += Points;
+				`LogAI("Adding Action Points from unit"@UnitState.ObjectID@":"@Points);
+				UnitsWithActionPoints.AddItem(UnitState.GetReference());
+			}
+		}
+	}
+	return TotalPoints;
+}
+
+// Validate tile to fit in the map and avoid NoSpawn locations.
+static function TTile GetClosestValidTile(TTile Tile)
+{
+	local XComWorldData World;
+	local vector ValidLocation;
+	World = `XWORLD;
+	ValidLocation = World.GetPositionFromTileCoordinates(Tile);
+	ValidLocation = World.FindClosestValidLocation(ValidLocation, false, false, true);
+	return World.GetTileCoordinatesFromPosition(ValidLocation);
+}
+
+static function bool GetFurthestReachableTileOnPathToDestination(out TTile BestTile_out, TTile DestinationTile, XComGameState_Unit UnitState)
+{
+	local bool bHasPath;
+	local XComWorldData World;
+	local vector EndPos;
+	local XGUnit UnitVisualizer;
+	local array<TTile> PathTiles;
+
+	UnitVisualizer = XGUnit(UnitState.GetVisualizer());
+	// First check the reachable tile cache to see if any tiles are reachable.
+	PathTiles.Length = 0;
+	if( UnitVisualizer.m_kReachableTilesCache.BuildPathToTile(DestinationTile, PathTiles) )
+	{
+		if( PathTiles.Length > 0 )
+		{
+			bHasPath = true;
+		}
+	}
+
+	if( !bHasPath )
+	{
+		World = `XWORLD;
+		EndPos = World.GetPositionFromTileCoordinates(DestinationTile);
+		if( World.IsPositionOnFloorAndValidDestination(EndPos, UnitState) )
+		{
+			if( class'X2PathSolver'.static.BuildPath(UnitState, UnitState.TileLocation, DestinationTile, PathTiles, false) )
+			{
+				// Found a valid path. 
+				bHasPath = true;
+			}
+		}
+	}
+
+	if( bHasPath )
+	{
+		if( GetFurthestReachableTileOnPath(BestTile_out, PathTiles, UnitState) )
+		{
+			return true;
+		}
+	}
+	// No valid paths found to target area (or no alert data found).
+	return false;
+}
+
+static function bool GetFurthestReachableTileOnPath(out TTile FurthestReachable, array<TTile> Path, XComGameState_Unit UnitState)
+{
+	local XGUnit UnitVisualizer;
+	local int TileIndex;
+	local TTile PathTile, FloorTile;
+	local XComWorldData World;
+	World = `XWORLD;
+	UnitVisualizer = XGUnit(UnitState.GetVisualizer());
+	if( UnitVisualizer != None )
+	{
+		for( TileIndex = Path.Length - 1; TileIndex > 0; --TileIndex )
+		{
+			PathTile = Path[TileIndex];
+			if( UnitVisualizer.m_kReachableTilesCache.IsTileReachable(PathTile) )
+			{
+				FurthestReachable = PathTile;
+				return true;
+			}
+			else
+			{
+				// Try floor tile.  Fixes failures with pathing from different elevations returning mid-air points that aren't in the tile cache.
+				FloorTile = PathTile;
+				FloorTile.Z = World.GetFloorTileZ(PathTile);
+				if( FloorTile.Z != PathTile.Z && UnitVisualizer.m_kReachableTilesCache.IsTileReachable(FloorTile) )
+				{
+					FurthestReachable = FloorTile;
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 static native function int FindTileInList(TTile Tile, const out array<TTile> List);
 static native function RemoveTileSubset(out array<TTile> ResultList, const out array<TTile> Superset, const out array<TTile> Subset);
+static native function bool VectorContainsNaNOrInfinite(Vector V);
 
 cpptext
 {

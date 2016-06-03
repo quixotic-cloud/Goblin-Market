@@ -19,6 +19,7 @@ static function X2DataTemplate CreateGatherEvidenceDevice()
 	`CREATE_X2TEMPLATE(class'X2EquipmentTemplate', Template, 'GatherEvidenceDevice');
 	Template.CanBeBuilt = false;
 	Template.StartingItem = true;
+	Template.bInfiniteItem = true;
 	Template.HideInInventory = true;
 	Template.HideInLootRecovered = true;
 
@@ -37,6 +38,7 @@ static function X2DataTemplate CreateExplosiveMissionDevice()
 	`CREATE_X2TEMPLATE(class'X2EquipmentTemplate', Template, 'ExplosiveMissionDevice');
 	Template.CanBeBuilt = false;
 	Template.StartingItem = true;
+	Template.bInfiniteItem = true;
 	Template.HideInInventory = true;
 	Template.HideInLootRecovered = true;
 
@@ -55,6 +57,7 @@ static function X2DataTemplate CreateAdvancedExplosiveMissionDevice()
 	`CREATE_X2TEMPLATE(class'X2EquipmentTemplate', Template, 'AdvancedExplosiveMissionDevice');
 	Template.CanBeBuilt = false;
 	Template.StartingItem = true;
+	Template.bInfiniteItem = true;
 	Template.HideInInventory = true;
 	Template.HideInLootRecovered = true;
 
@@ -75,6 +78,7 @@ static function X2DataTemplate CreateSpyDevice()
 	`CREATE_X2TEMPLATE(class'X2EquipmentTemplate', Template, 'SpyDevice');
 	Template.CanBeBuilt = false;
 	Template.StartingItem = true;
+	Template.bInfiniteItem = true;
 	Template.HideInInventory = true;
 	Template.HideInLootRecovered = true;
 

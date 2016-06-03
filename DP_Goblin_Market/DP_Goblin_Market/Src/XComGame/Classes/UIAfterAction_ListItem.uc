@@ -56,7 +56,7 @@ simulated function UpdateData(optional StateObjectReference UnitRef)
 
 		if(Unit.IsInjured())
 		{
-			statusText = Caps(Unit.GetWoundStatus());
+			statusText = Caps(Unit.GetWoundStatus(,true));
 			statusLabel = "wounded"; // corresponds to timeline label on 'AfterActionBG' mc in SquadList.fla
 			
 			if (Unit.m_iInjuryHours > 0) 

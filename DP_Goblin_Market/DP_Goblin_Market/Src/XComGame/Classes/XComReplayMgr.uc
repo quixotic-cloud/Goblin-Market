@@ -155,6 +155,7 @@ simulated function HandleGameState(XComGameStateHistory History, XComGameState G
 // 	local XComGameState_AIUnitData AIUnitData;
 // 	local int i;
 // 	local int Alert;
+
 // 
 // 	for (i = 0; i < GameState.GetNumGameStateObjects(); i++)
 // 	{
@@ -179,6 +180,28 @@ simulated function HandleGameState(XComGameStateHistory History, XComGameState G
 // 
 // 	}
 
+	local int i;
+	local XComGameStateContext ContextItr;
+	local XComGameStateContext_Ability TempAbilityContext;
+
+	ContextItr = GameState.GetContext();
+	// Grab context ... if first in chain => loop to process all effects in the chain to guarantee proper visualization of chained contexts. TTP: 23932 -ttalley
+	if(ContextItr != none)
+	{
+		if( ContextItr.EventChainStartIndex != 0 )
+		{
+			// This GameState is part of a chain, which means there may be a stun to the target
+			for( i = ContextItr.EventChainStartIndex; ContextItr != None && !ContextItr.bLastEventInChain; ++i )
+			{
+				ContextItr = History.GetGameStateFromHistory(i).GetContext();
+				TempAbilityContext = XComGameStateContext_Ability(ContextItr);
+				if( TempAbilityContext != None )
+				{
+					TempAbilityContext.FillEffectsForReplay();
+				}
+			}
+		}
+	}
 	GameState.GetContext().OnSubmittedToReplay(GameState);
 }
 

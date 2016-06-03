@@ -6,13 +6,57 @@
 //---------------------------------------------------------------------------------------
 //  Copyright (c) 2016 Firaxis Games, Inc. All rights reserved.
 //---------------------------------------------------------------------------------------
-class XComGameState_BattleData extends XComGameState_BaseObject dependson(XComParcelManager, XComPlotCoverParcelManager) native(Core);
+class XComGameState_BattleData extends XComGameState_BaseObject 
+	dependson(XComParcelManager, XComPlotCoverParcelManager) 
+	native(Core)
+	config(GameData);
 
 enum PlotSelectionEnum
 {
 	ePlotSelection_Random,
 	ePlotSelection_Type,
 	ePlotSelection_Specify
+};
+
+struct native DirectTransferInformation_UnitStats
+{
+	var StateObjectReference UnitStateRef;
+	var float                HP; // amount of HP this unit had before the transfer
+	var int                  ArmorShred; // amount armor that was shredded on this unit before the transfer
+
+	structcpptext
+	{
+		FDirectTransferInformation_UnitStats()
+		{
+			appMemzero(this, sizeof(FDirectTransferInformation_UnitStats));
+		}
+		FDirectTransferInformation_UnitStats(EEventParm)
+		{
+			appMemzero(this, sizeof(FDirectTransferInformation_UnitStats));
+		}
+	}
+};
+
+// This structure (and it's substructures) are intended to pass extra information along when doing a
+// direct mission->mission tactical transfer. Since many gamestates are destroyed permanently when
+// leaving a tactical mission, there will be various values that should be manually tracked at
+// the end of each mission, such as transferred unit stats and aliens killed
+struct native DirectTransferInformation
+{
+	var bool IsDirectMissionTransfer; // true if this battle data is being transferred over from another mission directly
+	var array<DirectTransferInformation_UnitStats> TransferredUnitStats;
+
+	structcpptext
+	{
+		FDirectTransferInformation()
+		{
+			appMemzero(this, sizeof(FDirectTransferInformation));
+		}
+		FDirectTransferInformation(EEventParm)
+		{
+			appMemzero(this, sizeof(FDirectTransferInformation));
+		}
+	}
 };
 
 //RAM - copied from XGBattleDesc
@@ -69,10 +113,10 @@ var() bool							bUseFirstStartTurnSeed; // If set, will set the engine's random
 var() int							m_iSubObjective;
 var() name 							m_nQuestItem;
 var() int							m_iLayer;
-var() private int					m_iForceLevel;
-var() private int					m_iAlertLevel;
-var() private int					m_iPopularSupport;
-var() private int					m_iMaxPopularSupport;
+var() privatewrite int				m_iForceLevel;
+var() privatewrite int				m_iAlertLevel;
+var() privatewrite int				m_iPopularSupport;
+var() privatewrite int				m_iMaxPopularSupport;
 
 // The tactical gameplay events affecting Alert/Popular support levels
 var() array<Name>					AlertEventIDs;
@@ -83,7 +127,9 @@ var() StateObjectReference			CivilianPlayerRef;
 var() bool							bRainIfPossible;	// Rain if the map supports rain
 //------------------------------------------------------------------------------
 //------------END STRATEGY GAME DATA -------------------------------------------
-var() bool							bIntendedForReloadLevel;//variable that gets checked so that we know if we want to create a new game, or load one instead when restarting a match
+
+var() bool							bIntendedForReloadLevel; //variable that gets checked so that we know if we want to create a new game, or load one instead when restarting a match
+var() DirectTransferInformation     DirectTransferInfo; // data used to facilitate direct mission->mission transfer carryover
 
 //These variables deal with controlling the flow of the Unit Actions turn phase
 var() array<StateObjectReference>   PlayerTurnOrder;	 //Indicates the order in which the players take the unit actions phase of their turn

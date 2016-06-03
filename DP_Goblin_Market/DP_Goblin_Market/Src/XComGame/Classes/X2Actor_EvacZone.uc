@@ -30,7 +30,7 @@ private function EventListenerReturn OnTileDataChanged( Object EventData, Object
 
 	EvacZoneState = XComGameState_EvacZone( History.GetGameStateForObjectID( ObjectID ) );
 
-	if (!class'X2TargetingMethod_EvacZone'.static.ValidateEvacArea( EvacZoneState.CenterLocation ))
+	if (!class'X2TargetingMethod_EvacZone'.static.ValidateEvacArea( EvacZoneState.CenterLocation, false ))
 	{
 		NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState( "Invalidating Evac Zone" );
 

@@ -105,6 +105,9 @@ var bool m_bConsumedBy3DFlashCached;
 var bool m_bConsumedByFlash;
 
 var config bool bForceEnableController; 
+var bool m_bInputSinceMouseMovement; 
+var float aMouseXCached;
+var float aMouseYCached; 
 
 // Idle subscription function callback
 delegate SubscriberCallback(); 
@@ -360,6 +363,20 @@ simulated event UIMovie Get3DMovie()
 	return XComPlayerController(Outer).Pres.Get3DMovie();
 }
 
+simulated function bool IsControllerActive()
+{
+	if( bForceEnableController )
+		return true; 
+
+	if( `XENGINE.m_SteamControllerManager.IsSteamControllerActive() )
+		return true; 
+
+	//TODO: 
+	//if( profileSetting.usingController) return true;
+
+	return false; 
+}
+
 private function bool PreProcessEventMatching( int cmd , int ActionMask) 
 {
 	local int foundIndex;
@@ -387,6 +404,13 @@ event PlayerInput( float DeltaTime )
 	super.PlayerInput(DeltaTime);
 	m_bConsumedByFlashCached = false;
 	m_bConsumedBy3DFlashCached = false;
+
+	if( aMouseX != aMouseXCached || aMouseY != aMouseYCached )
+	{
+		aMouseXCached = aMouseX;
+		aMouseYCached = aMouseY;
+		m_bInputSinceMouseMovement = false;
+	}
 }
 
 //-----------------------------------------------------------
@@ -470,14 +494,24 @@ final function InputEvent( int cmd , optional int ActionMask = class'UIUtilities
 			return;
 	}
 
+	// Smart-toggle the mouse based on input from mouse vs. from the controller 
+	// CheckMouseSmartToggle(cmd);
+
 	//Sending input to the UI first
 	iFilteredUICmd = FilterCmdForUI(cmd, ActionMask);
-	if(iFilteredUICmd != class'UIUtilities_Input'.const.FXS_INPUT_NONE)
- 		bConsume = GetScreenStack().OnInput( iFilteredUICmd, ActionMask );
+	if( iFilteredUICmd != class'UIUtilities_Input'.const.FXS_INPUT_NONE )
+	{
+		if( !bConsume )
+			bConsume = CheckSteamControllerSmartToggle(cmd, ActionMask);
+		
+		//We want this to happen before the main UI processes it.
+		if( !bConsume && ActionMask == class'UIUtilities_Input'.const.FXS_ACTION_RELEASE )
+			bConsume = AttemptSteamControllerConfirm(cmd);
 
-	// Smart-toggle the mouse based on input from mouse vs. from the controller 
-	// ???TMH - Now must be done via Options
-	// CheckMouseSmartToggle(cmd);
+		if( !bConsume )
+			bConsume = GetScreenStack().OnInput(iFilteredUICmd, ActionMask);
+	}
+
 
 	if( !WorldInfo.IsConsoleBuild()         // On PC only, 
 		&& !bConsume                        // And not yet consumed, 
@@ -512,6 +546,7 @@ final function InputEvent( int cmd , optional int ActionMask = class'UIUtilities
 			case class'UIUtilities_Input'.const.FXS_BUTTON_B:         bConsume = B_Button(ActionMask);         break;
 			case class'UIUtilities_Input'.const.FXS_BUTTON_X:         bConsume = X_Button(ActionMask);         break;
 			case class'UIUtilities_Input'.const.FXS_BUTTON_Y:         bConsume = Y_Button(ActionMask);         break;
+			case class'UIUtilities_Input'.const.FXS_BUTTON_A_STEAM :  bConsume = A_Button_Steam(ActionMask);   break;
 
 			// Triggers
 			case class'UIUtilities_Input'.const.FXS_BUTTON_LBUMPER:   bConsume = Bumper_Left(ActionMask);      break;
@@ -726,6 +761,7 @@ simulated function CheckMouseSmartToggle( int cmd )
 		{
 			Get2DMovie().ActivateMouse();
 		}
+		m_bInputSinceMouseMovement = true;
 	}
 	else if( IsControllerRangeEvent(cmd) )
 	{	
@@ -778,6 +814,9 @@ simulated function bool IsEventWithinInputTypeRange( int cmd )
 	if( IsControllerRangeEvent(cmd) )
 	{
 		if( bForceEnableController )
+			return true; 
+
+		if( `XENGINE.m_SteamControllerManager.IsSteamControllerActive() )
 			return true; 
 
 		if( XComPlayerController(Outer).Pres != none && Get2DMovie().IsMouseActive()  )
@@ -940,6 +979,7 @@ function bool A_Button(int ActionMask);
 function bool B_Button(int ActionMask);
 function bool X_Button(int ActionMask);
 function bool Y_Button(int ActionMask);
+function bool A_Button_Steam(int ActionMask);
 function bool Bumper_Left(int ActionMask);
 function bool Bumper_Right(int ActionMask);
 function bool Trigger_Left(float fTrigger, int ActionMask);
@@ -1329,12 +1369,60 @@ simulated function ClearAllRepeatTimers()
 	m_arrEventTrackers.Length = 0; 
 }
 
+function bool AttemptSteamControllerConfirm(int cmd)
+{
+	local bool bHandled;
+
+	if( cmd != class'UIUtilities_Input'.const.FXS_BUTTON_A_STEAM || !IsControllerActive() ) return false;
+
+	// Steam controller code below; this button was unused, try to make it an all-in-one targeting/pathing tool
+
+	if( TestMouseConsumedByFlash() )
+	{
+		//Push a click over in to Flash 
+		XComPlayerController(Outer).Pres.ClickPathUnderMouse();
+		bHandled = true;
+	}
+
+	if( TestMouseConsumedBy3DFlash() )
+	{
+		//Push a click over in to the 3D Flash movie 
+		XComPlayerController(Outer).Pres.ClickPathUnderMouse3D();
+		bHandled = true;
+	}
+	return bHandled; 
+}
+
+function bool CheckSteamControllerSmartToggle(int cmd, int ActionMask)
+{
+	if( cmd != class'UIUtilities_Input'.const.FXS_BUTTON_A_STEAM )
+	{
+		m_bInputSinceMouseMovement = true;
+	}
+
+	if( cmd == class'UIUtilities_Input'.const.FXS_BUTTON_A_STEAM 
+	   && IsControllerActive()
+	   && m_bInputSinceMouseMovement )
+	{
+
+		//We're going to absorb the Key I press and turn it in to an Enter press. 
+		InputEvent(class'UIUtilities_Input'.const.FXS_KEY_ENTER, ActionMask);
+
+		//Returning true will absorb the original KEY_I event. 
+		return true; 
+	}
+	return false;
+}
+
 defaultproperties
 {
 	m_fLTrigger = -1;
 	m_fRTrigger = -1;
+	aMouseXCached = 0.0f;
+	aMouseYCached = 0.0f;
 
 	m_bConsumedByFlashCached=false
 	m_bConsumedBy3DFlashCached=false
 	m_bConsumedByFlash=false
+	m_bInputSinceMouseMovement=false
 }

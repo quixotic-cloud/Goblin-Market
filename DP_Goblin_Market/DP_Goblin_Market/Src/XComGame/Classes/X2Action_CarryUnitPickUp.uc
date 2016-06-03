@@ -85,12 +85,14 @@ Begin:
 	AnimName = "HL_CarryBodyStart";
 	Params.AnimName = AppendMaleFemaleToAnim(AnimName);
 	Params.BlendTime = 0.0f;
+	Params.PlayRate = GetNonCriticalAnimationSpeed();
 	FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
 
 	AnimName = "ADD_NO_CarryBody";
 	Params.AnimName = AppendMaleFemaleToAnim(AnimName);
 	Params.BlendTime = 0.0f;
 	Params.Looping = true;
+	Params.PlayRate = GetNonCriticalAnimationSpeed();
 	UnitPawn.GetAnimTreeController().PlayAdditiveDynamicAnim(Params);
 
 	CompleteAction();

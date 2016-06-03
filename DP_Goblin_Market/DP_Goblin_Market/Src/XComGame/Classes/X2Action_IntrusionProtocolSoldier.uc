@@ -56,14 +56,22 @@ simulated state Executing
 {
 Begin:
 
-	Unit.IdleStateMachine.ForceHeading(ToTarget);
-	while(Unit.IdleStateMachine.IsEvaluatingStance())
-	{
-		Sleep(0.0f);
-	}
-
 	Params.AnimName = 'HL_SendGremlin';
-	FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
+	Unit.IdleStateMachine.ForceHeading(ToTarget);
+
+	if( ShouldPlayZipMode() )
+	{
+		UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params);
+	}
+	else
+	{
+		while( Unit.IdleStateMachine.IsEvaluatingStance() )
+		{
+			Sleep(0.0f);
+		}
+
+		FinishAnim(UnitPawn.GetAnimTreeController().PlayFullBodyDynamicAnim(Params));
+	}
 
 	UnitPawn.m_kGameUnit.IdleStateMachine.PlayIdleAnim();
 

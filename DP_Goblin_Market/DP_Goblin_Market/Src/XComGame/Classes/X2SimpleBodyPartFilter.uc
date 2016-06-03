@@ -9,18 +9,20 @@
 
 class X2SimpleBodyPartFilter extends X2BodyPartFilter;
 
-var private EGender Gender;
-var private ECharacterRace Race;
-var private X2BodyPartTemplate TorsoTemplate;
-var private name ArmorName;
-var private bool bCivilian;
-var private bool bVeteran;
+var protectedwrite EGender Gender;
+var protectedwrite ECharacterRace Race;
+var protectedwrite X2BodyPartTemplate TorsoTemplate;
+var protectedwrite name ArmorName;
+var protectedwrite array<name> DLCNames;
+var protectedwrite bool bCivilian;
+var protectedwrite bool bVeteran;
+var protectedwrite bool bAllowAllDLCContent;
 
 //Used for initial torso selection
-var private name MatchCharacterTemplateForTorso;
-var private name MatchArmorTemplateForTorso;
+var protectedwrite name MatchCharacterTemplateForTorso;
+var protectedwrite name MatchArmorTemplateForTorso;
 
-function Set(EGender inGender, ECharacterRace inRace, name inTorsoTemplateName, bool bIsCivilian = false, bool bIsVeteran = false)
+function Set(EGender inGender, ECharacterRace inRace, name inTorsoTemplateName, bool bIsCivilian = false, bool bIsVeteran = false, optional array<name> SetDLCNames)
 {
 	Gender = inGender;
 	Race = inRace;
@@ -36,6 +38,14 @@ function Set(EGender inGender, ECharacterRace inRace, name inTorsoTemplateName, 
 	{
 		ArmorName = '';
 	}
+
+	DLCNames.Length = 0;
+	DLCNames = SetDLCNames;	
+}
+
+function AddDLCPackFilter(name DLCPackName)
+{
+	DLCNames.AddItem(DLCPackName);	
 }
 
 function SetTorsoSelection(name InMatchCharacterTemplateForTorso, name InMatchArmorTemplateForTorso)
@@ -68,12 +78,34 @@ function bool FilterByRace(X2BodyPartTemplate Template)
 
 function bool FilterByNonSpecialized(X2BodyPartTemplate Template)
 {
-	return Template.SpecializedType == false && (!Template.bVeteran || bVeteran);
+	local int Index;
+	local bool bDLCNameValid;
+
+	bDLCNameValid = DLCNames.Length == 0 || Template.DLCName == '';
+	if(!bDLCNameValid)
+	{
+		//The template is part of a pack, see if the pack is in our list
+		for(Index = 0; Index < DLCNames.Length; ++Index)
+		{
+			if(DLCNames[Index] == Template.DLCName)
+			{
+				bDLCNameValid = true;
+				break;
+			}
+		}
+	}
+	
+	return Template.SpecializedType == false && (!Template.bVeteran || bVeteran) && bDLCNameValid;
 }
 
 function bool FilterByCivilian(X2BodyPartTemplate Template)
 {
 	return !bCivilian || Template.bCanUseOnCivilian;
+}
+
+function bool FilterByArmor(X2BodyPartTemplate Template)
+{
+	return Template.ArmorTemplate == '' || Template.ArmorTemplate == ArmorName;
 }
 
 function bool FilterByTech(X2BodyPartTemplate Template)
@@ -135,15 +167,53 @@ function bool FilterByGenderAndNonSpecializedAndTech(X2BodyPartTemplate Template
 	return FilterByGender(Template) && FilterByNonSpecialized(Template) && FilterByTech(Template);
 }
 
+function bool FilterByGenderAndNonSpecializedAndTechAndArmor(X2BodyPartTemplate Template)
+{
+	return FilterByGender(Template) && FilterByNonSpecialized(Template) && FilterByTech(Template) && FilterByArmor(Template);
+}
+
+function bool FilterByGenderAndRaceAndArmor(X2BodyPartTemplate Template)
+{
+	return FilterByGenderAndRace(Template) && FilterByArmor(Template);
+}
+
 function bool FilterByTorsoAndArmorMatch(X2BodyPartTemplate Template)
 {
+	local bool bMatched;
+	local int Index;
+
 	if (Template == None || TorsoTemplate == None)
 		return false;
 
-	return	FilterByGenderAndNonSpecialized(Template) &&
+	bMatched = FilterByGenderAndNonSpecialized(Template) &&
 		(TorsoTemplate.bVeteran == Template.bVeteran) &&
-		(TorsoTemplate.ArmorTemplate == Template.ArmorTemplate) &&
+		(TorsoTemplate.ArmorTemplate == Template.ArmorTemplate) &&		
 		(TorsoTemplate.CharacterTemplate == Template.CharacterTemplate);
+
+	//Don't iterate the sets unless we have to...
+	if(bMatched && Template.PartType != "Torso")
+	{
+		//Body part templates with set names can match to torsos with none, but not the other way around ( due to asset construction of the original content )
+		if( TorsoTemplate.SetNames.Length > 0 && Template.SetNames.Length == 0 )
+		{
+			bMatched = false;
+		}
+		else if(TorsoTemplate.SetNames.Length > 0 && Template.SetNames.Length > 0) //Attempt to find a set match unless both templates have no set
+		{
+			bMatched = false;
+			for(Index = 0; Index < Template.SetNames.Length; ++Index)
+			{
+				//Since the torso is the key, it should only ever belong to one set
+				if(TorsoTemplate.SetNames[0] == Template.SetNames[Index])
+				{
+					bMatched = true;
+					break;
+				}
+			}
+		}
+	}
+
+	return bMatched;
 }
 
 function bool FilterByGenderAndArmor( X2BodyPartTemplate Template )

@@ -282,6 +282,8 @@ function XComGameState_Destructible GetState(optional XComGameState NewGameState
 	local XComGameState_Destructible ExistingState;
 	local XComGameState_InteractiveObject ObjectState;
 	local bool SubmitState;
+	local TTile TileLocation;
+
 	// first check if this actor already has a state
 	ExistingState = FindExistingState(NewGameState);
 	if(ExistingState != none)
@@ -293,6 +295,13 @@ function XComGameState_Destructible GetState(optional XComGameState NewGameState
 		}
 
 		return ObjectState;
+	}
+
+	// don't create state for interactive objects outside the bounds of the level (periphery pcps)
+	TileLocation = `XWORLD.GetTileCoordinatesFromPosition(Location);
+	if (`XWORLD.IsTileOutOfRange( TileLocation ))
+	{
+		return none;
 	}
 
 	// if it doesn't exist, then we need to create it
@@ -640,7 +649,7 @@ simulated function OnDisableInteractiveActor()
 	GotoState('_Inactive');
 
 	// rebuild the pathing around us in state code so the world knows we are no longer interactive
-	class'XComWorldData'.static.GetWorldData().RemoveActorTileData( self, true );
+	class'XComWorldData'.static.GetWorldData().RefreshActorTileData( self );
 }
 
 simulated function OnEnableInteractiveActor()

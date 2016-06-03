@@ -41,6 +41,8 @@ var config array <WeaponDamageValue> GREMLINMK3_ABILITYDAMAGE;
 var config WeaponDamageValue XCOMTURRETM1_WPN_BASEDAMAGE;
 var config WeaponDamageValue XCOMTURRETM2_WPN_BASEDAMAGE;
 
+var config WeaponDamageValue ASSAULTRIFLE_CENTRAL_BASEDAMAGE;
+
 // ***** Advent and Alien RANGED Weapons *****
 var config WeaponDamageValue ADVTROOPERM1_WPN_BASEDAMAGE;
 var config WeaponDamageValue ADVTURRETM1_WPN_BASEDAMAGE;
@@ -87,6 +89,28 @@ var config WeaponDamageValue CHRYSSALID_MELEEATTACK_BASEDAMAGE;
 var config WeaponDamageValue FACELESS_MELEEAOE_BASEDAMAGE;
 var config WeaponDamageValue MUTON_MELEEATTACK_BASEDAMAGE;
 var config WeaponDamageValue PSIZOMBIE_MELEEATTACK_BASEDAMAGE;
+
+// ***** MP Weapon Damage *****
+var config WeaponDamageValue ADVTROOPERMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue ADVCAPTAINMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue ADVSTUNLANCERMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue ADVMEC_MP_WPN_BASEDAMAGE;
+var config WeaponDamageValue ADVSHIELDBEARERMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue SECTOIDMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue MUTONMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue VIPERMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue ARCHONMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue ANDROMEDONMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue CYBERUSMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue GATEKEEPERMP_WPN_BASEDAMAGE;
+var config WeaponDamageValue SECTOPODMP_WPN_BASEDAMAGE;
+
+// ***** MP Melee Damage *****
+var config WeaponDamageValue ANDROMEDONROBOTMP_MELEEATTACK_BASEDAMAGE;
+var config WeaponDamageValue BERSERKERMP_MELEEATTACK_BASEDAMAGE;
+var config WeaponDamageValue CHRYSSALIDMP_MELEEATTACK_BASEDAMAGE;
+var config WeaponDamageValue FACELESSMP_MELEEAOE_BASEDAMAGE;
+var config WeaponDamageValue PSIZOMBIEMP_MELEEATTACK_BASEDAMAGE;
 
 // ***** Data values for specific enemy abilities *****
 var config WeaponDamageValue ADVMEC_M1_MICROMISSILES_BASEDAMAGE;
@@ -456,6 +480,22 @@ static function array<X2DataTemplate> CreateTemplates()
 	Weapons.AddItem(CreateTemplate_Muton_MeleeAttack());
 	Weapons.AddItem(CreateTemplate_PsiZombie_MeleeAttack());
 
+	// MP Weapons
+	Weapons.AddItem(CreateTemplate_AdvTrooperMP_WPN());
+	Weapons.AddItem(CreateTemplate_AdvCaptainMP_WPN());
+	Weapons.AddItem(CreateTemplate_AdvStunLancerMP_WPN());
+	Weapons.AddItem(CreateTemplate_AdvShieldBearerMP_WPN());
+	Weapons.AddItem(CreateTemplate_AdvMEC_MP_WPN());
+	Weapons.AddItem(CreateTemplate_SectoidMP_WPN());
+	Weapons.AddItem(CreateTemplate_ViperMP_WPN());
+	Weapons.AddItem(CreateTemplate_MutonMP_WPN());
+	Weapons.AddItem(CreateTemplate_CyberusMP_WPN());
+	Weapons.AddItem(CreateTemplate_ArchonMP_WPN());
+	Weapons.AddItem(CreateTemplate_AndromedonMP_WPN());
+	Weapons.AddItem(CreateTemplate_SectopodMP_WPN());
+	Weapons.AddItem(CreateTemplate_GatekeeperMP_WPN());
+	Weapons.AddItem(CreateTemplate_PsiZombieMP_MeleeAttack());
+
 	return Weapons;
 }
 
@@ -512,9 +552,8 @@ static function X2DataTemplate CreateTemplate_AssaultRifle_Conventional()
 
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 	
-	Template.UpgradeItem = 'AssaultRifle_MG';
-
 	Template.fKnockbackDamageAmount = 5.0f;
 	Template.fKnockbackDamageRadius = 0.0f;
 
@@ -565,7 +604,8 @@ static function X2DataTemplate CreateTemplate_AssaultRifle_Magnetic()
 
 	Template.iPhysicsImpulse = 5;
 	
-	Template.UpgradeItem = 'AssaultRifle_BM';
+	Template.CreatorTemplateName = 'AssaultRifle_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'AssaultRifle_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -619,6 +659,9 @@ static function X2DataTemplate CreateTemplate_AssaultRifle_Beam()
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
 
+	Template.CreatorTemplateName = 'AssaultRifle_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'AssaultRifle_MG'; // Which item this will be upgraded from
+
 	Template.DamageTypeTemplateName = 'Projectile_BeamXCom';
 
 	return Template;
@@ -668,10 +711,9 @@ static function X2DataTemplate CreateTemplate_Pistol_Conventional()
 
 	Template.iPhysicsImpulse = 5;
 	
-	Template.UpgradeItem = 'Pistol_MG';
-
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	Template.DamageTypeTemplateName = 'Projectile_Conventional';
 
@@ -721,7 +763,8 @@ static function X2DataTemplate CreateTemplate_Pistol_Magnetic()
 
 	Template.iPhysicsImpulse = 5;
 
-	Template.UpgradeItem = 'Pistol_BM';
+	Template.CreatorTemplateName = 'Pistol_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Pistol_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -773,6 +816,9 @@ static function X2DataTemplate CreateTemplate_Pistol_Beam()
 	Template.GameArchetype = "WP_Pistol_BM.WP_Pistol_BM";
 
 	Template.iPhysicsImpulse = 5;
+
+	Template.CreatorTemplateName = 'Pistol_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Pistol_MG'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -834,10 +880,9 @@ static function X2DataTemplate CreateTemplate_Shotgun_Conventional()
 	Template.fKnockbackDamageAmount = 10.0f;
 	Template.fKnockbackDamageRadius = 16.0f;
 
-	Template.UpgradeItem = 'Shotgun_MG';
-
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	Template.DamageTypeTemplateName = 'Projectile_Conventional';
 
@@ -889,7 +934,8 @@ static function X2DataTemplate CreateTemplate_Shotgun_Magnetic()
 	Template.fKnockbackDamageAmount = 10.0f;
 	Template.fKnockbackDamageRadius = 16.0f;
 
-	Template.UpgradeItem = 'Shotgun_BM';
+	Template.CreatorTemplateName = 'Shotgun_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Shotgun_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -944,6 +990,9 @@ static function X2DataTemplate CreateTemplate_Shotgun_Beam()
 
 	Template.fKnockbackDamageAmount = 10.0f;
 	Template.fKnockbackDamageRadius = 16.0f;
+
+	Template.CreatorTemplateName = 'Shotgun_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Shotgun_MG'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1001,10 +1050,9 @@ static function X2DataTemplate CreateTemplate_Cannon_Conventional()
 
 	Template.iPhysicsImpulse = 5;
 
-	Template.UpgradeItem = 'Cannon_MG';
-
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	Template.DamageTypeTemplateName = 'Projectile_Conventional';
 
@@ -1053,7 +1101,8 @@ static function X2DataTemplate CreateTemplate_Cannon_Magnetic()
 
 	Template.iPhysicsImpulse = 5;
 
-	Template.UpgradeItem = 'Cannon_BM';
+	Template.CreatorTemplateName = 'Cannon_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Cannon_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1105,6 +1154,9 @@ static function X2DataTemplate CreateTemplate_Cannon_Beam()
 	Template.AddDefaultAttachment('Light', "BeamAttachments.Meshes.BeamFlashLight");
 
 	Template.iPhysicsImpulse = 5;
+
+	Template.CreatorTemplateName = 'Cannon_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Cannon_MG'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1164,10 +1216,9 @@ static function X2DataTemplate CreateTemplate_SniperRifle_Conventional()
 
 	Template.iPhysicsImpulse = 5;
 
-	Template.UpgradeItem = 'SniperRifle_MG';
-
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	Template.DamageTypeTemplateName = 'Projectile_Conventional';
 
@@ -1220,7 +1271,8 @@ static function X2DataTemplate CreateTemplate_SniperRifle_Magnetic()
 
 	Template.iPhysicsImpulse = 5;
 
-	Template.UpgradeItem = 'SniperRifle_BM';
+	Template.CreatorTemplateName = 'SniperRifle_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'SniperRifle_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1273,6 +1325,9 @@ static function X2DataTemplate CreateTemplate_SniperRifle_Beam()
 
 	Template.iPhysicsImpulse = 5;
 
+	Template.CreatorTemplateName = 'SniperRifle_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'SniperRifle_MG'; // Which item this will be upgraded from
+
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
 
@@ -1316,11 +1371,10 @@ static function X2DataTemplate CreateTemplate_Sword_Conventional()
 	Template.iSoundRange = default.RANGERSWORD_CONVENTIONAL_ISOUNDRANGE;
 	Template.iEnvironmentDamage = default.RANGERSWORD_CONVENTIONAL_IENVIRONMENTDAMAGE;
 	Template.BaseDamage.DamageType = 'Melee';
-
-	Template.UpgradeItem = 'Sword_MG';
 	
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	Template.DamageTypeTemplateName = 'Melee';
 
@@ -1359,16 +1413,17 @@ static function X2DataTemplate CreateTemplate_Sword_Magnetic()
 	Template.iEnvironmentDamage = default.RANGERSWORD_MAGNETIC_IENVIRONMENTDAMAGE;
 	Template.BaseDamage.DamageType='Melee';
 
-	Template.BonusWeaponEffects.AddItem(class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, default.RANGERSWORD_MAGNETIC_STUNCHANCE));
+	Template.BonusWeaponEffects.AddItem(class'X2StatusEffects'.static.CreateStunnedStatusEffect(2, default.RANGERSWORD_MAGNETIC_STUNCHANCE, false));
 
-	Template.UpgradeItem = 'Sword_BM';
+	Template.CreatorTemplateName = 'Sword_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Sword_CV'; // Which item this will be upgraded from
 	
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
 
 	Template.DamageTypeTemplateName = 'Melee';
 	
-	Template.SetUIStatMarkup(class'XLocalizedData'.default.StunChanceLabel, , default.RANGERSWORD_MAGNETIC_STUNCHANCE);
+	Template.SetUIStatMarkup(class'XLocalizedData'.default.StunChanceLabel, , default.RANGERSWORD_MAGNETIC_STUNCHANCE, , , "%");
 
 	return Template;
 }
@@ -1407,6 +1462,9 @@ static function X2DataTemplate CreateTemplate_Sword_Beam()
 
 	Template.BonusWeaponEffects.AddItem(class'X2StatusEffects'.static.CreateBurningStatusEffect(2, 0));
 	
+	Template.CreatorTemplateName = 'Sword_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Sword_MG'; // Which item this will be upgraded from
+
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
 
@@ -1445,10 +1503,9 @@ static function X2DataTemplate CreateTemplate_GremlinDrone_Conventional()
 	Template.InfiniteAmmo = true;
 	Template.iPhysicsImpulse = 5;
 
-	Template.UpgradeItem = 'Gremlin_MG';
-
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	Template.DamageTypeTemplateName = 'Electrical';
 
@@ -1485,7 +1542,8 @@ static function X2DataTemplate CreateTemplate_GremlinDrone_Magnetic()
 	Template.InfiniteAmmo = true;
 	Template.iPhysicsImpulse = 5;
 
-	Template.UpgradeItem = 'Gremlin_BM';
+	Template.CreatorTemplateName = 'Gremlin_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Gremlin_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1526,6 +1584,9 @@ static function X2DataTemplate CreateTemplate_GremlinDrone_Beam()
 	Template.NumUpgradeSlots = 2;
 	Template.InfiniteAmmo = true;
 	Template.iPhysicsImpulse = 5;
+
+	Template.CreatorTemplateName = 'Gremlin_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'Gremlin_MG'; // Which item this will be upgraded from
 	
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1554,7 +1615,7 @@ static function X2DataTemplate CreateTemplate_GremlinDrone_MP()
 
 	Template.ExtraDamage = default.GREMLINMK2_ABILITYDAMAGE;
 	Template.HackingAttemptBonus = default.GREMLINMK3_HACKBONUS;
-	Template.AidProtocolBonus = 10;
+	Template.AidProtocolBonus = 0;
 	Template.HealingBonus = 2;
 	Template.RevivalChargesBonus = 1;
 	Template.ScanningChargesBonus = 1;
@@ -1606,10 +1667,9 @@ static function X2DataTemplate CreateTemplate_PsiAmp_Conventional()
 	
 	Template.ExtraDamage = default.PSIAMPT1_ABILITYDAMAGE;
 
-	Template.UpgradeItem = 'PsiAmp_MG';
-
 	Template.StartingItem = true;
 	Template.CanBeBuilt = false;
+	Template.bInfiniteItem = true;
 
 	// Show In Armory Requirements
 	Template.ArmoryDisplayRequirements.RequiredTechs.AddItem('Psionics');
@@ -1643,7 +1703,8 @@ static function X2DataTemplate CreateTemplate_PsiAmp_Magnetic()
 
 	Template.ExtraDamage = default.PSIAMPT2_ABILITYDAMAGE;
 
-	Template.UpgradeItem = 'PsiAmp_BM';
+	Template.CreatorTemplateName = 'PsiAmp_MG_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'PsiAmp_CV'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1676,6 +1737,9 @@ static function X2DataTemplate CreateTemplate_PsiAmp_Beam()
 	Template.Abilities.AddItem('PsiAmpBM_BonusStats');
 
 	Template.ExtraDamage = default.PSIAMPT3_ABILITYDAMAGE;
+
+	Template.CreatorTemplateName = 'PsiAmp_BM_Schematic'; // The schematic which creates this item
+	Template.BaseItem = 'PsiAmp_MG'; // Which item this will be upgraded from
 
 	Template.CanBeBuilt = false;
 	Template.bInfiniteItem = true;
@@ -1785,15 +1849,15 @@ static function X2DataTemplate CreateTemplate_AssaultRifle_Central()
 	Template.WeaponCat = 'rifle';
 	Template.WeaponTech = 'conventional';
 	Template.strImage = "img:///UILibrary_Common.CentralAR";
-	Template.Tier = 0;
+	Template.Tier = 5;
 
-	Template.RangeAccuracy = default.MEDIUM_CONVENTIONAL_RANGE;
-	Template.BaseDamage = default.ASSAULTRIFLE_CONVENTIONAL_BASEDAMAGE;
-	Template.Aim = default.ASSAULTRIFLE_CONVENTIONAL_AIM;
-	Template.CritChance = default.ASSAULTRIFLE_CONVENTIONAL_CRITCHANCE;
-	Template.iClipSize = default.ASSAULTRIFLE_CONVENTIONAL_ICLIPSIZE;
-	Template.iSoundRange = default.ASSAULTRIFLE_CONVENTIONAL_ISOUNDRANGE;
-	Template.iEnvironmentDamage = default.ASSAULTRIFLE_CONVENTIONAL_IENVIRONMENTDAMAGE;
+	Template.RangeAccuracy = default.MEDIUM_MAGNETIC_RANGE;
+	Template.BaseDamage = default.ASSAULTRIFLE_CENTRAL_BASEDAMAGE;
+	Template.Aim = default.ASSAULTRIFLE_MAGNETIC_AIM;
+	Template.CritChance = default.ASSAULTRIFLE_MAGNETIC_CRITCHANCE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
 
 	Template.NumUpgradeSlots = 0;
 
@@ -3701,6 +3765,564 @@ static function X2DataTemplate CreateTemplate_AdvStunLancerM3_StunLance()
 	return Template;
 }
 // *********************************
+
+// #######################################################################################
+// -------------------- MP WEAPONS -------------------------------------------------------
+// #######################################################################################
+
+static function X2DataTemplate CreateTemplate_AdvTrooperMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'AdvTrooperMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.AdventAssaultRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_MAGNETIC_RANGE;
+	Template.BaseDamage = default.ADVTROOPERMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.ADVTROOPERM1_IDEALRANGE;
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_AssaultRifle_MG.WP_AssaultRifle_MG_Advent";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	Template.DamageTypeTemplateName = 'Projectile_Conventional';
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_AdvCaptainMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'AdvCaptainMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.AdventAssaultRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_MAGNETIC_RANGE;
+	Template.BaseDamage = default.ADVCAPTAINMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.ADVCAPTAINM1_IDEALRANGE;
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_AssaultRifle_MG.WP_AssaultRifle_MG_Advent";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	Template.DamageTypeTemplateName = 'Projectile_Conventional';
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_AdvStunLancerMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'AdvStunLancerMP_WPN');
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.AdventAssaultRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_MAGNETIC_RANGE;
+	Template.BaseDamage = default.ADVSTUNLANCERMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.ADVSTUNLANCERM1_IDEALRANGE;
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_AssaultRifle_MG.WP_AssaultRifle_MG_Advent";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	Template.DamageTypeTemplateName = 'Projectile_Conventional';
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_AdvShieldBearerMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'AdvShieldBearerMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.AdventAssaultRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_MAGNETIC_RANGE;
+	Template.BaseDamage = default.ADVSHIELDBEARERMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.ADVSHIELDBEARERM2_IDEALRANGE;
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_AssaultRifle_MG.WP_AssaultRifle_MG_Advent";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	Template.DamageTypeTemplateName = 'Projectile_MagAdvent';
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_AdvMEC_MP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'AdvMEC_MP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.AdventMecGun";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_MAGNETIC_RANGE;
+	Template.BaseDamage = default.ADVMEC_MP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.ADVMEC_M1_IDEALRANGE;
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+	Template.Abilities.AddItem('Suppression');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_AdvMec_Gun.WP_AdvMecGun";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	Template.DamageTypeTemplateName = 'Projectile_Conventional';
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_SectoidMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'SectoidMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.SectoidPistol";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_BEAM_RANGE;
+	Template.BaseDamage = default.SECTOIDMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.SECTOID_IDEALRANGE;
+
+	Template.DamageTypeTemplateName = 'Heavy';
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Sectoid_ArmPistol.WP_SectoidPistol";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_ViperMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'ViperMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.ViperRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_BEAM_RANGE;
+	Template.BaseDamage = default.VIPERMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.VIPER_IDEALRANGE;
+
+	Template.DamageTypeTemplateName = 'Heavy';
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Viper_Rifle.WP_ViperRifle";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_MutonMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'MutonMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.MutonRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_BEAM_RANGE;
+	Template.BaseDamage = default.MUTONMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.MUTON_IDEALRANGE;
+
+	Template.DamageTypeTemplateName = 'Heavy';
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('Suppression');
+	Template.Abilities.AddItem('HotLoadAmmo');
+	Template.Abilities.AddItem('Execute');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Muton_Rifle.WP_MutonRifle";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_CyberusMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'CyberusMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.ViperRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_BEAM_RANGE;
+	Template.BaseDamage = default.CYBERUSMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.CYBERUS_IDEALRANGE;
+
+	Template.DamageTypeTemplateName = 'Heavy';
+
+	Template.InfiniteAmmo = true;
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Cyberus_Gun.WP_CyberusRifle";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_ArchonMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'ArchonMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.ArchonStaff";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_MAGNETIC_RANGE;
+	Template.BaseDamage = default.ARCHONMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.ARCHON_IDEALRANGE;
+
+	Template.DamageTypeTemplateName = 'Heavy';
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Archon_Rifle.WP_ArchonRifle";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_AndromedonMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'AndromedonMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.AndromedonRifle";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_BEAM_RANGE;
+	Template.BaseDamage = default.ANDROMEDONMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.ANDROMEDON_IDEALRANGE;
+
+	Template.DamageTypeTemplateName = 'Heavy';
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('StandardShot');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Andromedon_Cannon.WP_AndromedonCannon";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_SectopodMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'SectopodMP_WPN');
+
+	Template.WeaponPanelImage = "_BeamSniperRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.AdventTurret";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_CONVENTIONAL_RANGE;
+	Template.BaseDamage = default.SECTOPODMP_WPN_BASEDAMAGE;
+	Template.iClipSize = default.ASSAULTRIFLE_MAGNETIC_ICLIPSIZE;
+	Template.iSoundRange = default.ASSAULTRIFLE_MAGNETIC_ISOUNDRANGE;
+	Template.iEnvironmentDamage = default.ASSAULTRIFLE_MAGNETIC_IENVIRONMENTDAMAGE;
+	Template.iIdealRange = default.SECTOPOD_IDEALRANGE;
+
+	Template.DamageTypeTemplateName = 'Heavy';
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.Abilities.AddItem('Blaster');
+	Template.Abilities.AddItem('BlasterDuringCannon');
+	Template.Abilities.AddItem('Overwatch');
+	Template.Abilities.AddItem('OverwatchShot');
+	Template.Abilities.AddItem('Reload');
+	Template.Abilities.AddItem('HotLoadAmmo');
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Sectopod_Turret.WP_Sectopod_Turret";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_GatekeeperMP_WPN()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'GatekeeperMP_WPN');
+
+	Template.WeaponPanelImage = "_ConventionalRifle";                       // used by the UI. Probably determines iconview of the weapon.
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'rifle';
+	Template.WeaponTech = 'magnetic';
+	Template.strImage = "img:///UILibrary_Common.AlienWeapons.GatekeeperEyeball";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.RangeAccuracy = default.MEDIUM_CONVENTIONAL_RANGE;
+	Template.BaseDamage = default.GATEKEEPERMP_WPN_BASEDAMAGE;
+	Template.iClipSize = 1;
+
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Gatekeeper_Anima_Gate.WP_Gatekeeper_Anima_Gate";
+
+	Template.iPhysicsImpulse = 5;
+
+	Template.CanBeBuilt = false;
+	Template.TradingPostValue = 30;
+
+	return Template;
+}
+
+static function X2DataTemplate CreateTemplate_PsiZombieMP_MeleeAttack()
+{
+	local X2WeaponTemplate Template;
+
+	`CREATE_X2TEMPLATE(class'X2WeaponTemplate', Template, 'PsiZombieMP_MeleeAttack');
+
+	Template.ItemCat = 'weapon';
+	Template.WeaponCat = 'melee';
+	Template.WeaponTech = 'alien';
+	Template.strImage = "img:///UILibrary_StrategyImages.Sword";
+	Template.InventorySlot = eInvSlot_PrimaryWeapon;
+	Template.StowedLocation = eSlot_RightHand;
+	// This all the resources; sounds, animations, models, physics, the works.
+	Template.GameArchetype = "WP_Zombiefist.WP_Zombiefist";
+	Template.RemoveTemplateAvailablility(Template.BITFIELD_GAMEAREA_Multiplayer); //invalidates multiplayer availability
+
+	Template.iRange = 2;
+	Template.iRadius = 1;
+	Template.NumUpgradeSlots = 2;
+	Template.InfiniteAmmo = true;
+	Template.iPhysicsImpulse = 5;
+	Template.iIdealRange = 1;
+
+	Template.BaseDamage = default.PSIZOMBIEMP_MELEEATTACK_BASEDAMAGE;
+	Template.BaseDamage.DamageType = 'Melee';
+	Template.iSoundRange = 2;
+	Template.iEnvironmentDamage = 10;
+
+	//Build Data
+	Template.StartingItem = false;
+	Template.CanBeBuilt = false;
+
+	Template.bDisplayWeaponAndAmmo = false;
+
+	Template.Abilities.AddItem('StandardMovingMelee');
+
+	return Template;
+}
 
 defaultproperties
 {

@@ -1980,16 +1980,23 @@ function SpawnPointOfInterest(XComGameState NewGameState, XComGameState_MissionS
 	History = `XCOMHISTORY;
 	BlackMarketState = XComGameState_BlackMarket(History.GetSingleGameStateObjectForClass(class'XComGameState_BlackMarket'));
 
-	if (!BlackMarketState.ShowBlackMarket(NewGameState) && MissionState.POIToSpawn.ObjectID != 0)
+	if (!BlackMarketState.ShowBlackMarket(NewGameState))
 	{
-		POIState = XComGameState_PointOfInterest(History.GetGameStateForObjectID(MissionState.POIToSpawn.ObjectID));
-		
-		if (POIState != none)
+		if (MissionState.POIToSpawn.ObjectID != 0)
 		{
-			POIState = XComGameState_PointOfInterest(NewGameState.CreateStateObject(class'XComGameState_PointOfInterest', POIState.ObjectID));
-			NewGameState.AddStateObject(POIState);
-			POIState.Spawn(NewGameState);
+			POIState = XComGameState_PointOfInterest(History.GetGameStateForObjectID(MissionState.POIToSpawn.ObjectID));
+
+			if (POIState != none)
+			{
+				POIState = XComGameState_PointOfInterest(NewGameState.CreateStateObject(class'XComGameState_PointOfInterest', POIState.ObjectID));
+				NewGameState.AddStateObject(POIState);
+				POIState.Spawn(NewGameState);
+			}
 		}
+	}
+	else
+	{
+		class'XComGameState_HeadquartersResistance'.static.DeactivatePOI(NewGameState, MissionState.POIToSpawn);
 	}
 }
 

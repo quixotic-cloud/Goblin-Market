@@ -47,7 +47,7 @@ simulated function UIArmory_LoadoutItem InitLoadoutItem(XComGameState_Item Item,
 	{
 		if (Item != None)
 		{
-			if ((ItemTemplate.bInfiniteItem || ItemTemplate.StartingItem) && !Item.HasBeenModified())
+			if (ItemTemplate.bInfiniteItem && !Item.HasBeenModified())
 			{
 				SetInfinite(true);
 			}
@@ -74,7 +74,7 @@ simulated function UIArmory_LoadoutItem InitLoadoutItem(XComGameState_Item Item,
 	}
 
 	// Create the Drop Item button
-	if(bLoadoutSlot)
+	if(bLoadoutSlot && !IsDisabled)
 	{
 		// add a custom text box since the flash component reports back with from the bg subcomponent
 		TooltipID = Movie.Pres.m_kTooltipMgr.AddNewTooltipTextBox(m_strDropItem, 0, 0, MCPath $ ".DropItemButton.bg");
@@ -286,7 +286,7 @@ simulated function UpdateDropItemButton(optional XComGameState_Item Item)
 {
 	local bool bShowClearButton;
 
-	if(!bLoadoutSlot) return;
+	if(!bLoadoutSlot || IsDisabled) return;
 
 	if(Item == none)
 		Item = XComGameState_Item(`XCOMHISTORY.GetGameStateForObjectID(ItemRef.ObjectID));
@@ -294,7 +294,7 @@ simulated function UpdateDropItemButton(optional XComGameState_Item Item)
 	if(UIArmory_Loadout_MP(Screen) != none)
 		bShowClearButton = Item != none && !UIArmory_Loadout_MP(Screen).GetUnit().ItemIsInMPBaseLoadout(Item.GetMyTemplateName());
 	else
-		bShowClearButton = Item != none && (!ItemTemplate.bInfiniteItem && !ItemTemplate.StartingItem) || Item.HasBeenModified();
+		bShowClearButton = Item != none && !ItemTemplate.bInfiniteItem || Item.HasBeenModified();
 
 	MC.SetBool("showClearButton", bShowClearButton);
 	MC.FunctionVoid("realize");

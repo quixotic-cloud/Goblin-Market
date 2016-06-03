@@ -1042,11 +1042,11 @@ simulated function UpdateUnit(int SoldierIndex, XComGameState_Unit Unit, XComGam
 
 	if( Unit.IsSoldier() )
 	{
-		CharacterGenerator = `XCOMGRI.Spawn(class'XGCharacterGenerator');
 		if( Soldiers[SoldierIndex].CharacterPoolSelection > 0 )
 		{
 			CharacterPoolUnit = CharacterPool.CharacterPool[Soldiers[SoldierIndex].CharacterPoolSelection - 1];
 
+			CharacterGenerator = `XCOMGRI.Spawn(CharacterPoolUnit.GetMyTemplate().CharacterGeneratorClass);
 			//Generate a charater of the proper gender and race
 			Soldier = CharacterGenerator.CreateTSoldierFromUnit(CharacterPoolUnit, UseGameState);
 
@@ -1060,6 +1060,7 @@ simulated function UpdateUnit(int SoldierIndex, XComGameState_Unit Unit, XComGam
 		}
 		else
 		{
+			CharacterGenerator = `XCOMGRI.Spawn(Unit.GetMyTemplate().CharacterGeneratorClass);
 			Soldier = CharacterGenerator.CreateTSoldierFromUnit(Unit, UseGameState);
 		}
 		CharacterGenerator.Destroy();

@@ -37,6 +37,8 @@ static function bool DestructionEffectTicked(X2Effect_Persistent PersistentEffec
 
 		NewDamageEvent = XComGameState_EnvironmentDamage( NewGameState.CreateStateObject(class'XComGameState_EnvironmentDamage') );
 
+		NewDamageEvent.DEBUG_SourceCodeLocation = "UC: X2Effect_DelayedDestruction:DestructionEffectTicked()";
+
 		NewDamageEvent.HitLocation = Actor.Location;
 		NewDamageEvent.DamageSource.ObjectID = Actor.ObjectID;
 

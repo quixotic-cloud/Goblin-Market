@@ -6,12 +6,12 @@ var UIButton RenameButton;
 
 var OnlineSaveGame SaveGame;
 
-var int               Index;
-var bool              bIsSaving;
-var UIPanel ButtonBG;
-var name ButtonBGLibID;
-var string DateTimeString;
-var bool bIsDifferentLanguage;
+var int         Index;
+var bool        bIsSaving;
+var UIPanel		ButtonBG;
+var name		ButtonBGLibID;
+var string		DateTimeString;
+var	bool		bIsDifferentLanguage;
 
 var UIList List;
 
@@ -43,7 +43,6 @@ simulated function UIPanel InitPanel(optional name InitName, optional name InitL
 simulated function UISaveLoadGameListItem InitSaveLoadItem(int listIndex, OnlineSaveGame save, bool bSaving, optional delegate<OnClickedDelegate> AcceptClickedDelegate, optional delegate<OnClickedDelegate> DeleteClickedDelegate, optional delegate<OnClickedDelegate> RenameClickedDelegate, optional delegate<OnMouseInDelegate> MouseInDelegate)
 {
 	local int ID;
-	local string acceptLabel;
 	local XComOnlineEventMgr OnlineEventMgr;
 
 	OnlineEventMgr = `ONLINEEVENTMGR;
@@ -63,9 +62,65 @@ simulated function UISaveLoadGameListItem InitSaveLoadItem(int listIndex, Online
 	ButtonBG.bCascadeFocus = false;
 	ButtonBG.InitPanel(ButtonBGLibID);
 
-	if(bIsSaving)
+	//Navigator.HorizontalNavigation = true;
+	
+	AcceptButton = Spawn(class'UIButton', ButtonBG);
+	AcceptButton.bIsNavigable = false;
+	AcceptButton.InitButton('Button0', GetAcceptLabel(ID == -1), ID == -1 ? RenameClickedDelegate : AcceptClickedDelegate);
+	AcceptButton.OnMouseEventDelegate = OnChildMouseEvent;
+
+	DeleteButton = Spawn(class'UIButton', ButtonBG);
+	DeleteButton.bIsNavigable = false;
+	DeleteButton.InitButton('Button1', GetDeleteLabel(), DeleteClickedDelegate);
+	DeleteButton.OnMouseEventDelegate = OnChildMouseEvent;
+	
+	if(bIsSaving && ID == -1)
 	{
-		if(ID == -1)
+		DeleteButton.Hide();
+	}
+	
+	RenameButton = Spawn(class'UIButton', ButtonBG);
+	RenameButton.bIsNavigable = false;
+	RenameButton.InitButton('Button2', m_sRenameLabel, RenameClickedDelegate);
+	RenameButton.Hide(); //No longer used, hidden permanently. 
+	RenameButton.OnMouseEventDelegate = OnChildMouseEvent;
+
+	OnMouseIn = MouseInDelegate;
+
+	return self;
+}
+
+simulated function OnInit()
+{
+	super.OnInit();
+
+	UpdateData(SaveGame);
+}
+
+function bool ImageCheck()
+{
+	local string MapName;
+	local array<string> Path; 
+
+	//Check to see if the image fails, and clear the image if failed so the default image will stay.
+
+	MapName = SaveGame.SaveGames[0].SaveGameHeader.MapImage;
+
+	Path = SplitString(mapname, ".");
+
+	if( Path.length < 2 ) //you have a malformed path 
+		return false;
+
+	return `XENGINE.DoesPackageExist(Path[0]); 
+}
+
+simulated function string GetAcceptLabel( bool bIsNewSave )
+{
+	local string acceptLabel;
+
+	if( bIsSaving )
+	{
+		if( bIsNewSave )
 		{
 			acceptLabel = m_sNewSaveLabel;
 		}
@@ -79,43 +134,24 @@ simulated function UISaveLoadGameListItem InitSaveLoadItem(int listIndex, Online
 		acceptLabel = m_sLoadLabel;
 	}
 
-	//Navigator.HorizontalNavigation = true;
-	
-	AcceptButton = Spawn(class'UIButton', ButtonBG);
-	AcceptButton.InitButton('Button0', acceptLabel, ID == -1? RenameClickedDelegate : AcceptClickedDelegate);
-	AcceptButton.OnMouseEventDelegate = OnChildMouseEvent;
-
-	DeleteButton = Spawn(class'UIButton', ButtonBG);
-	DeleteButton.InitButton('Button1', m_sDeleteLabel, DeleteClickedDelegate);
-	DeleteButton.OnMouseEventDelegate = OnChildMouseEvent;
-
-	Navigator.RemoveControl(AcceptButton);
-	Navigator.RemoveControl(DeleteButton);
-
-	Navigator.AddNavTargetLeft(AcceptButton);
-	Navigator.AddNavTargetRight(DeleteButton);
-
-	if(bIsSaving && ID == -1)
+	if( bIsFocused && XComInputBase(XComPlayerController(Movie.Pres.Owner).PlayerInput).IsControllerActive() )
 	{
-		DeleteButton.Hide();
+		acceptLabel = class'UIUtilities_Input'.static.InsertGamepadIcons("%A" @ acceptLabel);
 	}
-	
-	RenameButton = Spawn(class'UIButton', ButtonBG);
-	RenameButton.bIsNavigable = false;
-	RenameButton.InitButton('Button2', m_sRenameLabel, RenameClickedDelegate);
-	RenameButton.Hide(); //No longer used, hidden permanantly. 
-	RenameButton.OnMouseEventDelegate = OnChildMouseEvent;
-
-	OnMouseIn = MouseInDelegate;
-
-	return self;
+	return acceptLabel;
 }
 
-simulated function OnInit()
+simulated function string GetDeleteLabel()
 {
-	super.OnInit();
+	local string deleteLabel;
 
-	UpdateData(SaveGame);
+	deleteLabel = m_sDeleteLabel;
+
+	if( bIsFocused &&  XComInputBase(XComPlayerController(Movie.Pres.Owner).PlayerInput).IsControllerActive() )
+	{
+		deleteLabel = class'UIUtilities_Input'.static.InsertGamepadIcons("%Y" @ deleteLabel);
+	}
+	return deleteLabel; 
 }
 
 simulated function OnChildMouseEvent(UIPanel control, int cmd)
@@ -149,16 +185,22 @@ simulated function OnMouseEvent(int cmd, array<string> args)
 
 simulated function ShowHighlight()
 {
+	super.OnReceiveFocus();
 	MC.FunctionVoid("mouseIn");
 	DeleteButton.OnLoseFocus();
-	AcceptButton.OnReceiveFocus();
+	AcceptButton.OnLoseFocus();
+	AcceptButton.SetText(GetAcceptLabel(Index == 0));
+	DeleteButton.SetText(GetDeleteLabel());
 }
 
 simulated function HideHighlight()
 {
+	super.OnLoseFocus();
 	MC.FunctionVoid("mouseOut");
 	AcceptButton.OnLoseFocus();
 	DeleteButton.OnLoseFocus();
+	AcceptButton.SetText(GetAcceptLabel( Index == 0 ));
+	DeleteButton.SetText(GetDeleteLabel());
 }
 
 simulated function UpdateData(OnlineSaveGame save)
@@ -167,14 +209,14 @@ simulated function UpdateData(OnlineSaveGame save)
 	local Array<ASValue> myArray;
 	local XComOnlineEventMgr OnlineEventMgr;
 	local string FriendlyName, mapPath, strDate, strName, strMission, strTime;
-	local bool bNewSave;
 	local array<string> Descriptions;	
 	local SaveGameHeader Header;
+	local bool bIsNewSave, bHasValidImage;
 
 	OnlineEventMgr = `ONLINEEVENTMGR;	
 	if(save.Filename == "")
 	{		
-		bNewSave = true;
+		bIsNewSave = true; 
 		OnlineEventMgr.FillInHeaderForSave(Header, FriendlyName);
 	}
 	else
@@ -213,7 +255,9 @@ simulated function UpdateData(OnlineSaveGame save)
 	
 	mapPath = Header.MapImage;
 
-	if(mapPath == "")
+	bHasValidImage = ImageCheck();
+
+	if( mapPath == "" || !bHasValidImage )
 	{
 		// temp until we get the real screen shots to display
 		mapPath = "img:///UILibrary_Common.Xcom_default";
@@ -241,20 +285,14 @@ simulated function UpdateData(OnlineSaveGame save)
 	myArray.AddItem(myValue);
 
 	//accept Label
-	if(bIsSaving)
-	{
-		myValue.s = bNewSave ? m_sNewSaveLabel : m_sSaveLabel;
-	}
-	else
-	{
-		myValue.s = m_sLoadLabel;
-	}
+	myValue.s = GetAcceptLabel(bIsNewSave);
 	AcceptButton.SetText(myValue.s);
 	myArray.AddItem(myValue);
 
 	//delete label
-	myValue.s = m_sDeleteLabel;
+	myValue.s = GetDeleteLabel();
 	myArray.AddItem(myValue);
+	DeleteButton.SetText(myValue.s);
 
 	//rename label
 	myValue.s = bIsSaving? m_sRenameLabel: " ";
@@ -291,7 +329,6 @@ simulated function ClearImage()
 
 simulated function bool OnUnrealCommand(int cmd, int arg)
 {
-	local UIButton CurrentButton;
 	if( !CheckInputIsReleaseOrDirectionRepeat(cmd, arg) )
 		return false;
 
@@ -300,21 +337,17 @@ simulated function bool OnUnrealCommand(int cmd, int arg)
 	case class'UIUtilities_Input'.const.FXS_BUTTON_A:
 	case class'UIUtilities_Input'.const.FXS_KEY_ENTER:
 	case class'UIUtilities_Input'.const.FXS_KEY_SPACEBAR:
+		AcceptButton.Click();
+		return true;
 
-		CurrentButton = DeleteButton.bIsFocused ? DeleteButton : AcceptButton;
-
-		if( CurrentButton.bIsVisible && !CurrentButton.IsDisabled )
+	case class'UIUtilities_Input'.const.FXS_BUTTON_Y:
+	case class'UIUtilities_Input'.const.FXS_KEY_DELETE:
+		if( DeleteButton.IsVisible() )
 		{
-			CurrentButton.Click();
-
+			DeleteButton.Click();
 			return true;
 		}
-		//If you don't have a current button, fall down and hit the Navigation system. 
 		break;
-
-	case class'UIUtilities_Input'.const.FXS_KEY_DELETE:
-		DeleteButton.Click();
-		break; 
 	}
 
 	return super.OnUnrealCommand(cmd, arg);
@@ -327,4 +360,5 @@ defaultproperties
 	ButtonBGLibID = "ButtonGroup"
 	height = 135;
 	bIsDifferentLanguage = false
+	bCascadeFocus = false;
 }

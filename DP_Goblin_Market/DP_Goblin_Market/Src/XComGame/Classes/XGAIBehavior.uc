@@ -34,6 +34,7 @@ struct native AoETargetingInfo
 	var bool bRequirePotentialTarget;	// Requires target from potential target stack to be in the target area.
 	var bool bDoNotTargetGround;		// Require targeting unit positions, not ground positions.
 	var bool bTestLocationValidity;		// Additional check to ensure locations are valid for consideration.
+	var bool bPathToTarget;				// Unit paths to target destination for AoE effect.  Requires target locations within pathing range.
 	var int  MinTargets;				// Minimum number of targets for a target location to be valid.
 
 	structdefaultproperties
@@ -172,6 +173,8 @@ struct native BehaviorTreeLocalVar
 	var int Value;
 };
 var array<BehaviorTreeLocalVar> BTVars;
+
+var bool bForcePathIfUnreachable;
 
 // For X2 we have a new destination scoring system.
 struct native ai_tile_score 
@@ -332,6 +335,7 @@ var bool bIncludeAlliesAsMeleeTargets;
 
 var array<XComGameState_Unit> CachedActiveAllies;
 var array<StateObjectReference>  CachedKnownUnitRefs;
+var array<StateObjectReference>  IgnoredEnemiesForDefenseChecks; // for Ruler system, to ignore enemies that have no action points left.
 var int ActiveRevealedAllyCount;
 var float WeightedAllyRangeSq;
 var float AllyAbilityRangeWeight;
@@ -340,6 +344,20 @@ var int BTTargetIndex;    // from deprecated XGAIAbilityDM class
 var private native Map_Mirror       CachedEnemyCover{TMap<INT, FXComCoverPoint>};        //  maps unit id to a group id.
 
 var bool BTSkipTurnOnFailure;
+struct native CachedAbilityNameList
+{
+	var int HistoryIndex;
+	var array<Name> NameList;
+	structdefaultproperties
+	{
+		HistoryIndex = INDEX_NONE
+	}
+};
+
+var CachedAbilityNameList CachedAbilityNames;	// Cached names of all abilities available to this unit for the current BT run.
+var bool WaitForExecuteAbility;					// Flag to indicate we are waiting on a pending ability to be submitted.
+
+var array<TTile> AbilityPathTiles;	// Added for abilities that require a path.
 
 function int GetAIUnitDataID(int UnitID)
 {
@@ -1230,18 +1248,22 @@ function ai_tile_score FillTileScoreData(TTile kTile, vector vLoc, XComCoverPoin
 			continue;
 		}
 
-		if( VisibilityInfo.TargetCover == CT_None )
+		// Only consider flanked-ness of location if this target is not in our ignore list.
+		if( IgnoredEnemiesForDefenseChecks.Find('ObjectID', VisibilityInfo.SourceID) == INDEX_NONE )
 		{
-			nFlanked++;
-		}
-		// warning - this will just take the last cover type, not necessarily the worst or best cover available here.
-		else if( VisibilityInfo.TargetCover == CT_MidLevel )
-		{
-			nMidCover++;
-		}
-		else
-		{
-			nHighCover++;
+			if( VisibilityInfo.TargetCover == CT_None )
+			{
+				nFlanked++;
+			}
+			// warning - this will just take the last cover type, not necessarily the worst or best cover available here.
+			else if( VisibilityInfo.TargetCover == CT_MidLevel )
+			{
+				nMidCover++;
+			}
+			else
+			{
+				nHighCover++;
+			}
 		}
 	}
 
@@ -1406,9 +1428,9 @@ function bool IsBehaviorTreeAvailable()
 
 // RunCount = Number of times to sequentially run the behavior tree.
 // History Index = Minimum history index to wait before running the behavior tree.
-function bool StartRunBehaviorTree( Name OverrideNode='', bool bSkipTurnOnFailure=false)
+function bool StartRunBehaviorTree( Name OverrideNode='', bool bSkipTurnOnFailure=false, bool bInitFromPlayerEachRun=false)
 {
-	if( m_kBehaviorTree.m_eStatus == BTS_RUNNING ) // Should not be starting a behavior tree when one is currently running.
+	if( m_kBehaviorTree != None && m_kBehaviorTree.m_eStatus == BTS_RUNNING ) // Should not be starting a behavior tree when one is currently running.
 	{
 		`RedScreen("Attempting to start running new behavior tree ("$(OverrideNode!=''?String(OverrideNode):"Standard Root")$") on Unit "$UnitState.ObjectID$" when a behavior tree ("$m_kBehaviorTree.m_strName$") is already running!");
 	}
@@ -1419,7 +1441,7 @@ function bool StartRunBehaviorTree( Name OverrideNode='', bool bSkipTurnOnFailur
 		`BEHAVIORTREEMGR.BeginBehaviorTree(UnitState.ObjectID);
 		RefreshUnitCache();
 		LogAvailableAbilities();
-		InitBehaviorTree(bSkipTurnOnFailure);
+		InitBehaviorTree(bSkipTurnOnFailure, bInitFromPlayerEachRun);
 		StepProcessBehaviorTree();
 		return true;
 	}
@@ -1453,6 +1475,8 @@ function OnBehaviorTreeRunComplete()
 	{
 		m_kPlayer.OnBTRunCompletePostExecute(UnitState.ObjectID);
 	}
+	// Clear old behavior tree here, before the EndBehaviorTree kicks off the next one. (which could be this one again.)
+	m_kBehaviorTree = None;
 	BTMgr = `BEHAVIORTREEMGR;
 	BTMgr.EndBehaviorTree(UnitState.ObjectID);
 
@@ -1471,7 +1495,6 @@ function OnBehaviorTreeRunComplete()
 	}
 
 	`PRECOMPUTEDPATH.ClearOverrideTargetLocation(); // Clear this flag in case the grenade target location was locked.
-
 }
 
 private function int DecreasingOrder(int Entry1, int Entry2)
@@ -1661,6 +1684,7 @@ function BTExecuteAbility()
 		if( !bBTTargetSet )
 		{
 			m_kBTCurrTarget.kTarget = BT_GetBestTarget(m_strBTAbilitySelection);
+			m_kBTCurrTarget.AbilityName = m_strBTAbilitySelection;
 			BTTargetIndex = INDEX_NONE;
 		}
 		if( bSetDestinationWithAbility )
@@ -1668,7 +1692,7 @@ function BTExecuteAbility()
 			m_arrTargetLocations.Length = 0;
 			m_arrTargetLocations.AddItem(m_vBTDestination);
 		}
-		if( m_kBTCurrTarget.kTarget.PrimaryTarget.ObjectID > 0)
+		if( m_kBTCurrTarget.AbilityName == m_strBTAbilitySelection && m_kBTCurrTarget.kTarget.PrimaryTarget.ObjectID > 0 )
 		{
 			SetTargetIndexByObjectID(m_kBTCurrTarget.kTarget.PrimaryTarget.ObjectID);
 
@@ -1690,7 +1714,7 @@ function BTExecuteAbility()
 		// Activate ability directly here instead of switching to another state to activate it.
 		if( IsValidAction(SelectedAbility) )
 		{
-			class'XComGameStateContext_Ability'.static.ActivateAbility(SelectedAbility, BTTargetIndex, m_arrTargetLocations);
+			class'XComGameStateContext_Ability'.static.ActivateAbility(SelectedAbility, BTTargetIndex, m_arrTargetLocations,, AbilityPathTiles);
 			m_bUnitAbilityCacheDirty = true;
 
 			if( `CHEATMGR.bForceAbilityOneTimeUse && GetAbilityName(SelectedAbility) ~= `CHEATMGR.strAIForcedAbility )
@@ -1717,12 +1741,19 @@ function BTExecuteAbility()
 }
 
 
-function InitBehaviorTree(bool bSkipTurnOnFailure=false)
+function InitBehaviorTree(bool bSkipTurnOnFailure=false, bool bInitFromPlayerEachRun=false)
 {
 	local X2AIBTBehavior BT;
+	local array<Name> dummyList;
+	if( bInitFromPlayerEachRun )
+	{
+		InitFromPlayer();
+	}
 	BT = GetBehaviorTree();
+`if(`notdefined(FINAL_RELEASE))
 	BT.SetTraversalIndex(0); // Set node indices for each node in the behavior tree.  
-							// This traverses the entire tree recursively - but only used for debug logging.
+						// This traverses the entire tree recursively - but only used for debug logging.
+`endif
 
 	BTSkipTurnOnFailure = bSkipTurnOnFailure;
 	m_arrBTBestTargetOption.Length = 0;
@@ -1738,8 +1769,10 @@ function InitBehaviorTree(bool bSkipTurnOnFailure=false)
 	iBTSRunningTest = 3;
 	m_bBTDestinationSet = false;
 	bBTTargetSet = false;
+	m_arrTargetLocations.Length = 0;
 	bBTHasStartedDestinationsProcess = false;
 	PrimedAoEAbility = INDEX_NONE;
+	AbilityPathTiles.Length = 0;
 	ActiveBTStack.Length = 0;
 	CurrentBTStackRef.ObjectID = INDEX_NONE;
 	bIncludeAlliesAsMeleeTargets = false;
@@ -1748,9 +1781,13 @@ function InitBehaviorTree(bool bSkipTurnOnFailure=false)
 	DebugBTScratchText = "";
 	`CHEATMGR.m_strBTIntent = "";
 	BTPriorityTarget = 0;
+	m_kBTCurrTarget.TargetID = INDEX_NONE; // Clear current target
+	bForcePathIfUnreachable = false;
 
 	CacheAllies();
 	CacheKnownEnemies();
+
+	FindOrGetAbilityList('', dummyList); // Cache ability name list
 
 	if( m_kPlayer != None )
 	{
@@ -1783,9 +1820,47 @@ function CacheAllies()
 
 function CacheKnownEnemies()
 {
-	CachedKnownUnitRefs.Length = 0;
+	CachedKnownUnitRefs.Length = 0; 
 	GetAllKnownEnemyStates(,CachedKnownUnitRefs);
 	CacheEnemyCover();
+	UpdateIgnoredEnemyList();
+}
+
+function UpdateIgnoredEnemyList()
+{
+	local array<StateObjectReference> EnemiesWithActionPoints;
+	local int RemainingActionPoints;
+	local StateObjectReference KnownEnemyRef;
+	IgnoredEnemiesForDefenseChecks.Length = 0;
+	// Check if any units can be ignored for those that can act during every action.
+	if( UnitState.GetMyTemplate().bCanTickEffectsEveryAction )
+	{
+		if( !`TACTICALRULES.UnitActionPlayerIsAI() ) // No ignored enemies if this happens during the AI turn.
+		{
+			RemainingActionPoints = class'Helpers'.static.GetRemainingXComActionPoints(false, EnemiesWithActionPoints);
+			if( RemainingActionPoints > 0 ) // If all enemies used their points already, ignore none.
+			{
+				foreach CachedKnownUnitRefs(KnownEnemyRef)
+				{
+					// If this unit is not in the list of units with action points, add it to the ignore list.
+					if( EnemiesWithActionPoints.Find('ObjectID', KnownEnemyRef.ObjectID) == INDEX_NONE )
+					{
+						IgnoredEnemiesForDefenseChecks.AddItem(KnownEnemyRef);
+					}
+				}
+			}
+		}
+	}
+
+	// Otherwise, units that are last-resort units can be ignored when checking if the destination is flanked.
+	foreach CachedKnownUnitRefs(KnownEnemyRef)
+	{
+		if( IgnoredEnemiesForDefenseChecks.Find('ObjectID', KnownEnemyRef.ObjectID) == INDEX_NONE 
+		   && m_kPlayer != None && !m_kPlayer.IsTargetValidBasedOnLastResortEffects(KnownEnemyRef.ObjectID) )
+		{
+			IgnoredEnemiesForDefenseChecks.AddItem(KnownEnemyRef);
+		}
+	}
 }
 
 native function CacheEnemyCover();
@@ -2091,14 +2166,21 @@ function bool BT_FindClosestPointToTarget(Name AbilityName)
 {
 	local int BestIndex;
 	local XComGameState_Unit Target;
-	local TTile Tile;
+	local TTile Tile, TargetTile;
 	BestIndex = m_arrBTBestTargetOption.Find('AbilityName', AbilityName);
 	if( BestIndex != INDEX_NONE )
 	{
 		Target = XComGameState_Unit(`XCOMHISTORY.GetGameStateForObjectID(m_arrBTBestTargetOption[BestIndex].TargetID));
 		if( Target != None )
 		{
-			Tile = m_kUnit.m_kReachableTilesCache.GetClosestReachableDestination(Target.TileLocation);
+			// Pick an occupied tile next to the target to find a path to.
+			TargetTile = class'Helpers'.static.GetClosestValidTile(Target.TileLocation);
+			if( !class'Helpers'.static.GetFurthestReachableTileOnPathToDestination(Tile, TargetTile, UnitState) )
+			{
+				`LogAIBT(" GetFurthestReachableTileOnPathToDestination failed! \n");
+				Tile = m_kUnit.m_kReachableTilesCache.GetClosestReachableDestination(TargetTile);
+			}
+
 			if( m_kUnit.m_kReachableTilesCache.IsTileReachable(Tile) )
 			{
 				m_vBTDestination = `XWORLD.GetPositionFromTileCoordinates(Tile);
@@ -3153,6 +3235,7 @@ function bool BT_SelectAoETarget(Name ProfileName)
 	local int iAbilityID;
 	local AvailableTarget AvailTargets;
 	local AoETargetingInfo Profile;
+	local TTile TileDest;
 
 	if( HasAoEAbility(iAbilityID, GetAbilityFromTargetingProfile(ProfileName, Profile)) )
 	{
@@ -3162,6 +3245,11 @@ function bool BT_SelectAoETarget(Name ProfileName)
 			m_arrTargetLocations.Length = 0;
 			SetAOETargetLocations(AvailTargets);
 			PrimedAoEAbility = iAbilityID; // Mark this ability to save top aoe target if ability is used.
+			if( Profile.bPathToTarget )
+			{
+				TileDest = `XWORLD.GetTileCoordinatesFromPosition(TopAoETarget.Location);
+				m_kUnit.m_kReachableTilesCache.BuildPathToTile(TileDest, AbilityPathTiles);
+			}
 			return true;
 		}
 	}
@@ -3223,15 +3311,17 @@ function SetAOETargetLocations(const AvailableTarget Targets)
 }
 
 // Save out list of traversals to our unit AI data state.
-// Update - due to save file constraints, this now saves BT traversals locally.  
+// Update - due to save file constraints, this now saves BT traversals locally.  Also- this is only for debug.
 function SaveBTTraversals()
 {
+`if(`notdefined(FINAL_RELEASE))
 	local int RootIndex;
 	local array<BTDetailedInfo> arrStatusList;
 
 	BT_GetNodeDetailList(arrStatusList);
 	RootIndex = `BEHAVIORTREEMGR.GetNodeIndex(m_kBehaviorTree.m_strName);
 	AddTraversalData(arrStatusList, RootIndex);
+`endif
 }
 
 function AddTraversalData(array<BTDetailedInfo> TraversalData, int RootIndex)
@@ -3958,7 +4048,37 @@ function bool BT_HandleYellowAlertMovement()
 
 function string BT_GetLastAbilityName()
 {
-	return GetAbilityName(SelectedAbility);
+	local String LastAbilityUsed;
+	local XComGameStateHistory History;
+	local XComGameStateContext_Ability Context;
+	local XComGameState_Ability AbilityState;   
+
+	// Check if we have the last ability used cached here locally.
+	if( SelectedAbility.AbilityObjectRef.ObjectID > 0 )
+	{
+		LastAbilityUsed = GetAbilityName(SelectedAbility);
+		if( LastAbilityUsed != "" )
+		{
+			return LastAbilityUsed;
+		}
+	}
+
+	// Otherwise step through history and find last enemy that used an ability.
+	History = `XCOMHISTORY;
+	foreach History.IterateContextsByClassType(class'XComGameStateContext_Ability', Context)
+	{
+		if( Context.InputContext.SourceObject.ObjectID == UnitState.ObjectID )
+		{
+			AbilityState = XComGameState_Ability(History.GetGameStateForObjectID(Context.InputContext.AbilityRef.ObjectID));
+			if( AbilityState.IsAbilityInputTriggered() )
+			{
+				return String(Context.InputContext.AbilityTemplateName);
+			}
+		}
+	}
+
+	// None found.  Return empty string.
+	return LastAbilityUsed;
 }
 
 function int BT_GetSuppressorCount()
@@ -4116,7 +4236,19 @@ function bool FindOrGetAbilityList(Name TargetName, out array<Name> AbilityNames
 	local AvailableAction kAbility;
 	local XComGameState_Ability AbilityState;
 	local Name AbilityName;
+	local int HistoryIndex;
 	History = `XCOMHISTORY;
+	HistoryIndex = History.GetCurrentHistoryIndex();
+
+	if( CachedAbilityNames.HistoryIndex == HistoryIndex )
+	{
+		AbilityNames = CachedAbilityNames.NameList;
+		if( AbilityNames.Find(TargetName) != INDEX_NONE )
+		{
+			return true;
+		}
+		return false;
+	}
 
 	foreach UnitAbilityInfo.AvailableActions(kAbility)
 	{
@@ -4128,7 +4260,14 @@ function bool FindOrGetAbilityList(Name TargetName, out array<Name> AbilityNames
 		}
 		AbilityNames.AddItem(AbilityName);
 	}
+	AddCachedAbilityNameList(AbilityNames, HistoryIndex);
 	return false;
+}
+
+function AddCachedAbilityNameList(array<Name> AbilityNames, int HistoryIndex)
+{
+	CachedAbilityNames.NameList = AbilityNames;
+	CachedAbilityNames.HistoryIndex = HistoryIndex;
 }
 
 
@@ -4151,13 +4290,13 @@ function Name GetAbilityFromTargetingProfile(Name ProfileName, optional out AoET
 	}
 	return Ability;
 }
-function TTile GetClosestTile(const out array<TTile> TileList)
+function TTile GetClosestTile(const out array<TTile> TileList, vector ClosestToPoint=GetGameStateLocation())
 {
 	local float Dist, MinDist;
 	local int ClosestIndex, i, Count;
 	local vector Position, CurrLocation;
 	local XComWorldData XWorld;
-	CurrLocation = GetGameStateLocation();
+	CurrLocation = ClosestToPoint;
 	ClosestIndex = INDEX_NONE;
 	Count = TileList.Length;
 	XWorld = `XWORLD;
@@ -4190,7 +4329,8 @@ simulated function bool FindAoETarget(Name ProfileName)
 	local XComGameState_Unit RequiredTarget; // Target required to be in the AoE area.
 	local TTile RequiredHitLocation, ClosestTarget;
 	local X2AbilityMultiTargetStyle TargetStyle;
-	local array<TTile> TargetArea;
+	local array<TTile> TargetArea, PathableTiles;
+	local int TopHitCount, EnemyHits, BadHits;
 
 	XWorld = `XWORLD;
 	// Find targeting profile with given Profile Name.
@@ -4225,11 +4365,27 @@ simulated function bool FindAoETarget(Name ProfileName)
 		// Get points to avoid. Include destructible Objective locations and teammates if friendly fire is to be avoided.
 		GetAoEAvoidancePoints(FailOnHitList, Profile); 
 
+		if( Profile.bPathToTarget )
+		{
+			m_kUnit.m_kReachableTilesCache.GetAllPathableTiles(PathableTiles);
+			if( PathableTiles.Length == 0 )
+			{
+				return false;
+			}
+		}
+
 		// Start with largest group, looking for a valid midpoint target. If none found, remove furthest from group and repeat.
 		while( TargetList.Length >= Profile.MinTargets && TargetList.Length > 0)
 		{
 			// Test the center of the target list to see if all units are within the AoE radius.
 			TargetTile = GetMidPointTile(TargetList);
+
+			// Only use pathable tiles when specified.
+			if( Profile.bPathToTarget )
+			{
+				TargetLocation = XWorld.GetPositionFromTileCoordinates(TargetTile);
+				TargetTile = GetClosestTile(PathableTiles, TargetLocation);
+			}
 
 			// Ensure we use a valid ground target location
 			if( !Profile.bDoNotTargetGround )
@@ -4247,10 +4403,14 @@ simulated function bool FindAoETarget(Name ProfileName)
 			{
 				TargetLocation = XWorld.GetPositionFromTileCoordinates(TargetTile);
 			}
+
+			TargetArea.Length = 0;
 			TargetStyle.GetValidTilesForLocation(AbilityState, TargetLocation, TargetArea);
 
-			if( GetNumIntersectingTiles(TargetList, TargetArea) == TargetList.Length
-			   && GetNumIntersectingTiles(FailOnHitList, TargetArea) == 0 )
+			EnemyHits = GetNumIntersectingTiles(TargetList, TargetArea);
+			BadHits = GetNumIntersectingTiles(FailOnHitList, TargetArea);
+			if( EnemyHits == TargetList.Length
+			   &&  BadHits == 0 )
 			{
 				TopAoETarget.Location = TargetLocation;
 				TopAoETarget.Ability = AbilityName;
@@ -4258,6 +4418,15 @@ simulated function bool FindAoETarget(Name ProfileName)
 				bFoundTarget = true;
 				`LogAIBT("Found AoE target location that hits "$TargetList.Length@"targets! ");
 				break;
+			}
+			// Keep track of other decent options, but keep looking for better ones.
+			else if( EnemyHits >= Profile.MinTargets  && BadHits == 0 && EnemyHits >= TopHitCount)
+			{
+				TopHitCount = EnemyHits;
+				TopAoETarget.Location = TargetLocation;
+				TopAoETarget.Ability = AbilityName;
+				TopAoETarget.Profile = Profile.Profile;
+				bFoundTarget = true;
 			}
 
 			// Force the required hit location to stay on the list until there's only that one left.
@@ -4694,7 +4863,7 @@ function RefreshUnitCache()
 function Init( XGUnit kUnit )
 {
 	//local float fAggroRange;
-	local name strBTRoot;
+	//local name strBTRoot;
 	m_kUnit = kUnit;
 
 	//@TODO - acheng - X-Com 2 conversion
@@ -4708,12 +4877,12 @@ function Init( XGUnit kUnit )
 
 	if (!kUnit.m_bSubsystem)
 	{
-		strBTRoot = GetBehaviorTreeRoot();
-		if (strBTRoot != '')
-		{
-			`Assert( m_kBehaviorTree == None || m_kBehaviorTree.m_eStatus != BTS_RUNNING ); // Should not be changing the behavior tree when one is currently running.
-			m_kBehaviorTree = `BEHAVIORTREEMGR.GenerateBehaviorTree(strBTRoot, UnitState.GetMyTemplate().CharacterGroupName);
-		}
+		//strBTRoot = GetBehaviorTreeRoot();
+		//if (strBTRoot != '')
+		//{
+		//	`Assert( m_kBehaviorTree == None || m_kBehaviorTree.m_eStatus != BTS_RUNNING ); // Should not be changing the behavior tree when one is currently running.
+		//	//m_kBehaviorTree = `BEHAVIORTREEMGR.GenerateBehaviorTree(strBTRoot, UnitState.GetMyTemplate().CharacterGroupName);
+		//}
 		ValidateBTWeights();
 	}
 }
@@ -5832,6 +6001,7 @@ simulated function bool MoveToPoint(vector vDestination, optional out string Fai
 	local array<TTile> Path;
 	local bool bPathFailed;
 	local TTile kTileDest;
+	local array<PathPoint> PathPoints;
 
 	bPathFailed=false;
 
@@ -5860,7 +6030,7 @@ simulated function bool MoveToPoint(vector vDestination, optional out string Fai
 		}
 	}
 
-	if (!bPathFailed)
+	if( !bPathFailed || bForcePathIfUnreachable )
 	{	
 		if (XGAIBehavior_Civilian(self) != none)
 		{
@@ -5868,6 +6038,17 @@ simulated function bool MoveToPoint(vector vDestination, optional out string Fai
 		}
 
 		m_kUnit.m_kReachableTilesCache.BuildPathToTile(kTileDest, Path);
+		if( bForcePathIfUnreachable && Path.Length < 2 )
+		{
+			bPathFailed = false;
+			class'X2PathSolver'.static.BuildPath(UnitState, UnitState.TileLocation, kTileDest, Path);
+			// get the path points
+			class'X2PathSolver'.static.GetPathPointsFromPath(UnitState, Path, PathPoints);
+			// make the flight path nice and smooth
+			class'XComPath'.static.PerformStringPulling(m_kUnit, PathPoints);
+			// Reinsert into our array.
+			class'XComPath'.static.GetPathTileArray(PathPoints, Path);
+		}
 
 		if (Path.Length < 2)
 		{
@@ -6031,7 +6212,7 @@ simulated function bool IsInBadArea( Vector vLoc, bool bDebugLog=false, optional
 		return true;
 	}
 
-	if( class'XComSpawnRestrictor'.static.IsInvalidPathLocation(vLoc) )
+	if( class'XComSpawnRestrictor'.static.IsInvalidPathLocationNative(vLoc) )
 	{
 		return true;
 	}
@@ -6363,7 +6544,7 @@ state ExecutingAI
 		sleep(0.1f);
 	}
 	RefreshUnitCache();
-	if( !UnitAbilityInfo.bAnyActionsAvailable || UnitState.IsPanicked() || !IsBehaviorTreeAvailable() )
+	if( !UnitAbilityInfo.bAnyActionsAvailable || UnitState.IsPanicked() )
 	{
 		//It should be impossible to enter this state without abilities to use, but just in case...
 		SkipTurn("from state ExecutingAI - no actions available or unit is panicked");
@@ -6988,11 +7169,15 @@ simulated function bool HasValidDestinationToward( vector vTarget, out vector vD
 	// Force stay in cover if we need to.  Find nearest cover point to our destination.
 	kTile = `XWORLD.GetTileCoordinatesFromPosition(vTarget);
 
-	kClosestTile = m_kUnit.m_kReachableTilesCache.GetClosestReachableDestination(kTile);
-	if( !m_kUnit.m_kReachableTilesCache.IsTileReachable(kClosestTile) )
+	kTile = class'Helpers'.static.GetClosestValidTile(kTile);
+	if( !class'Helpers'.static.GetFurthestReachableTileOnPathToDestination(kClosestTile, kTile, UnitState) )
 	{
-		`RedScreenOnce(`Location@"\nUnit cannot reach 'closest reachable tile' - likely unit is stuck in an unpathable location! \nUnit #"$UnitState.ObjectID @ UnitState.GetMyTemplateName()$"\n@Tile: ("$UnitState.TileLocation.X@UnitState.TileLocation.Y@UnitState.TileLocation.Z$")\n @raasland or @dburchanowski or @acheng\n\n");
-		return false;
+		kClosestTile = m_kUnit.m_kReachableTilesCache.GetClosestReachableDestination(kTile);
+		if( !m_kUnit.m_kReachableTilesCache.IsTileReachable(kClosestTile) )
+		{
+			`RedScreenOnce(`Location@"\nUnit cannot reach 'closest reachable tile' - likely unit is stuck in an unpathable location! \nUnit #"$UnitState.ObjectID @ UnitState.GetMyTemplateName()$"\n@Tile: ("$UnitState.TileLocation.X@UnitState.TileLocation.Y@UnitState.TileLocation.Z$")\n @raasland or @dburchanowski or @acheng\n\n" );
+			return false;
+		}
 	}
 	if (kClosestTile != UnitState.TileLocation)
 	{
@@ -7632,9 +7817,13 @@ state EndOfTurn
 	}
 
 Begin:
-		OnUnitEndTurn();
+
+	Sleep(0.1f);
+
+	OnUnitEndTurn();
 //		`Log("Completed OnUnitEndTurn fn. Entering state Inactive."@self@GetStateName());
-		GotoState('Inactive');
+
+	GotoState('Inactive');
 }
 //------------------------------------------------------------------------------------------------
 simulated event Tick( float fDeltaT )

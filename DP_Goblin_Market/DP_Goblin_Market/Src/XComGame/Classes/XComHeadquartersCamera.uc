@@ -60,7 +60,7 @@ protected function OnCameraInterpolationComplete()
 {
 	super.OnCameraInterpolationComplete();
 
-	if (IsInState('EarthView') || IsInState('EarthViewFocusingOnLocation'))
+	if (IsInState('EarthView'))
 	{
 		LastCameraStateOrientation.Focus = `EARTH.GetWorldViewLocation();
 		OldCameraStateOrientation.Focus = LastCameraStateOrientation.Focus;
@@ -68,10 +68,11 @@ protected function OnCameraInterpolationComplete()
 	else if (IsInState('BaseViewTransition'))
 	{
 		StartRoomView(QueuedBaseRoom, fQueuedBaseRoomInterpTime);
-		PreviousRoom = QueuedBaseRoom;
-		fQueuedBaseRoomInterpTime = 0;
-		QueuedBaseRoom = '';
 	}
+
+	PreviousRoom = QueuedBaseRoom;
+	fQueuedBaseRoomInterpTime = 0;
+	QueuedBaseRoom = '';
 }
 
 

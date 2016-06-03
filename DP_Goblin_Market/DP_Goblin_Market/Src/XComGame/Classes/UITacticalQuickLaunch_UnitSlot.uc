@@ -118,7 +118,33 @@ simulated function UITacticalQuickLaunch_UnitSlot InitSlot(optional bool bMPSlot
 
 simulated function bool CanHaveHeavyWeapon()
 {
-	return (m_nArmorTemplate != '') && X2ArmorTemplate(class'X2ItemTemplateManager'.static.GetItemTemplateManager().FindItemTemplate(m_nArmorTemplate)).bHeavyWeapon;
+	local X2SoldierClassTemplate SoldierTemplate;
+	local SCATProgression Progression;
+	local name CheckAbility;
+	local int i;
+
+	//  this has to mimic the functionality in XComGameState_Unit:HasHeavyWeapon because we have no state objects to operate on
+
+	if ((m_nArmorTemplate != '') && X2ArmorTemplate(class'X2ItemTemplateManager'.static.GetItemTemplateManager().FindItemTemplate(m_nArmorTemplate)).bHeavyWeapon)
+		return true;
+
+	if (m_nSoldierClassTemplate != '')
+	{
+		SoldierTemplate = class'X2SoldierClassTemplateManager'.static.GetSoldierClassTemplateManager().FindSoldierClassTemplate(m_nSoldierClassTemplate);
+		foreach class'X2AbilityTemplateManager'.default.AbilityUnlocksHeavyWeapon(CheckAbility)
+		{
+			Progression = SoldierTemplate.GetSCATProgressionForAbility(CheckAbility);
+			if (Progression.iRank != INDEX_NONE && Progression.iBranch != INDEX_NONE)
+			{
+				for (i = 0; i < m_arrSoldierProgression.Length; ++i)
+				{
+					if (m_arrSoldierProgression[i].iBranch == Progression.iBranch && m_arrSoldierProgression[i].iRank == Progression.iRank)
+						return true;
+				}
+			}
+		}
+	}
+	return false;
 }
 
 simulated function string GetStringFormatPoints(int points)
@@ -339,6 +365,16 @@ simulated function name PopulateItemDropdown(UIDropdown kDropdown, name nCurrent
 			if (kSoldierClassTemplate != None && kEquipmentTemplate.IsA('X2WeaponTemplate'))
 			{
 				if (!kSoldierClassTemplate.IsWeaponAllowedByClass(X2WeaponTemplate(kEquipmentTemplate)))
+				{
+					if (nCurrentEquipped == kEquipmentTemplate.DataName)
+						nCurrentEquipped = '';
+					continue;
+				}
+			}
+
+			if (kSoldierClassTemplate != None && kEquipmentTemplate.IsA('X2ArmorTemplate'))
+			{
+				if (!kSoldierClassTemplate.IsArmorAllowedByClass(X2ArmorTemplate(kEquipmentTemplate)))
 				{
 					if (nCurrentEquipped == kEquipmentTemplate.DataName)
 						nCurrentEquipped = '';
@@ -589,10 +625,10 @@ simulated function UpdateUnit(XComGameState_Unit Unit, XComGameState UseGameStat
 
 	if (Unit.IsSoldier())
 	{
-		CharacterGenerator = `XCOMGRI.Spawn(class'XGCharacterGenerator');
 		if(m_iCharacterPoolSelection > 0)
 		{
 			CharacterPoolUnit = CharacterPool.CharacterPool[m_iCharacterPoolSelection - 1];
+			CharacterGenerator = `XCOMGRI.Spawn(CharacterPoolUnit.GetMyTemplate().CharacterGeneratorClass);
 
 			//Generate a charater of the proper gender and race
 			Soldier = CharacterGenerator.CreateTSoldierFromUnit(CharacterPoolUnit, UseGameState);
@@ -603,6 +639,7 @@ simulated function UpdateUnit(XComGameState_Unit Unit, XComGameState UseGameStat
 		}
 		else
 		{            
+			CharacterGenerator = `XCOMGRI.Spawn(Unit.GetMyTemplate().CharacterGeneratorClass);
 			Soldier = CharacterGenerator.CreateTSoldierFromUnit(Unit, UseGameState);            
 		}
 		CharacterGenerator.Destroy();
@@ -651,7 +688,7 @@ simulated function UpdateUnitItems(XComGameState_Unit Unit, XComGameState GameSt
 	// Clear out old inventory
 	for (i = 0; i < RemoveItems.Length; ++i)
 	{
-		Unit.RemoveItemFromInventory(RemoveItems[i]);
+		Unit.RemoveItemFromInventory(RemoveItems[i], GameState);
 		GameState.PurgeGameStateForObjectID(RemoveItems[i].ObjectID);
 	}
 

@@ -44,6 +44,9 @@ var localized string m_sDamageRangeLabel;
 var localized string m_sEndTurnTooltip;
 var localized string m_sRevealedTooltip;
 
+var int TooltipEndTurnID;
+var int TooltipRevealID;
+
 //----------------------------------------------------------------------------
 // METHODS
 //
@@ -51,13 +54,32 @@ simulated function UITacticalHUD_ShotHUD InitShotHUD()
 {
 	InitPanel();
 
-	AddTooltip( "endTurnMC", m_sEndTurnTooltip, Class'UIUtilities'.const.ANCHOR_MIDDLE_LEFT );
-	AddTooltip( "revealedMC", m_sRevealedTooltip, Class'UIUtilities'.const.ANCHOR_MIDDLE_RIGHT );
-
+	RefreshTooltips();
 	return self;
 }
 
-simulated function AddTooltip( string childPath, string tooltipText, int newAnchor )
+function RefreshTooltips()
+{
+	//ID check is to prevent unnecessary repeated calls to the tooltip manageer 
+
+	if( TooltipEndTurnID == -1 &&  UITacticalHUD(Owner).IsMenuRaised() )
+	{
+		TooltipEndTurnID = AddTextTooltip("endTurnMC", m_sEndTurnTooltip, Class'UIUtilities'.const.ANCHOR_MIDDLE_LEFT);
+		TooltipRevealID = AddTextTooltip("revealedMC", m_sRevealedTooltip, Class'UIUtilities'.const.ANCHOR_MIDDLE_RIGHT);
+	}
+	
+	if( TooltipEndTurnID != -1 && !UITacticalHUD(Owner).IsMenuRaised() )
+	{
+		Screen.Movie.Pres.m_kTooltipMgr.RemoveTooltipByID(TooltipEndTurnID);
+		Screen.Movie.Pres.m_kTooltipMgr.RemoveTooltipByID(TooltipRevealID);
+
+		TooltipEndTurnID = -1;
+		TooltipRevealID = -1;
+	}
+}
+
+simulated function AddTooltip(string childPath, string tooltipText, int newAnchor); //DEPRECATED 
+simulated function int AddTextTooltip(string childPath, string tooltipText, int newAnchor)
 {
 	local UITextTooltip Tooltip;
 
@@ -70,6 +92,7 @@ simulated function AddTooltip( string childPath, string tooltipText, int newAnch
 	Tooltip.sBody = tooltipText;
 	Tooltip.targetPath = string(MCPath) $ "." $ childPath;
 	Tooltip.ID = Screen.Movie.Pres.m_kTooltipMgr.AddPreformedTooltip( Tooltip );
+	return Tooltip.ID; 
 }
 
 simulated function OnMouseEvent(int cmd, array<string> args)
@@ -269,6 +292,13 @@ simulated function Update()
 			HideShine();
 		}
 	}
+	RefreshTooltips();
+}
+
+simulated function LowerShotHUD()
+{
+	ResetDamageBreakdown(true);
+	RefreshTooltips();
 }
 
 simulated function ResetDamageBreakdown(optional bool RemoveOnly)
