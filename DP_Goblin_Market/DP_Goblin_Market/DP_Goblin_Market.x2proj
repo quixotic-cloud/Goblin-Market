@@ -27,10 +27,16 @@ TODO:</Description>
     <Content Include="Config\XComEngine.ini" />
     <Content Include="Config\XComGame.ini" />
     <Content Include="Localization\XComGame.int" />
+    <Content Include="Src\GoblinMarket\Classes\DP_DefaultMissionSources_TemplateExchanger.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\GoblinMarket\Classes\DP_UIBlackMarket.uc">
       <SubType>Content</SubType>
     </Content>
     <Content Include="Src\GoblinMarket\Classes\DP_UIBlackMarket_Buy.uc">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Src\GoblinMarket\Classes\DP_UIInventory_ListItem.uc">
       <SubType>Content</SubType>
     </Content>
     <Content Include="Src\GoblinMarket\Classes\DP_UIMission_Council.uc">
@@ -40,6 +46,9 @@ TODO:</Description>
       <SubType>Content</SubType>
     </Content>
     <Content Include="Src\GoblinMarket\Classes\X2DownloadableContentInfo_GoblinMarket.uc" />
+    <Content Include="Src\GoblinMarket\Classes\XComGameState_Intel.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\XComGame\Classes\AnimNotify_ApplyPsiEffectsToTarget.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_BlendIK.uc" />
     <Content Include="Src\XComGame\Classes\AnimNotify_BreakWindow.uc" />

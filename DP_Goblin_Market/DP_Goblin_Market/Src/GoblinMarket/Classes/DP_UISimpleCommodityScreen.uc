@@ -13,6 +13,8 @@ var EUIConfirmButtonStyle m_eStyle;
 var int ConfirmButtonX;
 var int ConfirmButtonY;
 
+var UIText OptionDescText;
+
 var public localized String m_strBuy;
 
 simulated function OnPurchaseClicked(UIList kList, int itemIndex)
@@ -49,6 +51,8 @@ simulated function PopulateData()
 {
 //	local Commodity Template;
 	local MissionIntelOption Template;
+	// Using this from Elad's suggestion...
+	local UIMechaListItem MyItem;
 	local int i;
 
 	List.ClearItems();
@@ -57,14 +61,19 @@ simulated function PopulateData()
 	
 	for(i = 0; i < arrIntelItems.Length; i++)
 	{
+		MyItem = none; 
 		Template = arrIntelItems[i];
 		if(i < m_arrRefs.Length)
 		{
-			Spawn(class'UIInventory_ListItem', List.itemContainer).InitInventoryListCommodity(Template, m_arrRefs[i], GetButtonString(i), m_eStyle, ConfirmButtonX, ConfirmButtonY);
+			Spawn(class'DP_UIInventory_ListItem', List.itemContainer).InitInventoryListCommodity(Template, m_arrRefs[i], GetButtonString(i), m_eStyle, ConfirmButtonX, ConfirmButtonY);
+//		MyItem=Spawn(class'UIMechaListItem', List.itemContainer).InitListItem();
+//		MyItem.UpdateDataButton(string(arrIntelItems[i].IntelRewardName), GetButtonString(i), OnPurchaseClicked);
 		}
 		else
 		{
-			Spawn(class'UIInventory_ListItem', List.itemContainer).InitInventoryListCommodity(Template, , GetButtonString(i), m_eStyle, ConfirmButtonX, ConfirmButtonY);
+			Spawn(class'DP_UIInventory_ListItem', List.itemContainer).InitInventoryListCommodity(Template, , GetButtonString(i), m_eStyle, ConfirmButtonX, ConfirmButtonY);
+//		MyItem=Spawn(class'UIMechaListItem', List.itemContainer).InitListItem();
+//		MyItem.UpdateDataButton("NOTHING HERE MOVE ALONG", GetButtonString(i), OnPurchaseClicked);
 		}
 	}
 
@@ -90,9 +99,13 @@ simulated function SelectIntelItem(UIList ContainerList, int ItemIndex)
 	local MissionIntelOption SelectedOption;
 	local X2HackRewardTemplateManager HackRewardTemplateManager;
 	local X2HackRewardTemplate OptionTemplate;
+	local XComGameState_MissionSite MissionState;
 	
 	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
-	SelectedOption = GetMission().IntelOptions[ItemIndex];
+	//SelectedOption = GetMission().IntelOptions[ItemIndex];
+	//MissionState = XComGameState_MissionSite(XCOMHISTORY.GetGameStateForObjectID(MissionRef.ObjectID));
+	//SelectedOption = MissionState.IntelOptions[ItemIndex];
+	SelectedOption = XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(UIMission(Screen).MissionRef.ObjectID)).IntelOptions[ItemIndex];
 	OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(SelectedOption.IntelRewardName);
 
 	OptionDescText.SetText(OptionTemplate.GetDescription(none));
@@ -247,17 +260,19 @@ simulated function int GetIntelCost(MissionIntelOption IntelOption)
 //}
 
 // Not seeing where this is called in the code, so commenting out due to type Commodity
-//simulated function bool MeetsItemReqs(int ItemIndex)
-//{
-//	if( ItemIndex > -1 && ItemIndex < arrItems.Length )
-//	{
+// This is called in DP_UIInventory_ListItem. Not sure what it's checking against though
+simulated function bool MeetsItemReqs(int ItemIndex)
+{
+	if( ItemIndex > -1 && ItemIndex < arrIntelItems.Length )
+	{
 //		return XComHQ.MeetsCommodityRequirements(arrItems[ItemIndex]);
-//	}
-//	else
-//	{
-//		return false;
-//	}
-//}
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
 
 simulated function bool IsItemPurchased(int ItemIndex)
 {

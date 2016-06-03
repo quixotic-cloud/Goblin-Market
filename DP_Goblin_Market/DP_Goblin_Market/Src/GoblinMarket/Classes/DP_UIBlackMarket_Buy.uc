@@ -34,18 +34,18 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 //Iterator uses to populate the UI (where is this iterated?)
 // We want to get almost all rewards for Goblin Market
 // TODO: Perhaps filter out some rewards based on mission type or being too OP
-simulated function SelectIntelItem(UIList ContainerList, int ItemIndex)
-{
-	local MissionIntelOption SelectedOption;
-	local X2HackRewardTemplateManager HackRewardTemplateManager;
-	local X2HackRewardTemplate OptionTemplate;
+//simulated function SelectIntelItem(UIList ContainerList, int ItemIndex)
+//{
+//	local MissionIntelOption SelectedOption;
+//	local X2HackRewardTemplateManager HackRewardTemplateManager;
+//	local X2HackRewardTemplate OptionTemplate;
 	
-	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
-	SelectedOption = GetMission().IntelOptions[ItemIndex];
-	OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(SelectedOption.IntelRewardName);
+//	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
+//	SelectedOption = GetMission().IntelOptions[ItemIndex];
+//	OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(SelectedOption.IntelRewardName);
 
-	OptionDescText.SetText(OptionTemplate.GetDescription(none));
-}
+//	OptionDescText.SetText(OptionTemplate.GetDescription(none));
+//}
 
 //-------------- EVENT HANDLING --------------------------------------------------------
 
@@ -61,10 +61,11 @@ simulated function OnPurchaseClicked(UIList kList, int itemIndex)
 	{
 		PlaySFX("StrategyUI_Purchase_Item");
 		// Use all lines of code here except for this one..
-		GetMarket().BuyBlackMarketItem(arrItems[iSelectedItem].RewardRef);
-		();
+//		GetMarket().BuyBlackMarketItem(arrItems[iSelectedItem].RewardRef);
+		GetItems();
 		// Spawns inventory item for parent class. Replace with intel population for list
 		PopulateData();
+
 	}
 	else
 	{
@@ -93,7 +94,8 @@ simulated function String GetButtonString(int ItemIndex)
 // Not sure if this gets the bought intel options, or ones available to purchase for the mission
 simulated function array<MissionIntelOption> GetMissionIntelOptions()
 {
-	return GetMission().IntelOptions;
+//	return GetMission().IntelOptions;
+	return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(UIMission(Screen).MissionRef.ObjectID)).IntelOptions;
 }
 
 //Sends the bought items to game to make changes. Will be replaced by IntelOptions mission code
@@ -102,13 +104,13 @@ simulated function GetItems()
 //	local XComGameState NewGameState;
 //	local XComGameState_BlackMarket BlackMarketState;
 
-	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Update Tech Rushes");
-	BlackMarketState = XComGameState_BlackMarket(NewGameState.CreateStateObject(class'XComGameState_BlackMarket', GetMarket().ObjectID));
-	NewGameState.AddStateObject(BlackMarketState);
-	BlackMarketState.UpdateTechRushItems(NewGameState);
-	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
+//	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Update Tech Rushes");
+//	BlackMarketState = XComGameState_BlackMarket(NewGameState.CreateStateObject(class'XComGameState_BlackMarket', GetMarket().ObjectID));
+//	NewGameState.AddStateObject(BlackMarketState);
+//	BlackMarketState.UpdateTechRushItems(NewGameState);
+//	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
 
-	XComHQ = class'UIUtilities_Strategy'.static.GetXComHQ();
+//	XComHQ = class'UIUtilities_Strategy'.static.GetXComHQ();
 
 	// Repopulates Items from available list. Need to rewrite logic for Intel...
 	// Checkbox system doesn't remove already bought intel items...
@@ -140,8 +142,10 @@ simulated function BuyIntelOptions()
 	}
 
 	// Save the purchased options
-	MissionState = GetMission();
-	MissionState = XComGameState_MissionSite(NewGameState.CreateStateObject(class'XComGameState_MissionSite', MissionState.ObjectID));
+	MissionState = XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(UIMission(Screen).MissionRef.ObjectID));
+//	MissionState = GetMission();
+//	MissionState = XComGameState_MissionSite(NewGameState.CreateStateObject(class'XComGameState_MissionSite', MissionState.ObjectID));
+	MissionState = XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(UIMission(Screen).MissionRef.ObjectID));
 	NewGameState.AddStateObject(MissionState);
 	MissionState.PurchasedIntelOptions = SelectedOptions;
 
