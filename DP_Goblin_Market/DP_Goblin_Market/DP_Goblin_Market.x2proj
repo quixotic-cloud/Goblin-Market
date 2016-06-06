@@ -48,6 +48,9 @@ TODO:</Description>
     <Content Include="Src\GoblinMarket\Classes\DP_UISimpleCommodityScreen.uc">
       <SubType>Content</SubType>
     </Content>
+    <Content Include="Src\GoblinMarket\Classes\UIItemCard_HackingRewards.uc">
+      <SubType>Content</SubType>
+    </Content>
     <Content Include="Src\GoblinMarket\Classes\X2DownloadableContentInfo_GoblinMarket.uc" />
     <Content Include="Src\GoblinMarket\Classes\XComGameState_Intel.uc">
       <SubType>Content</SubType>

@@ -139,30 +139,49 @@ simulated function int GetItemIndex(MissionIntelOption Item)
 //		return "";
 //	}
 //}
+simulated function X2HackRewardTemplate GetItemTemplate(int ItemIndex)
+{
+	local X2HackRewardTemplateManager HackRewardTemplateManager;
+	local X2HackRewardTemplate OptionTemplate;
+	
+	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
+	OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(arrIntelItems[ItemIndex].IntelRewardName);
+	return OptionTemplate;
+}
+simulated function String GetItemImage(int ItemIndex)
+{
+	local X2HackRewardTemplateManager HackRewardTemplateManager;
+	local X2HackRewardTemplate OptionTemplate;
+	
+	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
+	OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(arrIntelItems[ItemIndex].IntelRewardName);
 
-//simulated function String GetItemImage(int ItemIndex)
-//{
-//	if( ItemIndex > -1 && ItemIndex < arrItems.Length )
-//	{
-//		return arrItems[ItemIndex].Image;
-//	}
-//	else
-//	{
-//		return "";
-//	}
-//}
+	if( ItemIndex > -1 && ItemIndex < arrIntelItems.Length )
+	{
+		return OptionTemplate.RewardImagePath;
+	}
+	else
+	{
+		return "";
+	}
+}
 
-//simulated function String GetItemCostString(int ItemIndex)
-//{
-//	if( ItemIndex > -1 && ItemIndex < arrItems.Length )
-//	{
-//		return class'UIUtilities_Strategy'.static.GetStrategyCostString(arrItems[ItemIndex].Cost, arrItems[ItemIndex].CostScalars);
-//	}
-//	else
-//	{
-//		return "";
-//	}
-//}
+simulated function String GetItemCostString(int ItemIndex)
+{
+	local X2HackRewardTemplateManager HackRewardTemplateManager;
+	local X2HackRewardTemplate OptionTemplate;
+	
+	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
+	OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(arrIntelItems[ItemIndex].IntelRewardName);
+	if( ItemIndex > -1 && ItemIndex < arrIntelItems.Length )
+	{
+		return ""$int(((OptionTemplate.MaxIntelCost+OptionTemplate.MinHackSuccess)/2.0f)) ;
+	}
+	else
+	{
+		return "";
+	}
+}
 
 //simulated function String GetItemReqString(int ItemIndex)
 //{
@@ -188,17 +207,23 @@ simulated function int GetItemIndex(MissionIntelOption Item)
 //	}
 //}
 
-//simulated function String GetItemDescString(int ItemIndex)
-//{
-//	if( ItemIndex > -1 && ItemIndex < arrItems.Length )
-//	{
-//		return arrItems[ItemIndex].Desc;
-//	}
-//	else
-//	{
-//		return "";
-//	}
-//}
+simulated function String GetItemDescString(int ItemIndex)
+{
+	local X2HackRewardTemplateManager HackRewardTemplateManager;
+	local X2HackRewardTemplate OptionTemplate;
+	
+	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
+	OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(arrIntelItems[ItemIndex].IntelRewardName);
+
+	if( ItemIndex > -1 && ItemIndex < arrIntelItems.Length )
+	{
+		return OptionTemplate.GetDescription(none);
+	}
+	else
+	{
+		return "";
+	}
+}
 
 simulated function bool NeedsAttention(int ItemIndex)
 {

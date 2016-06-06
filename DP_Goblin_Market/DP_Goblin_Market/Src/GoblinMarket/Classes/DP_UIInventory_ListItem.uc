@@ -28,7 +28,6 @@ simulated function UIInventory_ListItem InitInventoryListItem(X2ItemTemplate Ini
 	Quantity = InitQuantity;
 	ItemRef = InitItemRef;
 	ConfirmButtonStyle = InitConfirmButtonStyle;
-
 	InitListItem();
 
 	SetConfirmButtonStyle(ConfirmButtonStyle, Confirm, InitRightCol, InitHeight,, OnDoubleclickConfirmButton);
@@ -187,6 +186,10 @@ simulated function UpdateQuantity(int NewQuantity)
 simulated function PopulateData(optional bool bRealizeDisabled)
 {
 	local string ItemQuantity; 
+	local X2HackRewardTemplateManager HackRewardTemplateManager;
+	local X2HackRewardTemplate OptionTemplate;
+
+	HackRewardTemplateManager = class'X2HackRewardTemplateManager'.static.GetHackRewardTemplateManager();
 	
 	if(Quantity > 0)
 		ItemQuantity = GetColoredText(string(Quantity));
@@ -209,7 +212,8 @@ simulated function PopulateData(optional bool bRealizeDisabled)
 	}
 	else
 	{
-		MC.QueueString(GetColoredText(string(ItemIntel.IntelRewardName)));
+		OptionTemplate = HackRewardTemplateManager.FindHackRewardTemplate(ItemIntel.IntelRewardName);
+		MC.QueueString(GetColoredText(OptionTemplate.GetFriendlyName()));
 		ItemQuantity = GetColoredText("");
 	}
 	

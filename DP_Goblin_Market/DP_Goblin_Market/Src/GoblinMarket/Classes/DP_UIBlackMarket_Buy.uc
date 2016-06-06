@@ -11,6 +11,7 @@ var UIList List;
 var UIText OptionDescText;
 var UIText TotalIntelText;
 
+var UIItemCard_HackingRewards HackingRewardCard;
 var array<MissionIntelOption> SelectedOptions;
 
 //----------------------------------------------------------------------------
@@ -19,9 +20,22 @@ var array<MissionIntelOption> SelectedOptions;
 //Creates the Screen/UI. From original BM_Buy class
 simulated function InitScreen(XComPlayerController InitController, UIMovie InitMovie, optional name InitName)
 {
+	local array<UIPanel> ItemCards;
+	local UIPanel Card;
 	m_strTitle = ""; //Clear the header out intentionally. 	
 	super.InitScreen(InitController, InitMovie, InitName);
 	SetBlackMarketLayout();
+	ItemCard.PopulateData(" "," "," ","");
+	ItemCard.SetAlpha(0.001f);
+	ItemCard.SetVisible(false);
+	ListContainer.RemoveChild(ItemCard);
+	HackingRewardCard=UIItemCard_HackingRewards(Spawn(class'UIItemCard_HackingRewards', ListContainer).InitItemCard('HackingItemCard'));
+	HackingRewardCard.SetPosition(635,0);
+	HackingRewardCard.Show();
+	HackingRewardCard.PopulateHackingItemCard();
+	HackingRewardCard.SetAlpha(1);
+	HackingRewardCard.PopulateHackingItemCard(self.GetItemTemplate(0));
+	HackingRewardCard.Show();
 
 	MC.BeginFunctionOp("SetGreeble");
 	MC.QueueString(class'UIAlert'.default.m_strBlackMarketFooterLeft);
@@ -74,6 +88,18 @@ simulated function OnPurchaseClicked(UIList kList, int itemIndex)
 	XComHQPresentationLayer(Movie.Pres).m_kAvengerHUD.UpdateResources();
 }
 
+simulated function SelectedItemChanged(UIList ContainerList, int ItemIndex)
+{
+	local array<UIPanel> ItemCards;
+	local UIPanel Card;
+	
+	super.SelectedItemChanged(ContainerList,ItemIndex);
+	//TitleHeader.SetText(self.GetItemDescString(ItemIndex));
+	`log(self.GetItemDescString(ItemIndex),true,'Team Dragonpunk Goblin Market');
+	ListContainer.RemoveChild(ItemCard);
+	HackingRewardCard.Show();
+	HackingRewardCard.PopulateHackingItemCard(self.GetItemTemplate(ItemIndex));
+}
 //-------------- GAME DATA HOOKUP --------------------------------------------------------
 
 //Repurpose this to get Hacker reward template and state
