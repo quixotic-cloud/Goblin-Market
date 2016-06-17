@@ -24,7 +24,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 
 	super.InitScreen(InitController, InitMovie, InitName);
 	BuildScreen();
-
+	self.SetAlpha(1);
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Trigger Event: On Black Market Open");
 	`XEVENTMGR.TriggerEvent('OnBlackMarketOpen', , , NewGameState);
 	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);
@@ -113,23 +113,19 @@ simulated function OnBuyClicked(UIButton button)
 // If you change this title, then you'll need to create a new button delegate
 simulated function OnSellClicked(UIButton button)
 {
-//	`HQPRES.UIBlackMarketSell();
+	local DP_UIMission_Council MyScreen;
     CloseScreen();
+	MyScreen=DP_UIMission_Council(`ScreenStack.GetFirstInstanceOf(class'UIMission'));
+	if(MyScreen!=none)
+	{
+		MyScreen.ExposeOLC(button);
+	}
+	self.Removed();
 }
 
 // Override for custom cleanup logic// TODO: Move custom logic to UIMission for use in all 7 mission types...simulated function OnRemoved()
 {
-	local DP_UIMission_Council MyScreen;
-	local UIButton MyButton;
-	
-	MyScreen=DP_UIMission_Council(`ScreenStack.GetFirstInstanceOf(class'UIMission'));
-	if(MyScreen!=none)
-	{
-		MyScreen.ExposeOLC(MyButton);
-//		MyScreen.OnLaunchClicked(MyButton);
-	}
-	
-//	XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(UIMission(Screen).MissionRef.ObjectID)).ConfirmSelection;
+	super.OnRemoved();
 }
 
 //-------------- GAME DATA HOOKUP --------------------------------------------------------

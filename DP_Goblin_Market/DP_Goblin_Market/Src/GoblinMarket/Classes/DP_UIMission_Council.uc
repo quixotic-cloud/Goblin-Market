@@ -77,16 +77,16 @@ simulated function BuildOptionsPanel()
 simulated public function OnLaunchClicked(UIButton button)
 {
 	local DP_UIBlackMarket kScreen;
-		kScreen = Screen.Spawn(class'DP_UIBlackMarket', Screen);
-		`ScreenStack.Push(kScreen);
-        `log("-------------DOING MY MISSION SCREEN-----------------",true,'Team Dragonpunk Goblin Market');
-//		super.OnLaunchClicked(button);
+	//isuper.OnLaunchClicked(button);
+	kScreen = Screen.Spawn(class'DP_UIBlackMarket', Screen);
+	`ScreenStack.Push(kScreen);
+    `log("-------------DOING MY MISSION SCREEN-----------------",true,'Team Dragonpunk Goblin Market');
 
 }
 
 simulated public function ExposeOLC(UIButton Button)
 {
-   super.OnLaunchClicked(Button);
+    super.OnLaunchClicked(Button);
 }
 
 //-------------- GAME DATA HOOKUP --------------------------------------------------------

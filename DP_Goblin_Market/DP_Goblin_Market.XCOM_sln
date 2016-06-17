@@ -3,15 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # XCOM ModBuddy Solution File, Format Version 11.00
 VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{5DAE07AF-E217-45C1-8DE7-FF99D6011E8A}") = "DP_Goblin_Market", "DP_Goblin_Market\DP_Goblin_Market.x2proj", "{C1DF0074-B8D8-45F6-8939-EB57677F04C5}"
+Project("{5DAE07AF-E217-45C1-8DE7-FF99D6011E8A}") = "DP_Goblin_Market", "DP_Goblin_Market\DP_Goblin_Market.x2proj", "{E37FEBF9-BC29-441D-BFBF-1419EE843E5B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Default|XCOM 2 = Default|XCOM 2
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C1DF0074-B8D8-45F6-8939-EB57677F04C5}.Default|XCOM 2.ActiveCfg = Default|XCOM 2
-		{C1DF0074-B8D8-45F6-8939-EB57677F04C5}.Default|XCOM 2.Build.0 = Default|XCOM 2
+		{E37FEBF9-BC29-441D-BFBF-1419EE843E5B}.Default|XCOM 2.ActiveCfg = Default|XCOM 2
+		{E37FEBF9-BC29-441D-BFBF-1419EE843E5B}.Default|XCOM 2.Build.0 = Default|XCOM 2
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
