@@ -11,6 +11,8 @@ var UIList List;
 var UIText OptionDescText;
 var UIText TotalIntelText;
 
+var UILargeButton ExitButton;
+
 var UIItemCard_HackingRewards HackingRewardCard;
 var array<MissionIntelOption> SelectedOptions;
 
@@ -36,15 +38,43 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	HackingRewardCard.SetAlpha(1);
 	HackingRewardCard.PopulateHackingItemCard(self.GetItemTemplate(0));
 	HackingRewardCard.Show();
-
+	ExitButton = Spawn(class'UILargeButton', self);
+	ExitButton.bAnimateOnInit = false;
+	ExitButton.InitLargeButton('ExitButton',"SQUAD" , "SELECT", OnStartMissionClicked);
+	ExitButton.AnchorBottomRight();
 	MC.BeginFunctionOp("SetGreeble");
 	MC.QueueString(class'UIAlert'.default.m_strBlackMarketFooterLeft);
 	MC.QueueString(class'UIAlert'.default.m_strBlackMarketFooterRight);
 //	MC.QueueString(class'UIAlert'.default.m_strBlackMarketLogoString);
 	MC.QueueString("GOBLIN MARKET");
 	MC.EndOp();
+	GetItems();
+}
+simulated function OnStartMissionClicked(UIButton button)
+{
+	local DP_UIMission_Council MyScreen;
+	MyScreen=DP_UIMission_Council(`ScreenStack.GetFirstInstanceOf(class'UIMission'));
+	`SCREENSTACK.Pop(self);
+	`SCREENSTACK.PopFirstInstanceOfClass(Class'DP_UIBlackMarket');
+	//CloseScreen();
+	`XSTRATEGYSOUNDMGR.PlaySoundEvent("Black_Market_Ambience_Loop_Stop");
+	if(MyScreen!=none)
+	{
+		MyScreen.ExposeOLC(button);
+	}
+	self.OnRemoved();
 }
 
+	
+simulated function CloseScreen()
+{
+	`XSTRATEGYSOUNDMGR.PlaySoundEvent("Black_Market_Ambience_Loop_Stop");
+	super.CloseScreen();
+}
+simulated function OnRemoved()
+{
+	super.OnRemoved();
+}
 //Iterator uses to populate the UI (where is this iterated?)
 // We want to get almost all rewards for Goblin Market
 // TODO: Perhaps filter out some rewards based on mission type or being too OP
@@ -121,9 +151,16 @@ simulated function String GetButtonString(int ItemIndex)
 simulated function array<MissionIntelOption> GetMissionIntelOptions()
 {
 //	return GetMission().IntelOptions;
-  	local UIMission Screen;                                 
+  	local UIMission Screen,Screen2; 
+                            
 	Screen=UIMission(`SCREENSTACK.GetFirstInstanceOf(Class'UIMission'));
-	return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(Screen.MissionRef.ObjectID)).IntelOptions;
+	Screen2=UIMission(movie.Stack.GetFirstInstanceOf(Class'UIMission'));
+	if(Screen!=none)
+		return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(Screen.MissionRef.ObjectID)).IntelOptions;
+	else if(Screen2!=none)
+		return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(Screen2.MissionRef.ObjectID)).IntelOptions;
+	else if(`XComHQ.MissionRef.ObjectID>0)
+		return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(`XComHQ.MissionRef.ObjectID)).IntelOptions;
 }
 
 //Sends the bought items to game to make changes. Will be replaced by IntelOptions mission code
@@ -144,6 +181,7 @@ simulated function GetItems()
 	// Checkbox system doesn't remove already bought intel items...
 	// TODO: This is where we need to populate the list with unpurchased hacker rewards
 //	arrItems = GetMarket().GetForSaleList();
+	arrIntelItems.Length=0;
 	arrIntelItems = GetMissionIntelOptions();
 }
 
