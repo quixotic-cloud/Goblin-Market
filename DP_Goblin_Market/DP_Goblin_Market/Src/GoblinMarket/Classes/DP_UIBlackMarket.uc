@@ -25,6 +25,7 @@ simulated function InitScreen(XComPlayerController InitController, UIMovie InitM
 	super.InitScreen(InitController, InitMovie, InitName);
 	BuildScreen();
 	self.SetAlpha(1);
+	//class'DP_DefaultMissionSources_TemplateExchanger'.static.CreateTemplates();
 	NewGameState = class'XComGameStateContext_ChangeContainer'.static.CreateChangeState("Trigger Event: On Black Market Open");
 	`XEVENTMGR.TriggerEvent('OnBlackMarketOpen', , , NewGameState);
 	`XCOMGAME.GameRuleset.SubmitGameState(NewGameState);

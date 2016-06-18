@@ -156,11 +156,10 @@ simulated function array<MissionIntelOption> GetMissionIntelOptions()
 	Screen=UIMission(`SCREENSTACK.GetFirstInstanceOf(Class'UIMission'));
 	Screen2=UIMission(movie.Stack.GetFirstInstanceOf(Class'UIMission'));
 	if(Screen!=none)
-		return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(Screen.MissionRef.ObjectID)).IntelOptions;
+		return Screen.GetMission().IntelOptions;
 	else if(Screen2!=none)
-		return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(Screen2.MissionRef.ObjectID)).IntelOptions;
-	else if(`XComHQ.MissionRef.ObjectID>0)
-		return XComGameState_MissionSite(`XCOMHISTORY.GetGameStateForObjectID(`XComHQ.MissionRef.ObjectID)).IntelOptions;
+		return Screen2.GetMission().IntelOptions;
+
 }
 
 //Sends the bought items to game to make changes. Will be replaced by IntelOptions mission code
@@ -181,7 +180,6 @@ simulated function GetItems()
 	// Checkbox system doesn't remove already bought intel items...
 	// TODO: This is where we need to populate the list with unpurchased hacker rewards
 //	arrItems = GetMarket().GetForSaleList();
-	arrIntelItems.Length=0;
 	arrIntelItems = GetMissionIntelOptions();
 }
 
