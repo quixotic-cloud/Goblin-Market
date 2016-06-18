@@ -2,6 +2,7 @@
                            
 class UIItemCard_HackingRewards extends UIItemCard;
 
+
 simulated function PopulateHackingItemCard(optional X2HackRewardTemplate ItemTemplate, optional StateObjectReference ItemRef)
 {
 	local string strDesc, strRequirement, strTitle;
@@ -16,13 +17,15 @@ simulated function PopulateHackingItemCard(optional X2HackRewardTemplate ItemTem
 
 	strTitle = class'UIUtilities_Text'.static.GetColoredText(class'UIUtilities_Text'.static.CapsCheckForGermanScharfesS(ItemTemplate.GetFriendlyName()), eUIState_Header, 24);
 	strDesc = class'UIUtilities_Text'.static.GetColoredText(ItemTemplate.GetDescription(none), eUIState_Normal, 24);//Description and requirements strings are reversed for item cards, desc appears at the very bottom of the card so not needed here
-	strRequirement = "";
+	strRequirement = class'UIUtilities_Text'.static.GetColoredText(ItemTemplate.GetDescription(none), eUIState_Normal, 24);//Description and requirements strings are reversed for item cards, desc appears at the very bottom of the card so not needed here
 	if(	ItemTemplate==none)
 	{
 		strTitle="Welcom to the Goblin Market";
 		strDesc="Welcom to the Goblin Market";
+		strRequirement="Welcom to the Goblin Market";
 	}
-	PopulateData(strTitle, strDesc, strRequirement, "");
+	PopulateData(strTitle,"", strDesc, "");
+
 	SetHackingItemImages(ItemTemplate, ItemRef);
 	SetHackingItemCost(ItemTemplate, ItemRef);
 }
@@ -40,5 +43,7 @@ simulated function SetHackingItemCost(optional X2HackRewardTemplate ItemTemplate
 	MC.BeginFunctionOp("PopulateCostData");
 	MC.QueueString(m_strCostLabel);
 	MC.QueueString(StrCost);
+	MC.QueueString("");
+	MC.QueueString("");
 	MC.EndOp();
 }
